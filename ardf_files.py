@@ -1,3 +1,5 @@
+import h5py
+
 #==========================================
 #ARDF conversion
 def debug_print(dstr):

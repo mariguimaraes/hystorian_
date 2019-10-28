@@ -1,4 +1,5 @@
 from igor import binarywave
+import h5py
 
 #==========================================
 #IBW conversion
@@ -27,22 +28,38 @@ def ibw2hdf5(filename):
     try:
         tmpdata = binarywave.load(filename)['wave']
         note = tmpdata['note']
+        label_list = correct_label(tmpdata['labels'])
 
-        label_list = filename.split('.')[-1]
+        fastsize = float(str(note).split('FastScanSize:')[-1].split('\\r')[0])
+        slowsize = float(str(note).split('SlowScanSize:')[-1].split('\\r')[0])
+        xoffset = float(str(note).split('XOffset:')[-1].split('\\r')[0])
+        yoffset = float(str(note).split('YOffset:')[-1].split('\\r')[0])
+
 
         with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-            file_type = get_type(filename)
-            f.create_dataset("type", data=file_type)
+            f.create_dataset("type", data=filename.split('.')[-1])
             f.create_dataset("metadata", data=tmpdata['note'])
-            f.create_dataset("channels/name", data=label_list)
 
-            sizes = []
+            datagrp = f.create_group("datas")
             for i, k in enumerate(label_list):
-                sizes.append(tmpdata['wData'][:,:,i].shape)
+                datagrp.create_dataset(k, data=tmpdata['wData'][:,:,i])
 
-            f.create_dataset("channelsdata/pxs", data=sizes)
-            f.create_dataset("data", data=tmpdata['wData'])
+                datagrp[label_list[i]].attrs['name'] = k.decode('utf8')
+                datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:,:,i].shape
+                datagrp[label_list[i]].attrs['size'] = (fastsize,slowsize)
+                datagrp[label_list[i]].attrs['offset'] = (xoffset,yoffset)
+                if "Phase" in str(k):
+                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
+                elif "Amplitude" in str(k):
+                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'V')
+                elif "Height" in str(k):
+                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'm')
+                else:
+                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'unknown')
+
+
+            #f.create_dataset("channelsdata/pxs", data=sizes)
+
         print('file successfully converted')
     except:
-        print('error in the ibw->hdf5 conversion')
-        
+        print('Conversion from .ibw to .hdf5 failed.')
