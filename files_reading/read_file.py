@@ -1,6 +1,6 @@
-import ibw_files
-import xrdml_files
-import ardf_files
+from . import ibw_files
+from . import xrdml_files
+from . import ardf_files
 
 def tohdf5(filename):
     if filename.split('.')[-1] == 'ibw':
