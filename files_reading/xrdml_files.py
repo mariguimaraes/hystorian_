@@ -36,6 +36,8 @@ def xrdml2hdf5(filename):
             
             metadatagrp = f.create_group("metadata")
             metadatagrp.create_dataset(filename.split('.')[0], data=contents)
+            
+            f.create_group("process")
 
             datagrp = f.create_group("datasets/"+filename.split('.')[0])
             datagrp.create_dataset("counts", data=cnts)

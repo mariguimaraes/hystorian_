@@ -31,7 +31,7 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
         metadatagrp = f.create_group('metadata')
         datagrp = f.create_group('datasets')
         procgrp = f.create_group('process')   
-        print(f.keys())
+        #print(f.keys())
 
     for filename in filelist:
         if filename.split('.')[0] == combined_name:
@@ -53,7 +53,7 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                     print('Warning: \''+filename+'\' is a non-hdf5 file, but the list containt a hdf5 file with the same name. File has been ignored.')
                     continue
         with h5py.File(combined_name +'.hdf5', 'a') as f:
-            print(f.keys())
+            #print(f.keys())
             typegrp = f['type']
             metadatagrp = f['metadata']
             datagrp = f['datasets']
@@ -73,7 +73,7 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                 i = i + 1
         
         print('\''+filename+'\' successfully merged')
-        print(erase_file)    
+        #print(erase_file)    
         if erase_file == 'all':
             print('Erasing the file')
             os.remove(filename)
