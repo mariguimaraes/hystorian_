@@ -27,11 +27,15 @@ def merge_hdf5(filelist, combined_name):
                 print('Warning: \''+filename+'\' already exists. File has been ignored and will be overwritten.')
             else:
                 with h5py.File(filename, 'r') as source_f:
-                    source_f.copy('type/'+filename.split('.')[0], typegrp)
-                    source_f.copy('metadata/'+filename.split('.')[0], metadatagrp)
-                    source_f.copy('datasets/'+filename.split('.')[0], datagrp)
+                    for source_type in source_f['type']:
+                        source_f.copy('type/'+source_type, typegrp)
+                    for source_metadata in source_f['metadata']:
+                        source_f.copy('metadata/'+source_metadata, metadatagrp)
+                    for source_data in source_f['datasets']:
+                        source_f.copy('datasets/'+source_data, datagrp)
                     try:
-                        source_f.copy('process/'+filename.split('.')[0], procgrp)
+                        for source_proc in source_f['process']:
+                            source_f.copy('process/'+source_proc, procgrp)
                     except:
                         pass
                     i = i + 1
