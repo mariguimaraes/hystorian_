@@ -21,7 +21,7 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
     i = 0
     temporary = False
     if erase_file == 'all':
-        print('CAUTION YOU RISK ERASING SOME RAW DATA FILES, ARE YOU SURE ? Due to the way python erase file, they will NOT be in the recycle bin. Please write "yes, I am sure!" if you want to take that risk')
+        print('CAUTION YOU RISK ERASING SOME RAW DATA FILES, ARE YOU SURE ? Due to the way python erase file, they will NOT be in the recycle bin. Please write "Yes, I am sure!" if you want to take that risk')
         tmp_val = input()
         if tmp_val != 'Yes, I am sure!':
               return 
