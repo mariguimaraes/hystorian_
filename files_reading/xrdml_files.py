@@ -31,19 +31,19 @@ def xrdml2hdf5(filename):
 
 
         with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-            file_type = filename.split('.')[-1]
-            f.create_dataset("type", data=file_type)
-            f.create_dataset("metadata", data=contents)
+            typegrp = f.create_group("type")
+            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+            
+            metadatagrp = f.create_group("metadata")
+            metadatagrp.create_dataset(filename.split('.')[0], data=contents)
 
-            datagrp = f.create_group("datas")
+            datagrp = f.create_group("datasets/"+filename.split('.')[0])
             datagrp.create_dataset("counts", data=cnts)
             datagrp['counts'].attrs['name'] = 'counts'
             datagrp['counts'].attrs['shape'] = len(cnts)
             datagrp['counts'].attrs['size'] = 0
             datagrp['counts'].attrs['offset'] = 0
             datagrp['counts'].attrs['unit'] = 'au'
-
-
 
             for i,k in enumerate(params):
                 if len(params[k].split()) == 1:
