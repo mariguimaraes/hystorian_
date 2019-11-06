@@ -29,12 +29,18 @@ def save_image(filename, scalebar=False, size=(10,10), labelsize=25, std_range=3
                 plt.tick_params(labelsize=labelsize)
                 if 'Phase' in k:
                     colorm = 'inferno'
-                    offsetdata = data[k] + np.min(data[k])
+                    if np.min(data[k]) < 0:
+                        offsetdata = data[k] + np.min(data[k])
+                    else:
+                        offsetdata = data[k] - np.min(data[k])
                     v_min = -180
                     v_max = 180
                 else:
                     colorm = 'afmhot'
-                    offsetdata = data[k] - np.min(data[k])
+                    if np.min(data[k]) < 0:
+                        offsetdata = data[k] + np.min(data[k])
+                    else:
+                        offsetdata = data[k] - np.min(data[k])
                     mean_val = np.mean(data[k])
                     std_val = np.std(data[k])
                     v_min = mean_val - std_range*std_val
