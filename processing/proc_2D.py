@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib_scalebar.scalebar import ScaleBar
 from . import proc_tools as pt
+import cv2
 
 #FUNCTION save_image 
 #INPUTS:
@@ -72,4 +73,134 @@ def save_image(filename, scalebar=False, size=(10,10), labelsize=25, std_range=3
                     plt.close()
     return
 
+#FUNCTION distortion_params_
+## determine cumulative translation matrices for distortion correction.
+#INPUTS:
+## filename: name of hdf5 file containing data
+## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
+## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for correction based on topography in data from Asylum AFM.
+## selection_depth: determines what level at which to look at a selection. Default allows for correction based on topography in data from Asylum AFM.
+#OUTPUTS:
+## null
 
+def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace', selection_depth = 2):
+    path_lists = pt.initialise_process(filename, 'distortion_params', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
+    fineCheck = False
+    tform21 = np.eye(2,3,dtype=np.float32)
+    cumulative_tform21 = np.eye(2,3,dtype=np.float32)
+    with h5py.File(filename, "a") as f:
+        for i in range(len(path_lists)):
+            if i == 0:
+                pass
+            else:
+                img1 = img2cv((f[path_lists[i-1][0]]))
+                img2 = img2cv((f[path_lists[i][0]]))
+                tform21 = generate_transform_xy(img1, img2, tform21, fineCheck)
+                cumulative_tform21[0,2]=cumulative_tform21[0,2]+tform21[0,2]
+                cumulative_tform21[1,2]=cumulative_tform21[1,2]+tform21[1,2]
+                print('Scan '+str(i)+' Complete. Cumulative Transform Matrix:')
+                print(cumulative_tform21)
+            pt.generic_write(f, cumulative_tform21, path_lists[i])
+        
+
+#FUNCTION img2cv
+## Converts img (numpy array, or hdf5 dataset) into cv2
+#INPUTS:
+## img1: currently used image
+## sigma_cutoff: ???
+#OUTPUTS:
+## converted image into cv2 valid format
+
+def img2cv(img1, sigma_cutoff=10):
+    #img1 = np.diff(img1)
+    img1 = img1-np.min(img1)
+    img1 = img1/np.max(img1)
+    tmp1 = sigma_cutoff*np.std(img1)
+    img1[img1>tmp1] = tmp1
+    return img1
+
+
+#FUNCTION generate_transform_array
+## Determines transformation matrixes in x and y
+## Slow and primitive: needs updating
+#INPUTS:
+## img: currently used image (in cv2 format) to find transformation array of
+## img_orig: image (in cv2 format) to find transformation array is based off of
+## tfinit: ???
+## fineCheck: Initially used to force an "initial guess"
+#OUTPUTS:
+## Transformation images used to convert img_orig into img
+
+def generate_transform_xy(img, img_orig, tfinit=None, fineCheck = False):
+    # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
+    # findTransformECC (OpenCV 3.0+ only).
+    # Returns the transform matrix of the img with respect to img_orig
+    warp_mode = cv2.MOTION_TRANSLATION
+    if tfinit is not None:
+        warp_matrix = tfinit
+    else:
+        warp_matrix = np.eye(2,3,dtype=np.float32)
+    number_of_iterations = 100000
+    termination_eps = 1e-1#e-5
+    term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
+
+    criteria = (term_flags, number_of_iterations, termination_eps)
+
+    if fineCheck == False:
+        try:
+            diff = np.Inf
+            for i in range(-5,4):
+                for j in range(-5,4):
+                    warp_matrix[0,2] = 2*i
+                    warp_matrix[1,2] = 2*j
+                    try:
+                        (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
+                        img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
+                        currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
+                        if currDiff < diff:
+                            diff = currDiff
+                            offset1 = tform21[0,2]
+                            offset2 = tform21[1,2]
+                    except:
+                        pass
+                    warp_matrix[0,2] = offset1
+                    warp_matrix[1,2] = offset2
+        except:
+            diff = np.Inf
+            for i in range(-11,10):
+                for j in range(-11, 10):
+                    warp_matrix[0,2] = 2*i
+                    warp_matrix[1,2] = 2*j
+                    try:
+                        (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
+                        img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
+                        currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
+                        if currDiff < diff:
+                            diff = currDiff
+                            offset1 = tform21[0,2]
+                            offset2 = tform21[1,2]
+                    except:
+                        pass
+                    warp_matrix[0,2] = offset1
+                    warp_matrix[1,2] = offset2
+                
+    else:
+        diff = np.Inf
+        for i in range(-60,-55):
+            for j in range(-15, 15):
+                warp_matrix[0,2] = 2*i
+                warp_matrix[1,2] = 2*j
+                try:
+                    (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
+                    img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
+                    currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
+                    if currDiff < diff:
+                        diff = currDiff
+                        offset1 = tform21[0,2]
+                        offset2 = tform21[1,2]
+                except:
+                    pass
+                warp_matrix[0,2] = offset1
+                warp_matrix[1,2] = offset2            
+        
+    return warp_matrix
