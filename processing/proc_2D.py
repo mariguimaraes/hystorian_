@@ -10,6 +10,8 @@ import os
 #INPUTS:
 ## filename : The hdf5 file containing the data you want to convert into png
 ## data_folder (default : 'datasets'): Choose the folder that needs to be saved, by default the raw datas are used
+## selection (default : None): determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
+## selection_depth (default: 0): determines what level at which to look at a selection.
 ## scalebar (default: False): Add a scalebar to the image, requires three attributes : 
 ##                                                 shape, which define the pixel size of the image
 ##                                                 size, which gives the phyiscal dimension of the image
@@ -20,8 +22,10 @@ import os
 ## saving_path (default: '') : The path to the folder where to save the image
 ## verbose (default: False) : if True, print a line each time a image is saved.
 ## Output : N png images, where N is the number of datas channels in the hdf5 file.
+## TO DO: Allow for autocalculation of size params
 
-def save_image(filename, data_folder='datasets', scalebar=False, size=(10,10), labelsize=25, std_range=3, saving_path='', verbose=False): 
+
+def save_image(filename,data_folder='datasets', selection=None, selection_depth=0, scalebar=False, colorbar = True, size=(10,10), labelsize=25, std_range=3, saving_path='', verbose=False): 
     erase = False
     std_range = float(std_range)
     if filename.split('.')[-1] != 'hdf5':
@@ -32,59 +36,63 @@ def save_image(filename, data_folder='datasets', scalebar=False, size=(10,10), l
         except:
             print("File extension is not hdf5 and it was not possible to convert it, please convert it before using this function")
             return
+    path_list = pt.initialise_process(filename, None, data_folder=data_folder, selection=selection, selection_depth=selection_depth)
     with h5py.File(filename, "r") as f:
-        data_folder = f[data_folder]
-
-        for k_folder in data_folder.keys():
-
-            data = data_folder[k_folder]
-
-            for k in data.keys():
-                plt.figure(figsize=size)
-                plt.tick_params(labelsize=labelsize)
-                print(k)
-                if 'Phase' in k:
-                    colorm = 'inferno'
-                    offsetdata = data[k] - np.min(data[k])
-                    print(np.min(offsetdata))
-                    v_min = 0
-                    v_max = 180
-                    pos = plt.imshow(offsetdata)#, vmin=v_min, vmax=v_max, cmap=colorm)
+        for path in path_list:
+            image_name = path.rsplit('/')[-1]
+            plt.figure(figsize=size)
+            plt.tick_params(labelsize=labelsize)
+            print(image_name)
+            if 'Phase' in image_name:
+                colorm = 'inferno'
+                offsetdata = f[path] - np.min(f[path])
+                print(np.min(offsetdata))
+                v_min = 0
+                v_max = 180
+                pos = plt.imshow(offsetdata, cmap = colorm)#, vmin=v_min, vmax=v_max, cmap=colorm)
+            if 'Amplitude' in image_name:
+                colorm = 'binary'
+                offsetdata = f[path] - np.min(f[path])
+                print(np.min(offsetdata))
+                v_min = 0
+                v_max = 180
+                pos = plt.imshow(-offsetdata, cmap=colorm)#, vmin=v_min, vmax=v_max, cmap=colorm)
+            else:
+                colorm = 'afmhot'
+                offsetdata = f[path] - np.min(f[path])
+                print(np.min(offsetdata))
+                if std_range == "full":
+                    pos = plt.imshow(offsetdata, cmap=colorm)
                 else:
-                    colorm = 'afmhot'
-                    offsetdata = data[k] - np.min(data[k])
-                    print(np.min(offsetdata))
-                    if std_range == "full":
+                    try:
+                        mean_val = np.mean(offsetdata)
+                        std_val = np.std(offsetdata)
+                        v_min = 0
+                        v_max = mean_val + std_range*std_val
+                        print(v_max)
+                        pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
+                    except:
+                        print("error in the min, max for the image, whole range is used.")
                         pos = plt.imshow(offsetdata, cmap=colorm)
-                    else:
-                        try:
-                            mean_val = np.mean(offsetdata)
-                            std_val = np.std(offsetdata)
-                            v_min = 0
-                            v_max = mean_val + std_range*std_val
-                            print(v_max)
-                            pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
-                        except:
-                            print("error in the min, max for the image, whole range is used.")
-                            pos = plt.imshow(offsetdata, cmap=colorm)
+            if colorbar == True:
                 cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
                 cbar.ax.tick_params(labelsize=25) 
-                plt.tight_layout()
-                #plt.ylim(plt.ylim()[::-1])
-                plt.axis('off')
-                if scalebar:
-                    try:
-                        phys_size = data[k].attrs['size'][0]
-                        px = data[k].attrs['shape'][0]
-                        scalebar = ScaleBar(phys_size/px, data[k].attrs['unit'][0], location='lower right', font_properties={'size':25})
-                        plt.gca().add_artist(scalebar)
-                    except:
-                        print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
+            plt.tight_layout()
+            #plt.ylim(plt.ylim()[::-1])
+            plt.axis('off')
+            if scalebar:
+                try:
+                    phys_size = data[k].attrs['size'][0]
+                    px = data[k].attrs['shape'][0]
+                    scalebar = ScaleBar(phys_size/px, f[path].attrs['unit'][0], location='lower right', font_properties={'size':25})
+                    plt.gca().add_artist(scalebar)
+                except:
+                    print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
 
-                plt.savefig(saving_path+str(data).split('/')[-1].split('\"')[0]+'_'+str(k)+'.png')
-                if verbose:
-                    print(filename.split('.')[0]+'_'+str(k)+'.png saved.')
-                plt.close()
+            plt.savefig(saving_path+path.rsplit('/')[-2]+'_'+str(image_name)+'.png')
+            if verbose:
+                print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
+            plt.close()
     if erase:
         import os
         os.remove(filename)
@@ -222,3 +230,47 @@ def generate_transform_xy(img, img_orig, tfinit=None, fineCheck = False):
                 warp_matrix[1,2] = offset2            
         
     return warp_matrix
+
+
+def distortion_correction_(filename, data_folder, selection, selection_depth, dm_data_folder, dm_selection, dm_selection_depth, cropping = True)
+    dm_path_lists = pt.initialise_process(filename, None, data_folder=dm_data_folder, selection=dm_selection, selection_depth=dm_selection_depth)
+    distortion_matrices = []
+    with h5py.File(filename, "a") as f:
+        for path in dm_path_lists[:]:
+            distortion_matrices.append(np.copy(f[path]))
+        xoffsets = []
+        yoffsets = []
+        for matrix in distortion_matrices:
+            xoffsets.append(np.array(matrix[0,2]))
+            yoffsets.append(np.array(matrix[1,2]))
+    offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
+
+    path_lists = pt.initialise_process(filename, 'distortion_correction', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
+    if len(path_lists)%len(dm_path_lists):
+        print('Error: Images to be corrected are not a multiple of the amount of distortion matrices')
+        return
+
+    number_of_images_for_each_matrix = len(path_lists)//len(dm_path_lists)
+    with h5py.File(filename, "a") as f:
+        j = -1
+        for i in range(len(path_lists)):
+            if i%number_of_images_for_each_matrix == 0:
+                j = j+1
+            orig_image = f[path_lists[i][0]]
+            cropped_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+            pt.generic_write(f, cropped_image, path_lists[i], 'source (distortion params)', dm_path_lists[j], 'distortion_params', distortion_matrices[j])
+# Make option to not crop
+
+
+def array_cropped(array, xoffset, yoffset, offset_caps):
+    if offset_caps != [0,0,0,0]:
+        left = int(np.ceil(offset_caps[0])-np.floor(xoffset))
+        right = int(np.floor(offset_caps[1])-np.floor(xoffset))
+        top = int(np.ceil(offset_caps[2])-np.floor(yoffset))
+        bottom = int(np.floor(offset_caps[3])-np.floor(yoffset))
+        if right == 0:
+            right = np.shape(array)[1]
+        if bottom == 0:
+            bottom = np.shape(array)[0]
+        array = array[top:bottom, left:right]
+    return array

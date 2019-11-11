@@ -16,7 +16,7 @@ from . import proc_tools as pt
 def negative_(filename, data_folder='datasets', selection = None, selection_depth = 0):
     # Trivial sample function to show how to use proc_tools
     # Processes an array determine negatives of all values
-    path_lists = pt.initialise_process(filename, 'negative')
+    path_lists = pt.initialise_process(filename, 'negative', data_folder = data_folder, selection = selection, selection_depth = selection_depth)
     with h5py.File(filename, "a") as f:
         for path in path_lists[:]:
             neg = -np.array(f[path[0]])
