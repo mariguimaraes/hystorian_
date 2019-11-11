@@ -4,10 +4,12 @@ import numpy as np
 from matplotlib_scalebar.scalebar import ScaleBar
 from . import proc_tools as pt
 import cv2
+import os
 
 #FUNCTION save_image 
 #INPUTS:
 ## filename : The hdf5 file containing the data you want to convert into png
+## data_folder (default : 'datasets'): Choose the folder that needs to be saved, by default the raw datas are used
 ## scalebar (default: False): Add a scalebar to the image, requires three attributes : 
 ##                                                 shape, which define the pixel size of the image
 ##                                                 size, which gives the phyiscal dimension of the image
@@ -19,58 +21,74 @@ import cv2
 ## verbose (default: False) : if True, print a line each time a image is saved.
 ## Output : N png images, where N is the number of datas channels in the hdf5 file.
 
-def save_image(filename, scalebar=False, size=(10,10), labelsize=25, std_range=3, saving_path='', verbose=False): 
+def save_image(filename, data_folder='datasets', scalebar=False, size=(10,10), labelsize=25, std_range=3, saving_path='', verbose=False): 
+    erase = False
+    std_range = float(std_range)
     if filename.split('.')[-1] != 'hdf5':
-        print("File extension is not hdf5, please convert it before using this function")
-    else:
-        with h5py.File(filename, "r") as f:
-            data_folder = f['datasets']
-            
-            for k_folder in data_folder.keys():
-            
-                data = data_folder[k_folder]
+        try:
+            read_file.tohdf5(filename)
+            filename = filename.split('.')[0] + '.hdf5'
+            erase = True
+        except:
+            print("File extension is not hdf5 and it was not possible to convert it, please convert it before using this function")
+            return
+    with h5py.File(filename, "r") as f:
+        data_folder = f[data_folder]
 
-                for k in data.keys():
-                    plt.figure(figsize=size)
-                    plt.tick_params(labelsize=labelsize)
-                    if 'Phase' in k:
-                        colorm = 'inferno'
-                        offsetdata = data[k] - np.min(data[k])
-                        v_min = -180
-                        v_max = 180
-                    else:
-                        colorm = 'afmhot'
-                        offsetdata = data[k] - np.min(data[k])
-                        mean_val = np.mean(data[k])
-                        std_val = np.std(data[k])
-                        v_min = mean_val - std_range*std_val
-                        v_max = mean_val + std_range*std_val
+        for k_folder in data_folder.keys():
+
+            data = data_folder[k_folder]
+
+            for k in data.keys():
+                plt.figure(figsize=size)
+                plt.tick_params(labelsize=labelsize)
+                print(k)
+                if 'Phase' in k:
+                    colorm = 'inferno'
+                    offsetdata = data[k] - np.min(data[k])
+                    print(np.min(offsetdata))
+                    v_min = 0
+                    v_max = 180
+                    pos = plt.imshow(offsetdata)#, vmin=v_min, vmax=v_max, cmap=colorm)
+                else:
+                    colorm = 'afmhot'
+                    offsetdata = data[k] - np.min(data[k])
+                    print(np.min(offsetdata))
                     if std_range == "full":
                         pos = plt.imshow(offsetdata, cmap=colorm)
                     else:
                         try:
+                            mean_val = np.mean(offsetdata)
+                            std_val = np.std(offsetdata)
+                            v_min = 0
+                            v_max = mean_val + std_range*std_val
+                            print(v_max)
                             pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
                         except:
                             print("error in the min, max for the image, whole range is used.")
                             pos = plt.imshow(offsetdata, cmap=colorm)
-                    cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
-                    cbar.ax.tick_params(labelsize=25) 
-                    plt.tight_layout()
-                    #plt.ylim(plt.ylim()[::-1])
-                    plt.axis('off')
-                    if scalebar:
-                        try:
-                            phys_size = data[k].attrs['size'][0]
-                            px = data[k].attrs['shape'][0]
-                            scalebar = ScaleBar(phys_size/px, data[k].attrs['unit'][0], location='lower right', font_properties={'size':25})
-                            plt.gca().add_artist(scalebar)
-                        except:
-                            print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
+                cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
+                cbar.ax.tick_params(labelsize=25) 
+                plt.tight_layout()
+                #plt.ylim(plt.ylim()[::-1])
+                plt.axis('off')
+                if scalebar:
+                    try:
+                        phys_size = data[k].attrs['size'][0]
+                        px = data[k].attrs['shape'][0]
+                        scalebar = ScaleBar(phys_size/px, data[k].attrs['unit'][0], location='lower right', font_properties={'size':25})
+                        plt.gca().add_artist(scalebar)
+                    except:
+                        print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
 
-                    plt.savefig(saving_path+str(data).split('/')[-1].split('\"')[0]+'_'+str(k)+'.png')
-                    if verbose:
-                        print(filename.split('.')[0]+'_'+str(k)+'.png saved.')
-                    plt.close()
+                plt.savefig(saving_path+str(data).split('/')[-1].split('\"')[0]+'_'+str(k)+'.png')
+                if verbose:
+                    print(filename.split('.')[0]+'_'+str(k)+'.png saved.')
+                plt.close()
+    if erase:
+        import os
+        os.remove(filename)
+        erase = False
     return
 
 #FUNCTION distortion_params_
