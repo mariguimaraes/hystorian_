@@ -16,7 +16,7 @@ import os
 ##                                                 shape, which define the pixel size of the image
 ##                                                 size, which gives the phyiscal dimension of the image
 ##                                                 unit, which give the physical unit of size
-## size (default: (10,10)) : Dimension of the saved image
+## size (default: None : Dimension of the saved image. If none, the image is set to have one pixel per data point at 100 dpi
 ## labelsize (default: 25) : Size of the text in pxs
 ## std_range (default: 3) : Range around the mean for the colorscale, alternatively the value can be "full", to take the full range.
 ## saving_path (default: '') : The path to the folder where to save the image
@@ -25,7 +25,7 @@ import os
 ## TO DO: Allow for autocalculation of size params
 
 
-def save_image(filename,data_folder='datasets', selection=None, selection_depth=0, scalebar=False, colorbar = True, size=(10,10), labelsize=25, std_range=3, saving_path='', verbose=False): 
+def save_image(filename,data_folder='datasets', selection=None, selection_depth=0, scalebar=False, colorbar = True, size=None, labelsize=25, std_range=3, saving_path='', verbose=False): 
     erase = False
     std_range = float(std_range)
     if filename.split('.')[-1] != 'hdf5':
@@ -40,56 +40,61 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
     with h5py.File(filename, "r") as f:
         for path in path_list:
             image_name = path.rsplit('/')[-1]
-            plt.figure(figsize=size)
+            if size is None:
+                fig = plt.figure(frameon=False, figsize=(np.array(np.shape(f[path]))/100)[::-1], dpi=100)
+            else:
+                fig = plt.figure(figsize=size)
+            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            fig.add_axes(ax)
             plt.tick_params(labelsize=labelsize)
-            print(image_name)
+            #print(image_name)
             if 'Phase' in image_name:
                 colorm = 'inferno'
-                offsetdata = f[path] - np.min(f[path])
-                print(np.min(offsetdata))
+                offsetdata = f[path] - np.nanmin(f[path])
+                #print(np.min(offsetdata))
                 v_min = 0
                 v_max = 180
-                pos = plt.imshow(offsetdata, cmap = colorm)#, vmin=v_min, vmax=v_max, cmap=colorm)
+                pos = ax.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
             if 'Amplitude' in image_name:
-                colorm = 'binary'
-                offsetdata = f[path] - np.min(f[path])
-                print(np.min(offsetdata))
+                colorm = 'binary_r'
+                offsetdata = f[path] - np.nanmin(f[path])
+                #print(np.min(offsetdata))
+                mean_val = np.nanmean(offsetdata)
+                std_val = np.nanstd(offsetdata)
                 v_min = 0
-                v_max = 180
-                pos = plt.imshow(-offsetdata, cmap=colorm)#, vmin=v_min, vmax=v_max, cmap=colorm)
+                v_max = mean_val + std_range*std_val
+                pos = ax.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
             else:
                 colorm = 'afmhot'
-                offsetdata = f[path] - np.min(f[path])
-                print(np.min(offsetdata))
+                offsetdata = f[path] - np.nanmin(f[path])
+                #print(np.min(offsetdata))
                 if std_range == "full":
-                    pos = plt.imshow(offsetdata, cmap=colorm)
+                    pos = ax.imshow(offsetdata, cmap=colorm)
                 else:
                     try:
-                        mean_val = np.mean(offsetdata)
-                        std_val = np.std(offsetdata)
+                        mean_val = np.nanmean(offsetdata)
+                        std_val = np.nanstd(offsetdata)
                         v_min = 0
                         v_max = mean_val + std_range*std_val
-                        print(v_max)
-                        pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
+                        #print(v_max)
+                        pos = ax.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
                     except:
                         print("error in the min, max for the image, whole range is used.")
-                        pos = plt.imshow(offsetdata, cmap=colorm)
+                        pos = ax.imshow(offsetdata, cmap=colorm)
             if colorbar == True:
                 cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
                 cbar.ax.tick_params(labelsize=25) 
-            plt.tight_layout()
-            #plt.ylim(plt.ylim()[::-1])
-            plt.axis('off')
             if scalebar:
                 try:
-                    phys_size = data[k].attrs['size'][0]
-                    px = data[k].attrs['shape'][0]
+                    phys_size = f[path].attrs['size'][0]
+                    px = f[path].attrs['shape'][0]
                     scalebar = ScaleBar(phys_size/px, f[path].attrs['unit'][0], location='lower right', font_properties={'size':25})
-                    plt.gca().add_artist(scalebar)
+                    fig.add_artist(scalebar)
                 except:
                     print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
 
-            plt.savefig(saving_path+path.rsplit('/')[-2]+'_'+str(image_name)+'.png')
+            fig.savefig(saving_path+path.rsplit('/')[-2]+'_'+str(image_name)+'.png')
             if verbose:
                 print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
             plt.close()
@@ -232,7 +237,20 @@ def generate_transform_xy(img, img_orig, tfinit=None, fineCheck = False):
     return warp_matrix
 
 
-def distortion_correction_(filename, data_folder, selection, selection_depth, dm_data_folder, dm_selection, dm_selection_depth, cropping = True)
+#FUNCTION distortion_correction_
+## applies distortion correction params to an image
+#INPUTS:
+## filename: name of hdf5 file containing data
+## data_folder: folder searched for image inputs. eg. 'datasets', or 'process/negative'
+## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for correction based on topography in data from Asylum AFM.
+## selection_depth: determines what level at which to look at a selection. Default allows for correction based on topography in data from Asylum AFM.
+## dm_data_folder: folder searched for distortion matrix inputs. eg. 'datasets', or 'process/negative'
+## dm_selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for extraction if distortion parameters were the first processing funciton applied.
+## dm_selection_depth: determines what level at which to look at a selection. Default allows for extraction if distortion parameters were the first processing funciton applied.
+#OUTPUTS:
+## null
+
+def distortion_correction_(filename, data_folder='datasets', selection=None, selection_depth=0, dm_data_folder = 'process/1-distortion_params', dm_selection=None, dm_selection_depth=0, cropping = True):
     dm_path_lists = pt.initialise_process(filename, None, data_folder=dm_data_folder, selection=dm_selection, selection_depth=dm_selection_depth)
     distortion_matrices = []
     with h5py.File(filename, "a") as f:
@@ -257,10 +275,22 @@ def distortion_correction_(filename, data_folder, selection, selection_depth, dm
             if i%number_of_images_for_each_matrix == 0:
                 j = j+1
             orig_image = f[path_lists[i][0]]
-            cropped_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
-            pt.generic_write(f, cropped_image, path_lists[i], 'source (distortion params)', dm_path_lists[j], 'distortion_params', distortion_matrices[j])
-# Make option to not crop
+            if cropping == True:
+                final_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+            else:
+                final_image = array_expanded(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+            pt.generic_write(f, final_image, path_lists[i], 'source (distortion params)', dm_path_lists[j], 'distortion_params', distortion_matrices[j])
 
+            
+#FUNCTION array_cropped
+## crops a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set, to include only valid data shared by all arrays
+#INPUTS:
+## array: the array to be cropped
+## xoffset: the xoffset of the array
+## yoffset: the yoffset of the array
+## offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset minimum, yoffset maximum, and yoffset minimum fo all arrays
+#OUTPUTS:
+## the cropped array
 
 def array_cropped(array, xoffset, yoffset, offset_caps):
     if offset_caps != [0,0,0,0]:
@@ -272,5 +302,28 @@ def array_cropped(array, xoffset, yoffset, offset_caps):
             right = np.shape(array)[1]
         if bottom == 0:
             bottom = np.shape(array)[0]
-        array = array[top:bottom, left:right]
-    return array
+        cropped_array = array[top:bottom, left:right]
+    return cropped_array
+
+
+#FUNCTION array_expanded
+## expands a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set, to include all points of each array. Empty data is set to be NaN
+#INPUTS:
+## array: the array to be expanded
+## xoffset: the xoffset of the array
+## yoffset: the yoffset of the array
+## offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset minimum, yoffset maximum, and yoffset minimum fo all arrays
+#OUTPUTS:
+## the expanded
+
+def array_expanded(array, xoffset, yoffset, offset_caps):
+    height = int(np.shape(array)[0]+np.ceil(offset_caps[2])-np.floor(offset_caps[3]))
+    length = int(np.shape(array)[1]+np.ceil(offset_caps[0])-np.floor(offset_caps[1]))
+    expanded_array = np.empty([height, length])
+    expanded_array[:] = np.nan
+    left = int(-np.floor(offset_caps[1])+xoffset)
+    right = int(length-np.ceil(offset_caps[0])+xoffset)
+    top = int(-np.floor(offset_caps[3])+yoffset)
+    bottom= int(height-np.ceil(offset_caps[2])+yoffset)
+    expanded_array[top:bottom, left:right] = array
+    return expanded_array
