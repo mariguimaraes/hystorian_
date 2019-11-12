@@ -35,8 +35,8 @@ def ibw2hdf5(filename):
 
         fastsize = float(str(note).split('FastScanSize:')[-1].split('\\r')[0])
         slowsize = float(str(note).split('SlowScanSize:')[-1].split('\\r')[0])
-        xoffset = float(str(note).split('XOffset:')[-1].split('\\r')[0])
-        yoffset = float(str(note).split('YOffset:')[-1].split('\\r')[0])
+        xoffset = float(str(note).split('XOffset:')[1].split('\\r')[0])
+        yoffset = float(str(note).split('YOffset:')[1].split('\\r')[0])
 
         with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
             typegrp = f.create_group("type")

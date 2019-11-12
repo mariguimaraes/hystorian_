@@ -111,29 +111,94 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
 ## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
 ## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for correction based on topography in data from Asylum AFM.
 ## selection_depth: determines what level at which to look at a selection. Default allows for correction based on topography in data from Asylum AFM.
+## speed: determines speed and accuracy of function. An integer between 1 and 3, a higher number if faster (but needs less distortion to work)
 #OUTPUTS:
 ## null
 
-def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace', selection_depth = 2):
+def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace', selection_depth = 2, speed = 2):
     path_lists = pt.initialise_process(filename, 'distortion_params', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
-    fineCheck = False
     tform21 = np.eye(2,3,dtype=np.float32)
     cumulative_tform21 = np.eye(2,3,dtype=np.float32)
     with h5py.File(filename, "a") as f:
+        recent_offsets=[]
         for i in range(len(path_lists)):
             if i == 0:
                 pass
             else:
                 img1 = img2cv((f[path_lists[i-1][0]]))
                 img2 = img2cv((f[path_lists[i][0]]))
-                tform21 = generate_transform_xy(img1, img2, tform21, fineCheck)
+                
+                # try estimate offset change from attribs of img1 and img2
+                try:
+                    offset2 = (f[path_lists[i][0]]).attrs['offset']
+                    offset1 = (f[path_lists[i-1][0]]).attrs['offset']
+                    scan_size = (f[path_lists[i][0]]).attrs['size']
+                    shape = (f[path_lists[i][0]]).attrs['shape']
+                    offset_px = m2px(offset2-offset1, shape, scan_size)
+                except:
+                    offset_px = [0,0]
+                
+                if speed != 1 and speed != 2 and speed != 3 and speed != 4:
+                    print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest). Speed now set to level 2.')
+                    speed = 2                
+                if len(recent_offsets) == 0:
+                    offset_guess = offset_px
+                    if speed == 1:
+                        warp_check_range = 16
+                    elif speed == 2:
+                        warp_check_range = 12
+                    elif speed == 3:
+                        warp_check_range = 10
+                    elif speed == 4:
+                        warp_check_range = 8
+                elif len(recent_offsets) < 3:
+                    offset_guess = offset_px + recent_offsets[-1]
+                    if speed == 1:
+                        warp_check_range = 12
+                    elif speed == 2:
+                        warp_check_range = 8
+                    elif speed == 3:
+                        warp_check_range = 8
+                    elif speed == 4:
+                        warp_check_range = 6
+                else:
+                    offset_guess = offset_px + recent_offsets[2]/2 + recent_offsets[1]/3 + recent_offsets[0]/6
+                    if speed == 1:
+                        warp_check_range = 8
+                    elif speed == 2:
+                        warp_check_range = 6
+                    elif speed == 3:
+                        warp_check_range = 4
+                    elif speed == 4:
+                        warp_check_range = 2
+
+                tform21 = generate_transform_xy(img1, img2, tform21, offset_guess, warp_check_range)
                 cumulative_tform21[0,2]=cumulative_tform21[0,2]+tform21[0,2]
                 cumulative_tform21[1,2]=cumulative_tform21[1,2]+tform21[1,2]
                 print('Scan '+str(i)+' Complete. Cumulative Transform Matrix:')
                 print(cumulative_tform21)
+                
+                recent_offsets.append([tform21[0,2], tform21[1,2]]-offset_px)
+                if len(recent_offsets)>3:
+                    recent_offsets = recent_offsets[1:]
+                    
             pt.generic_write(f, cumulative_tform21, path_lists[i])
         
 
+#FUNCTION m2px
+## Converts length in metres to a length in pixels
+#INPUTS:
+## m: length in metres to be converted
+## points: number of lines or points per row
+## scan_size: total length of scan
+#OUTPUTS:
+## converted length in pixels
+        
+def m2px (m, points, scan_size):
+    px = m*points/scan_size
+    return px
+        
+        
 #FUNCTION img2cv
 ## Converts img (numpy array, or hdf5 dataset) into cv2
 #INPUTS:
@@ -157,12 +222,13 @@ def img2cv(img1, sigma_cutoff=10):
 #INPUTS:
 ## img: currently used image (in cv2 format) to find transformation array of
 ## img_orig: image (in cv2 format) to find transformation array is based off of
-## tfinit: ???
-## fineCheck: Initially used to force an "initial guess"
+## tfinit: base array passed into function
+## offset_guess: Initial estimate of distortion, in pixels
+## warp_check_range: total distance (in pixels) examined. Number of iterations = (warp_check_range+1)**2
 #OUTPUTS:
 ## Transformation images used to convert img_orig into img
 
-def generate_transform_xy(img, img_orig, tfinit=None, fineCheck = False):
+def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp_check_range=10):
     # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
@@ -177,65 +243,24 @@ def generate_transform_xy(img, img_orig, tfinit=None, fineCheck = False):
 
     criteria = (term_flags, number_of_iterations, termination_eps)
 
-    if fineCheck == False:
-        try:
-            diff = np.Inf
-            for i in range(-5,4):
-                for j in range(-5,4):
-                    warp_matrix[0,2] = 2*i
-                    warp_matrix[1,2] = 2*j
-                    try:
-                        (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
-                        img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
-                        currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
-                        if currDiff < diff:
-                            diff = currDiff
-                            offset1 = tform21[0,2]
-                            offset2 = tform21[1,2]
-                    except:
-                        pass
-                    warp_matrix[0,2] = offset1
-                    warp_matrix[1,2] = offset2
-        except:
-            diff = np.Inf
-            for i in range(-11,10):
-                for j in range(-11, 10):
-                    warp_matrix[0,2] = 2*i
-                    warp_matrix[1,2] = 2*j
-                    try:
-                        (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
-                        img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
-                        currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
-                        if currDiff < diff:
-                            diff = currDiff
-                            offset1 = tform21[0,2]
-                            offset2 = tform21[1,2]
-                    except:
-                        pass
-                    warp_matrix[0,2] = offset1
-                    warp_matrix[1,2] = offset2
-                
-    else:
-        diff = np.Inf
-        for i in range(-60,-55):
-            for j in range(-15, 15):
-                warp_matrix[0,2] = 2*i
-                warp_matrix[1,2] = 2*j
-                try:
-                    (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
-                    img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
-                    currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
-                    if currDiff < diff:
-                        diff = currDiff
-                        offset1 = tform21[0,2]
-                        offset2 = tform21[1,2]
-                except:
-                    pass
-                warp_matrix[0,2] = offset1
-                warp_matrix[1,2] = offset2            
-        
+    diff = np.Inf
+    for i in range(-warp_check_range//2,(warp_check_range//2)+1):
+        for j in range(-warp_check_range//2,(warp_check_range//2)+1):
+            warp_matrix[0,2] = 2*i + offset_guess[0]
+            warp_matrix[1,2] = 2*j + offset_guess[1]
+            try:
+                (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
+                img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
+                currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
+                if currDiff < diff:
+                    diff = currDiff
+                    offset1 = tform21[0,2]
+                    offset2 = tform21[1,2]
+            except:
+                pass
+            warp_matrix[0,2] = offset1
+            warp_matrix[1,2] = offset2
     return warp_matrix
-
 
 #FUNCTION distortion_correction_
 ## applies distortion correction params to an image
@@ -303,6 +328,8 @@ def array_cropped(array, xoffset, yoffset, offset_caps):
         if bottom == 0:
             bottom = np.shape(array)[0]
         cropped_array = array[top:bottom, left:right]
+    else:
+        cropped_array = array
     return cropped_array
 
 
