@@ -422,21 +422,20 @@ def ardf2hdf5(filename):
                 x_size = volm_vdef[3]
                 z_size  = vdat_data[0][6]-vdat_data[0][5]
                 numchans = len(label_list)
-                data_matrix = np.ndarray(shape=(y_size, x_size, z_size))
-                    
+                data_matrix = np.ndarray(shape=(numchans, y_size, x_size, z_size))
+                for vd in vdat_data:
+                    try:
+                        ypos = vd[1]
+                        xpos = vd[2]
+                        chanindex = vd[4]
+                        data = vd[9][vd[5]:vd[6]]
+                        data_matrix[chanindex, ypos, xpos, :] = data[:]
+                    except:
+                        pass
+                  
                 for i, k in enumerate(label_list): 
-                    data_matrix[:] = np.nan
-                    for vd in vdat_data:
-                        try:
-                            ypos = vd[1]
-                            xpos = vd[2]
-                            chanindex = vd[4]
-                            data = vd[9][vd[5]:vd[6]]
-                            data_matrix[ypos, xpos, :] = data[:]
-                        except:
-                            pass
                         
-                    datagrp.create_dataset(k, data=data_matrix)
+                    datagrp.create_dataset(k, data=data_matrix[i,:,:,:])
                     try:
                         datagrp[k].attrs['unit'] = data_channels_units[i].decode('utf-8').replace('\x00','')
                     except:
