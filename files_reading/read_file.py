@@ -12,7 +12,7 @@ def tohdf5(filename):
             ibw_files.ibw2hdf5(filename)
         elif filename.split('.')[-1] == 'xrdml':
             xrdml_files.xrdml2hdf5(filename)
-        elif filename.split('.')[-1] == 'ardf':
+        elif filename.split('.')[-1] == 'ardf' or filename.split('.')[-1] == 'ARDF':
             ardf_files.ardf2hdf5(filename)
         else:
             print('file type not yet supported')
