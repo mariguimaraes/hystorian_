@@ -1,3 +1,7 @@
+import numpy as np
+import struct
+import zlib
+import os
 import h5py
 
 #==========================================
@@ -5,7 +9,7 @@ import h5py
 def debug_print(dstr):
     if not dstr.startswith("Info"):
         print(dstr)
-
+    
 def ARDF_get_next_element(fd):
     try:    
         header = fd.read(0x8)
@@ -130,7 +134,7 @@ def ARDF_parse_FTOC(fd, ftoc_hdr_size,ftoc_hdr):
 def ARDF_parse_TTOC(fd, ttoc_hdr_size,ttoc_hdr):
     return ARDF_parse_TOC(fd, ttoc_hdr_size, ttoc_hdr, ARDF_get_TTOC_entry)
 
-def ARDF_load_file(filename):
+def ARDF_load_file(datafile):
     fd = open(datafile, "rb")
     
     fd.seek(0,os.SEEK_END)
@@ -169,14 +173,12 @@ def ARDF_load_file(filename):
             magic_bytes = struct.unpack("<4s",data[0:4])[0].decode("ascii")
 
             if magic_bytes == 'FTOC':
-                debug_print("Warning: load_ardf - Found FTOC, parsing.")
+                #debug_print("Warning: load_ardf - Found FTOC, parsing.")
                 ardf_ftoc = ARDF_parse_FTOC(fd, size,data)
             elif magic_bytes == 'TTOC':
-                debug_print("Warning: load_ardf - Found TTOC, parsing.")
+                #debug_print("Warning: load_ardf - Found TTOC, parsing.")
                 ardf_ttoc = ARDF_parse_TTOC(fd, size,data)          
             else:
-                #debug_print("Error: Found another header: " + magic_bytes)
-                #break
                 break
                     
         except:
@@ -378,38 +380,85 @@ def ARDF_parse_THMB(fd, thmb_entry):
     bin_data = struct.unpack("<"+str(nbytes)+"s", thmb_entry[24:24+nbytes])[0]
     
     return [x_size,y_size,bin_data]
-    
-def ardf2hdf5(filename):
-    ftoc,ttoc,fd = ARDF_load_file(datafile)
 
-    print("======================================")
-    print("Going through global FTOC:")
+def ardf2hdf5(filename):
+    ftoc,ttoc,fd = ARDF_load_file(filename)
+
+    #print("======================================")
+    #print("Going through global FTOC:")
     for f in ftoc:
         #print(f)
         if f[0] == 'IMAG':
-            print("Found IMAG header, parsing:")        
+            #print("Found IMAG header, parsing:")        
             imag_ftoc,imag_ttoc,imag_idef,imag_ibox,imag_data = ARDF_get_IMAG(fd, f)
-            #plt.figure()
-            #plt.imshow(np.array(imag_data))
             for imag_f in imag_ftoc:
                 if imag_f[0] == 'NEXT':
-                    print("--> Ignoring NEXT header for now.")
+                    #print("--> Ignoring NEXT header for now.")
+                    pass
                 elif imag_f[0] == 'THMB':
-                    print("--> Parsing THMB (thumbnail):")
+                    #print("--> Parsing THMB (thumbnail):")
                     [x,y,d] = ARDF_parse_THMB(fd, imag_f)
                     d_img = np.array(bytearray(d), dtype=np.byte).reshape((x,y))
-                    #plt.figure()
-                    #plt.imshow(d_img)
                 else:
-                    print("WTF?? Found '" + str(imag_f[0]) + "' header. What is it?")
+                    print("Found '" + str(imag_f[0]) + "' header. What is it?")
             for imag_t in imag_ttoc:
                 if imag_t[0] == 'TOFF':
-                    print("--> Found TOFF, parsing TEXT.")
-                    #print(ARDF_get_TEXT_from_TOFF(fd, imag_t))
+                    #print("--> Found TOFF, parsing TEXT.")
+                    pass
                 else:
-                    print("WTF?? Found '" + str(imag_t[0]) + "' header. What is it?")                
+                    print("Found '" + str(imag_t[0]) + "' header. What is it?")                
         elif f[0] == 'VOLM':
-            print("Found VOLM header, parsing:")        
+            #print("Found VOLM header, parsing:")        
             volm_ftoc, volm_ttoc, volm_vdef, x_channel_names, data_channels_names, data_channels_units,voff_data,vset_data,vnam_data,vdat_data,xdat_data = ARDF_get_VOLM(fd, f)
+            
+            with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
+                typegrp = f.create_group("type")
+                typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+                metadatagrp = f.create_group("metadata")
+                datagrp = f.create_group("datasets/"+filename.split('.')[0])
+                f.create_group("process")
+                label_list = list(map(lambda x: x.decode('utf-8').replace('\x00',''),data_channels_names))
+                y_size = volm_vdef[2]
+                x_size = volm_vdef[3]
+                z_size  = vdat_data[0][6]-vdat_data[0][5]
+                numchans = len(label_list)
+                data_matrix = np.ndarray(shape=(numchans, y_size, x_size, z_size))
+                for vd in vdat_data:
+                    try:
+                        ypos = vd[1]
+                        xpos = vd[2]
+                        chanindex = vd[4]
+                        data = vd[9][vd[5]:vd[6]]
+                        data_matrix[chanindex, ypos, xpos, :] = data[:]
+                    except:
+                        pass
+                  
+                for i, k in enumerate(label_list): 
+                        
+                    datagrp.create_dataset(k, data=data_matrix[i,:,:,:])
+                    try:
+                        datagrp[k].attrs['unit'] = data_channels_units[i].decode('utf-8').replace('\x00','')
+                    except:
+                        if b'\xb0' in data_channels_units[i]:
+                            datagrp[k].attrs['unit'] = 'deg'
+                        else:
+                            datagrp[k].attrs['unit'] = 'unknown'
+                    datagrp[label_list[i]].attrs['name'] = k
+                    datagrp[label_list[i]].attrs['shape'] = data_matrix.shape
+                    #datagrp[label_list[i]].attrs['size'] = (fastsize,slowsize)
+                    #datagrp[label_list[i]].attrs['offset'] = (xoffset,yoffset)
+                    
         else:
-            print("WTF?? Found '" + str(f[0]) + "' header. What is it?")
+            print("Found '" + str(f[0]) + "' header. What is it?")
+    #print("======================================")
+    #print("Going through global TTOC:")
+    for t in ttoc:
+        if t[0] == 'TOFF':
+            meta = ARDF_get_TEXT_from_TOFF(fd, t).decode('windows-1252')
+            metalist = meta.split('\r')
+            metalist = [i.encode('utf8') for i in metalist]
+        else:
+            print("Found '" + str(t[0]) + "' header. What is it?")
+        
+        with h5py.File(filename.split('.')[0] + ".hdf5", "a") as f:
+            f["metadata"].create_dataset(filename.split('.')[0], data=metalist)

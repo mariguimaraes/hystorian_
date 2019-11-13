@@ -177,12 +177,16 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
                 cumulative_tform21[1,2]=cumulative_tform21[1,2]+tform21[1,2]
                 print('Scan '+str(i)+' Complete. Cumulative Transform Matrix:')
                 print(cumulative_tform21)
+<<<<<<< HEAD
                 
                 recent_offsets.append([tform21[0,2], tform21[1,2]]-offset_px)
                 if len(recent_offsets)>3:
                     recent_offsets = recent_offsets[1:]
                     
             pt.generic_write(f, cumulative_tform21, path_lists[i])
+=======
+            pt.generic_write(f, path_lists[i], cumulative_tform21)
+>>>>>>> 66fd60e9b63a494bfa6d2b3d1fa100f050693aa5
         
 
 #FUNCTION m2px
@@ -304,7 +308,7 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, sel
                 final_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
             else:
                 final_image = array_expanded(orig_image, xoffsets[j], yoffsets[j], offset_caps)
-            pt.generic_write(f, final_image, path_lists[i], 'source (distortion params)', dm_path_lists[j], 'distortion_params', distortion_matrices[j])
+            pt.generic_write(f, path_lists[i], final_image, 'source (distortion params)', dm_path_lists[j], 'distortion_params', distortion_matrices[j])
 
             
 #FUNCTION array_cropped
