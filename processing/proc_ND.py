@@ -2,9 +2,10 @@ from processing import proc_tools as pt
 import numpy as np
 import h5py
 
-def extract_hyst(filename):
+
+def extract_hyst(filename, data_folder = 'datasets', selection = None):
     with h5py.File(filename, 'a') as f:
-        
+
         notedict = {}
         for file in f['metadata'].keys(): 
             for k in f['metadata'][file]:
@@ -14,8 +15,32 @@ def extract_hyst(filename):
                 except:
                     pass
 
-        for file in f['datasets'].keys():
-            bias = f['datasets'][file]['Bias']
+        if selection == None:
+            keylist = f[data_folder].keys()
+        elif selection == list:
+            keylist = selection
+        elif selection == str:
+            keylist = [selection]
+        else:
+            print('selection input is incorrect, looking at the keys automatically')
+            keylist = f[data_folder].keys()
+            
+        print(keylist)
+        for file in keylist:
+
+            inout_list = []
+            inout_list = pt.initialise_process(filename, 
+                      process_name = 'Extracted_PFM', 
+                      data_folder = data_folder, 
+                      selection = file, 
+                      selection_depth = 1, 
+                      create_groups = True)
+            try:
+                bias = f[data_folder][file]['Bias']
+            except:
+                print('Impossible to find the bias in this file, skipping it.')
+                continue
+                
             waveform_amp = notedict["ARDoIVAmp"]
             waveform_freq = float(notedict["ARDoIVFrequency"])
             waveform_phase = float(notedict["ARDoIVArg2"])
@@ -29,15 +54,21 @@ def extract_hyst(filename):
             waveform_numbiaspoints = int(np.floor(waveform_delta*len(bias[1,1,:])/waveform_pulsetime))
             waveform_pulsepoints = int(waveform_pulsetime/waveform_delta)
             waveform_offpoints = int(waveform_pulsepoints*(1.0-waveform_dutycycle))
-            
-            for k in f['datasets'][file]:
-                x,y,z = np.shape(f['datasets'][file][k])
+
+            for chan in inout_list:
+                print(chan[2] + ' started...')
+                x,y,z = np.shape(f[data_folder][file][chan[2]])
                 b = waveform_numbiaspoints
-                dgroup = f.require_group('process/' + file + '/' + 'SSPFM_parameters/')
-                dset_on = dgroup.require_dataset(k + '_on', (x,y,b), dtype=float)
-                dset_off = dgroup.require_dataset(k + '_off', (x,y,b), dtype=float)
-
-
+                # dgroup = f.require_group('process/' + file + '/' + 'SSPFM_parameters/')
+                
+                dset_on = f.require_dataset(chan[1] + chan[2]+ '_on', (x,y,b), dtype=float)
+                PATH = [chan[0], chan[1], chan[2] + '_on']
+                pt.generic_write(f, path=PATH)
+                
+                dset_off = f.require_dataset(chan[1] + chan[2]+ '_off', (x,y,b), dtype=float)
+                PATH = [chan[0], chan[1], chan[2] + '_off']
+                pt.generic_write(f, path=PATH)
+                
                 for b in range(waveform_numbiaspoints):
                     start = b*waveform_pulsepoints+waveform_offpoints
                     stop = (b+1)*waveform_pulsepoints
@@ -45,8 +76,8 @@ def extract_hyst(filename):
                     var2 = stop-start+1
                     realstart = int(start+var2*.25)
                     realstop = int(stop-var2*.25)
-                    f['process/' + file + '/' + 'SSPFM_parameters/'+k+'_on'][:,:,b] = \
-                        np.nanmean(f['datasets'][file][k][:,:,realstart:realstop])
+                    f[chan[1] + chan[2]+ '_on'][:,:,b] = \
+                        np.nanmean(f[chan[0]][:,:,realstart:realstop], axis=2)
 
                     start = stop
                     stop = stop + waveform_pulsepoints*waveform_dutycycle
@@ -54,8 +85,9 @@ def extract_hyst(filename):
                     var2 = stop-start+1
                     realstart = int(start+var2*.25)
                     realstop = int(stop-var2*.25)
-                    f['process/' + file + '/' + 'SSPFM_parameters/'+k+'_off'][:,:,b] = \
-                        np.nanmean(f['datasets'][file][k][:,:,realstart:realstop])
+                    f[chan[1] + chan[2]+ '_off'][:,:,b] = \
+                        np.nanmean(f[chan[0]][:,:,realstart:realstop], axis=2)
+                print(chan[2] + ' done.')
 
 
 def calc_hyst_params(bias, phase):
@@ -102,27 +134,41 @@ def calc_hyst_params(bias, phase):
 
     return [coercive_volt_up, coercive_volt_dn, 0.5*step_left_dn+0.5*step_left_up, 0.5*step_right_dn+0.5*step_right_up]
 
+
 def PFM_params_map(filename, phase = 1):
     
     with h5py.File(filename, 'a') as f:
-        for file in f['process/'].keys():
-            bias = f['process/' + file + '/' + 'SSPFM_parameters/Bias_on']
-            if phase == 1:
-                phase = f['process/' + file + '/' + 'SSPFM_parameters/Phase_on']
+        for proc in f['process/'].keys():
+            print(proc)
+            if len(proc.split('-')) < 2:
+                print(proc + '. This process name was not formatted correctly, skipping it')
+                continue
+            if proc.split('-')[1] != 'Extracted_PFM':
+                continue
             else:
-                phase = f['process/' + file + '/' + 'SSPFM_parameters/Phas2_on']
-            x,y,z = np.shape(phase)
-            list_values = ['coerc_pos', 'coerc_neg', 'step_left', 'step_right', 'imprint', 'phase_shift']
-            f['process/' + file + '/' ].require_group('PFM_physical_parameters')
-            for val in list_values:
-                f['process/' + file + '/' + 'PFM_physical_parameters/'].require_dataset(val, (x,y), dtype=float)
-            
-            for xi in range(x):
-                for yi in range(y):    
-                    hyst_matrix = calc_hyst_params(bias[xi,yi,:],phase[xi,yi,:])
-                    f['process/' + file + '/' + 'PFM_physical_parameters/coerc_pos'][xi,yi] = hyst_matrix[0] 
-                    f['process/' + file + '/' + 'PFM_physical_parameters/coerc_neg'][xi,yi] = hyst_matrix[1]
-                    f['process/' + file + '/' + 'PFM_physical_parameters/step_left'][xi,yi] = hyst_matrix[2]
-                    f['process/' + file + '/' + 'PFM_physical_parameters/step_right'][xi,yi] = hyst_matrix[3]
-                    f['process/' + file + '/' + 'PFM_physical_parameters/imprint'][xi,yi] = (hyst_matrix[0]+hyst_matrix[1])/2.0
-                    f['process/' + file + '/' + 'PFM_physical_parameters/phase_shift'][xi,yi] = (hyst_matrix[3]-hyst_matrix[2])
+                operation_number = str(len(f['process'])+1)    
+                for file in f['process/' + proc].keys():
+                    bias = f['process/' + proc + '/' + file + '/Bias_on']
+                    if phase == 1:
+                        path_bias = 'process/' + proc + '/' + file + '/Phase_on'
+                        phase = f[path_bias]
+                    else:
+                        path_bias = 'process/' + proc + '/' + file + '/Phas2_on'
+                        phase = f[path_bias]
+                    x,y,z = np.shape(phase)
+                    
+                    list_values = ['coerc_pos', 'coerc_neg', 'step_left', 'step_right', 'imprint', 'phase_shift']
+                    f['process/'].require_group(operation_number + '-PFM_physical_parameters/' + file)
+                    for val in list_values:
+                        f['process/' + operation_number + '-PFM_physical_parameters/' + file].require_dataset(val, (x,y), dtype=float)
+                        PATH = [path_bias, 'process/' + operation_number + '-PFM_physical_parameters/' + file, val]
+                        pt.generic_write(f, path=PATH)
+                    for xi in range(x):
+                        for yi in range(y):    
+                            hyst_matrix = calc_hyst_params(bias[xi,yi,:],phase[xi,yi,:])
+                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/coerc_pos'][xi,yi] = hyst_matrix[0] 
+                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/coerc_neg'][xi,yi] = hyst_matrix[1]
+                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/step_left'][xi,yi] = hyst_matrix[2]
+                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/step_right'][xi,yi] = hyst_matrix[3]
+                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/imprint'][xi,yi] = (hyst_matrix[0]+hyst_matrix[1])/2.0
+                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/phase_shift'][xi,yi] = (hyst_matrix[3]-hyst_matrix[2])

@@ -106,20 +106,25 @@ def select_certain_data(path_list, selection, selection_depth):
 #OUTPUTS:
 ## null
 
-def generic_write(f, data, path, *arg):
-    try:
-        # By default doesn't allow overwrite, so delete before writing
-        del f[path[1]][path[2]]
-    except:
-        pass
+def generic_write(f, path, data=None, *arg):
+    if data!= None:
+        try:
+            # By default doesn't allow overwrite, so delete before writing
+            del f[path[1]][path[2]]
+        except:
+            pass
+        f[path[1]].create_dataset(path[2], data = data)
+        f[path[1]][path[2]].attrs['shape'] = data.shape
+        
     operation_name = path[1].split('/')[1]
-    f[path[1]].create_dataset(path[2], data = data)
     f[path[1]][path[2]].attrs['name'] = path[2]
     f[path[1]][path[2]].attrs['operation name'] = operation_name.split('-')[1]
     f[path[1]][path[2]].attrs['operation number'] = operation_name.split('-')[0]
     f[path[1]][path[2]].attrs['source'] = path[0]
     f[path[1]][path[2]].attrs['time'] = str(datetime.now())
-    f[path[1]][path[2]].attrs['shape'] = data.shape
+
+    if data == None:
+        f[path[1]][path[2]].attrs['shape'] = f[path[1]][path[2]][()].shape
     if len(arg)%2 != 0:
         print('Error: Odd amount of input arguments')
     else:

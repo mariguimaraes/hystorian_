@@ -20,4 +20,4 @@ def negative_(filename, data_folder='datasets', selection = None, selection_dept
     with h5py.File(filename, "a") as f:
         for path in path_lists[:]:
             neg = -np.array(f[path[0]])
-            pt.generic_write(f, neg, path)
+            pt.generic_write(f, path, neg)
