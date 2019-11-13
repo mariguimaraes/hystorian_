@@ -25,7 +25,7 @@ import os
 ## TO DO: Allow for autocalculation of size params
 
 
-def save_image(filename,data_folder='datasets', selection=None, selection_depth=0, scalebar=False, colorbar = True, size=None, labelsize=25, std_range=3, saving_path='', verbose=False): 
+def save_image(filename,data_folder='datasets', selection=None, selection_depth=0, scalebar=False, colorbar = True, size=None, labelsize=16, std_range=3, saving_path='', verbose=False): 
     erase = False
     std_range = float(std_range)
     if filename.split('.')[-1] != 'hdf5':
@@ -41,21 +41,25 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
         for path in path_list:
             image_name = path.rsplit('/')[-1]
             if size is None:
-                fig = plt.figure(frameon=False, figsize=(np.array(np.shape(f[path]))/100)[::-1], dpi=100)
+                figsize = (np.array(np.shape(f[path]))/100)[::-1]
+                if figsize[0] < 5:
+                    scale_factor = np.ceil(5/figsize[0])
+                    figsize = scale_factor*figsize
+                fig = plt.figure(frameon=False, figsize=figsize, dpi=100)
             else:
                 fig = plt.figure(figsize=size)
-            ax = plt.Axes(fig, [0., 0., 1., 1.])
-            ax.set_axis_off()
-            fig.add_axes(ax)
-            plt.tick_params(labelsize=labelsize)
+            #ax = plt.Axes(fig, [0.1, 0.1, 0.9, 0.9])
+            #ax.set_axis_off()
+            #fig.add_axes(ax)
             #print(image_name)
+            plt.tick_params(labelsize=labelsize)
             if 'Phase' in image_name:
                 colorm = 'inferno'
                 offsetdata = f[path] - np.nanmin(f[path])
                 #print(np.min(offsetdata))
                 v_min = 0
                 v_max = 180
-                pos = ax.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
+                pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
             if 'Amplitude' in image_name:
                 colorm = 'binary_r'
                 offsetdata = f[path] - np.nanmin(f[path])
@@ -64,7 +68,7 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
                 std_val = np.nanstd(offsetdata)
                 v_min = 0
                 v_max = mean_val + std_range*std_val
-                pos = ax.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
+                pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
             else:
                 colorm = 'afmhot'
                 offsetdata = f[path] - np.nanmin(f[path])
@@ -78,13 +82,14 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
                         v_min = 0
                         v_max = mean_val + std_range*std_val
                         #print(v_max)
-                        pos = ax.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
+                        pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
                     except:
                         print("error in the min, max for the image, whole range is used.")
-                        pos = ax.imshow(offsetdata, cmap=colorm)
+                        pos = plt.imshow(offsetdata, cmap=colorm)
             if colorbar == True:
                 cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
-                cbar.ax.tick_params(labelsize=25) 
+                cbar.ax.tick_params(labelsize=labelsize) 
+            plt.tight_layout()
             if scalebar:
                 try:
                     phys_size = f[path].attrs['size'][0]
