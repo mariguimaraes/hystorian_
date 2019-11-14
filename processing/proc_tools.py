@@ -152,3 +152,150 @@ def find_data_path_structure(filename, data_folder = 'datasets', selection = Non
     print(in_path_list)
     
 
+    
+    
+    
+def path_inputs(filename_or_f, data_folder = 'datasets', selection = None, criteria=None):
+    if type(filename_or_f) == str:
+        filename = filename_or_f
+        with h5py.File(filename, 'a') as f:
+            in_path_list = path_inputs(f, data_folder, selection, criteria)
+    elif type(filename_or_f) == h5py._hl.files.File:
+        f = filename_or_f
+        in_path_list = find_paths_of_all_subgroups(f, data_folder)
+        if selection is not None:
+            in_path_list = criteria_selection(in_path_list, selection, criteria)
+    else:
+        print('Error: First argument should either be the filename of an hdf5 file, or an open hdf5 file.')
+        in_path_list = []
+    return in_path_list
+
+#FUNCTION find_paths_of_all_subgroups
+## Recursively determines list of paths for all datafiles in current_path
+## also finds datafiles in all subfolders (and sub-subfolders and...) of current path
+#INPUTS:
+## f: open hdf5 file
+## current_path: current group searched
+#OUTPUTS:
+## list of paths to datafiles
+
+def find_paths_of_all_subgroups(f, current_path):
+    # Recursively determines list of paths for all datafiles in current_path, and all subfolders (and sub-subfolders and...) of current path
+    path_list = []
+    for sub_group in f[current_path]:
+        if isinstance(f[current_path+'/'+sub_group], h5py.Group):
+            path_list.extend(find_paths_of_all_subgroups(f, current_path+'/'+sub_group))
+        elif isinstance(f[current_path+'/'+sub_group], h5py.Dataset):
+            path_list.append(current_path+'/'+sub_group)
+    return path_list
+
+
+def criteria_selection(path_list, selection, criteria):
+    valid_path_list = []
+    if type(selection) != list:
+        selection = [selection]
+    if criteria == 'process' or criteria == 'Process' or criteria == 'p':
+        for path in path_list:
+            split_path = path.split('/')
+            if split_path[0] == 'process':
+                if is_valid_path(split_path, selection, 1):
+                    valid_path_list.append(path)
+            else:
+                print('Error: \'process\' criteria given, but path not linking to \'process\' folder. Path considered invalid.')
+                
+    elif criteria == 'sample' or criteria == 'Sample' or criteria == 's':
+        for path in path_list:
+            split_path = path.split('/')
+            if split_path[0] == 'process':
+                if is_valid_path(split_path, selection, 2):
+                    valid_path_list.append(path)
+            elif split_path[0] == 'datasets':
+                if is_valid_path(split_path, selection, 1):
+                    valid_path_list.append(path)
+            else:
+                print('Error: Path not linking to \'process\' or \'datasets\' folder. Path considered invalid.')
+    elif criteria == 'channel' or criteria == 'Channel' or criteria == 'c':
+        for path in path_list:
+            split_path = path.split('/')
+            if split_path[0] == 'process':
+                if is_valid_path(split_path, selection, 3):
+                    valid_path_list.append(path)
+            elif split_path[0] == 'datasets':
+                if is_valid_path(split_path, selection, 2):
+                    valid_path_list.append(path)
+            else:
+                print('Error: Path not linking to \'process\' or \'datasets\' folder. Path considered invalid.')
+    elif criteria is None:
+        for path in path_list:
+            split_path = path.split('/')
+            if is_valid_path(split_path, selection, 0):
+                valid_path_list.append(path)
+    else:
+        print('Error: Criteria should be either \'process\', \'sample\', or \'channel\'. No selection was performed.')
+        valid_path_list = path_list
+    return valid_path_list
+
+def is_valid_path(split_path, selection, check_index):
+    valid = False
+    for valid_name in selection:
+        if split_path[check_index] == valid_name:
+            valid = True
+    return valid
+
+def find_output_folder_location(filename_or_f, process_name, folder_names, overwrite_if_same = False):
+    out_folder_location_list = []
+    if type(filename_or_f) == str:
+        filename = filename_or_f
+        with h5py.File(filename, 'a') as f:
+            out_folder_location_list = find_output_folder_location(f, process_name, folder_names, overwrite_if_same)
+    elif type(filename_or_f) == h5py._hl.files.File:
+        f = filename_or_f
+        operation_number = len(f['process'])+1
+        if overwrite_if_same == True:
+            if str(operation_number-1)+'-'+process_name in f['process'].keys():
+                operation_number = operation_number-1
+        if type(folder_names) != list:
+            folder_names = [folder_names]
+        for folder in folder_names:
+            if '/' in folder:
+                folder_root, output_filename = folder.rsplit('/', 1)
+                if folder_root.split('/', 1)[0] == 'datasets':
+                    folder_centre = folder_root.split('/', 1)[1]
+                elif folder_root.split('/', 1)[0] == 'process':
+                    folder_centre = folder_root.split('/', 2)[2]
+                else:
+                    print('Error: folder_names should not contain a slash unless a path to either datasets or process')
+            else:
+                folder_centre = folder
+            out_folder_location = 'process/'+str(operation_number)+'-'+process_name+'/'+folder_centre+'/'
+            out_folder_location_list.append(out_folder_location)
+    return out_folder_location_list
+
+
+def write_output_f(f, data, out_folder_location, in_paths, output_name = None):
+    f.require_group(out_folder_location)
+    if type(in_paths) != list:
+        in_paths = [in_paths]
+    if output_name is None:
+        output_name = in_paths[0].rsplit('/', 1)[1]
+    try:
+        # By default doesn't allow overwrite, so delete before writing
+        del f[out_folder_location][output_name]
+    except:
+        pass
+    f[out_folder_location].create_dataset(output_name, data = data)
+    dataset = f[out_folder_location][output_name]
+    write_generic_attributes(dataset, out_folder_location, in_paths, output_name)
+    return dataset
+
+def write_generic_attributes(dataset, out_folder_location, in_paths, output_name):
+    if type(in_paths) != list:
+        in_paths = [in_paths]
+    operation_name = out_folder_location.split('/')[1]
+    dataset.attrs['shape'] = dataset.shape
+    dataset.attrs['name'] = output_name
+    dataset.attrs['operation name'] = operation_name.split('-')[1]
+    dataset.attrs['operation number'] = operation_name.split('-')[0]
+    dataset.attrs['time'] = str(datetime.now())
+    for i in range(len(in_paths)):
+        dataset.attrs['source'+str(i)] = in_paths[i]

@@ -11,7 +11,7 @@ import os
 ## filename : The hdf5 file containing the data you want to convert into png
 ## data_folder (default : 'datasets'): Choose the folder that needs to be saved, by default the raw datas are used
 ## selection (default : None): determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## selection_depth (default: 0): determines what level at which to look at a selection.
+## criteria (default: None): determines the type of data selected. Set to 'process', 'sample' or 'channel'
 ## scalebar (default: False): Add a scalebar to the image, requires three attributes : 
 ##                                                 shape, which define the pixel size of the image
 ##                                                 size, which gives the phyiscal dimension of the image
@@ -22,10 +22,9 @@ import os
 ## saving_path (default: '') : The path to the folder where to save the image
 ## verbose (default: False) : if True, print a line each time a image is saved.
 ## Output : N png images, where N is the number of datas channels in the hdf5 file.
-## TO DO: Allow for autocalculation of size params
+## TO DO: Allow for no border at all
 
-
-def save_image(filename,data_folder='datasets', selection=None, selection_depth=0, scalebar=False, colorbar = True, size=None, labelsize=16, std_range=3, saving_path='', verbose=False): 
+def save_image(filename,data_folder='datasets', selection=None, criteria=None, scalebar=False, colorbar = True, size=None, labelsize=16, std_range=3, saving_path='', verbose=False): 
     erase = False
     std_range = float(std_range)
     if filename.split('.')[-1] != 'hdf5':
@@ -36,9 +35,9 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
         except:
             print("File extension is not hdf5 and it was not possible to convert it, please convert it before using this function")
             return
-    path_list = pt.initialise_process(filename, None, data_folder=data_folder, selection=selection, selection_depth=selection_depth)
+    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     with h5py.File(filename, "r") as f:
-        for path in path_list:
+        for path in in_path_list:
             image_name = path.rsplit('/')[-1]
             if size is None:
                 figsize = (np.array(np.shape(f[path]))/100)[::-1]
@@ -115,30 +114,31 @@ def save_image(filename,data_folder='datasets', selection=None, selection_depth=
 ## filename: name of hdf5 file containing data
 ## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
 ## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for correction based on topography in data from Asylum AFM.
-## selection_depth: determines what level at which to look at a selection. Default allows for correction based on topography in data from Asylum AFM.
+## criteria (default: 'channel'): determines the type of data selected. Set to 'process', 'sample' or 'channel'. Default allows for correction based on topography in data from Asylum AFM.
 ## speed: determines speed and accuracy of function. An integer between 1 and 3, a higher number if faster (but needs less distortion to work)
 #OUTPUTS:
 ## null
 
-def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace', selection_depth = 2, speed = 2):
-    path_lists = pt.initialise_process(filename, 'distortion_params', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
+def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace', criteria = 'channel', speed = 2):
+    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params', in_path_list)
     tform21 = np.eye(2,3,dtype=np.float32)
     cumulative_tform21 = np.eye(2,3,dtype=np.float32)
     with h5py.File(filename, "a") as f:
         recent_offsets=[]
-        for i in range(len(path_lists)):
+        for i in range(len(in_path_list)):
             if i == 0:
                 pass
             else:
-                img1 = img2cv((f[path_lists[i-1][0]]))
-                img2 = img2cv((f[path_lists[i][0]]))
+                img1 = img2cv((f[in_path_list[i-1]]))
+                img2 = img2cv((f[in_path_list[i]]))
                 
                 # try estimate offset change from attribs of img1 and img2
                 try:
-                    offset2 = (f[path_lists[i][0]]).attrs['offset']
-                    offset1 = (f[path_lists[i-1][0]]).attrs['offset']
-                    scan_size = (f[path_lists[i][0]]).attrs['size']
-                    shape = (f[path_lists[i][0]]).attrs['shape']
+                    offset2 = (f[in_path_list[i]]).attrs['offset']
+                    offset1 = (f[in_path_list[i-1]]).attrs['offset']
+                    scan_size = (f[in_path_list[i]]).attrs['size']
+                    shape = (f[in_path_list[i]]).attrs['shape']
                     offset_px = m2px(offset2-offset1, shape, scan_size)
                 except:
                     offset_px = [0,0]
@@ -186,7 +186,7 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
                 recent_offsets.append([tform21[0,2], tform21[1,2]]-offset_px)
                 if len(recent_offsets)>3:
                     recent_offsets = recent_offsets[1:]
-            pt.generic_write(f, path_lists[i], cumulative_tform21)
+            pt.write_output_f(f, cumulative_tform21, out_folder_locations[i], in_path_list[i])
         
 
 #FUNCTION m2px
@@ -279,11 +279,13 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp
 #OUTPUTS:
 ## null
 
-def distortion_correction_(filename, data_folder='datasets', selection=None, selection_depth=0, dm_data_folder = 'process/1-distortion_params', dm_selection=None, dm_selection_depth=0, cropping = True):
-    dm_path_lists = pt.initialise_process(filename, None, data_folder=dm_data_folder, selection=dm_selection, selection_depth=dm_selection_depth)
+def distortion_correction_(filename, data_folder='datasets', selection=None, criteria=None, dm_data_folder = 'process/1-distortion_params', dm_selection=None, dm_criteria=None, cropping = True):
+    #dm_path_lists = pt.initialise_process(filename, None, data_folder=dm_data_folder, selection=dm_selection, selection_depth=dm_selection_depth)
+    
+    dm_path_list = pt.path_inputs(filename, dm_data_folder, dm_selection, dm_criteria)
     distortion_matrices = []
     with h5py.File(filename, "a") as f:
-        for path in dm_path_lists[:]:
+        for path in dm_path_list[:]:
             distortion_matrices.append(np.copy(f[path]))
         xoffsets = []
         yoffsets = []
@@ -292,23 +294,27 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, sel
             yoffsets.append(np.array(matrix[1,2]))
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
-    path_lists = pt.initialise_process(filename, 'distortion_correction', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
-    if len(path_lists)%len(dm_path_lists):
+    #path_lists = pt.initialise_process(filename, 'distortion_correction', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
+    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction', in_path_list)
+    if len(in_path_list)%len(dm_path_list):
         print('Error: Images to be corrected are not a multiple of the amount of distortion matrices')
         return
 
-    number_of_images_for_each_matrix = len(path_lists)//len(dm_path_lists)
+    number_of_images_for_each_matrix = len(in_path_list)//len(dm_path_list)
     with h5py.File(filename, "a") as f:
         j = -1
-        for i in range(len(path_lists)):
+        for i in range(len(in_path_list)):
             if i%number_of_images_for_each_matrix == 0:
                 j = j+1
-            orig_image = f[path_lists[i][0]]
+            orig_image = f[in_path_list[i]]
             if cropping == True:
                 final_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
             else:
                 final_image = array_expanded(orig_image, xoffsets[j], yoffsets[j], offset_caps)
-            pt.generic_write(f, path_lists[i], final_image, 'source (distortion params)', dm_path_lists[j], 'distortion_params', distortion_matrices[j])
+            pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i], dm_path_list[j]])
+            
+            #pt.generic_write(f, in_path_list[i], final_image, 'source (distortion params)', dm_path_list[j], 'distortion_params', distortion_matrices[j])
 
             
 #FUNCTION array_cropped
