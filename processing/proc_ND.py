@@ -135,40 +135,13 @@ def calc_hyst_params(bias, phase):
     return [coercive_volt_up, coercive_volt_dn, 0.5*step_left_dn+0.5*step_left_up, 0.5*step_right_dn+0.5*step_right_up]
 
 
-def PFM_params_map(filename, phase = 1):
+def PFM_params_map(bias,phase):
+    x,y,z = np.shape(phase)
+
+    list_values = ['coerc_pos', 'coerc_neg', 'step_left', 'step_right', 'imprint', 'phase_shift']
+    for xi in range(x):
+        for yi in range(y):    
+            hyst_matrix = calc_hyst_params(bias[xi,yi,:],phase[xi,yi,:])
     
-    with h5py.File(filename, 'a') as f:
-        for proc in f['process/'].keys():
-            print(proc)
-            if len(proc.split('-')) < 2:
-                print(proc + '. This process name was not formatted correctly, skipping it')
-                continue
-            if proc.split('-')[1] != 'Extracted_PFM':
-                continue
-            else:
-                operation_number = str(len(f['process'])+1)    
-                for file in f['process/' + proc].keys():
-                    bias = f['process/' + proc + '/' + file + '/Bias_on']
-                    if phase == 1:
-                        path_bias = 'process/' + proc + '/' + file + '/Phase_on'
-                        phase = f[path_bias]
-                    else:
-                        path_bias = 'process/' + proc + '/' + file + '/Phas2_on'
-                        phase = f[path_bias]
-                    x,y,z = np.shape(phase)
-                    
-                    list_values = ['coerc_pos', 'coerc_neg', 'step_left', 'step_right', 'imprint', 'phase_shift']
-                    f['process/'].require_group(operation_number + '-PFM_physical_parameters/' + file)
-                    for val in list_values:
-                        f['process/' + operation_number + '-PFM_physical_parameters/' + file].require_dataset(val, (x,y), dtype=float)
-                        PATH = [path_bias, 'process/' + operation_number + '-PFM_physical_parameters/' + file, val]
-                        pt.generic_write(f, path=PATH)
-                    for xi in range(x):
-                        for yi in range(y):    
-                            hyst_matrix = calc_hyst_params(bias[xi,yi,:],phase[xi,yi,:])
-                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/coerc_pos'][xi,yi] = hyst_matrix[0] 
-                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/coerc_neg'][xi,yi] = hyst_matrix[1]
-                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/step_left'][xi,yi] = hyst_matrix[2]
-                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/step_right'][xi,yi] = hyst_matrix[3]
-                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/imprint'][xi,yi] = (hyst_matrix[0]+hyst_matrix[1])/2.0
-                            f['process/' + operation_number + '-PFM_physical_parameters/' + file + '/phase_shift'][xi,yi] = (hyst_matrix[3]-hyst_matrix[2])
+    return hyst_matrix[0], hyst_matrix[1],hyst_matrix[2],hyst_matrix[3],(hyst_matrix[0]+hyst_matrix[1])/2.0,(hyst_matrix[3]-hyst_matrix[2])
+
