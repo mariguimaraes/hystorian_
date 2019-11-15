@@ -8,10 +8,7 @@ import os
 
 #FUNCTION save_image 
 #INPUTS:
-## filename : The hdf5 file containing the data you want to convert into png
-## data_folder (default : 'datasets'): Choose the folder that needs to be saved, by default the raw datas are used
-## selection (default : None): determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## criteria (default: None): determines the type of data selected. Set to 'process', 'sample' or 'channel'
+## data: A 2-D array which will be converted into a png image.
 ## scalebar (default: False): Add a scalebar to the image, requires three attributes : 
 ##                                                 shape, which define the pixel size of the image
 ##                                                 size, which gives the phyiscal dimension of the image
@@ -21,91 +18,58 @@ import os
 ## std_range (default: 3) : Range around the mean for the colorscale, alternatively the value can be "full", to take the full range.
 ## saving_path (default: '') : The path to the folder where to save the image
 ## verbose (default: False) : if True, print a line each time a image is saved.
-## Output : N png images, where N is the number of datas channels in the hdf5 file.
+## Output : one png images
 ## TO DO: Allow for no border at all
 
-def save_image(filename,data_folder='datasets', selection=None, criteria=None, scalebar=False, colorbar = True, size=None, labelsize=16, std_range=3, saving_path='', verbose=False): 
-    erase = False
-    std_range = float(std_range)
-    if filename.split('.')[-1] != 'hdf5':
-        try:
-            read_file.tohdf5(filename)
-            filename = filename.split('.')[0] + '.hdf5'
-            erase = True
-        except:
-            print("File extension is not hdf5 and it was not possible to convert it, please convert it before using this function")
-            return
-    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
-    with h5py.File(filename, "r") as f:
-        for path in in_path_list:
-            image_name = path.rsplit('/')[-1]
-            if size is None:
-                figsize = (np.array(np.shape(f[path]))/100)[::-1]
-                if figsize[0] < 5:
-                    scale_factor = np.ceil(5/figsize[0])
-                    figsize = scale_factor*figsize
-                fig = plt.figure(frameon=False, figsize=figsize, dpi=100)
-            else:
-                fig = plt.figure(figsize=size)
-            #ax = plt.Axes(fig, [0.1, 0.1, 0.9, 0.9])
-            #ax.set_axis_off()
-            #fig.add_axes(ax)
-            #print(image_name)
-            plt.tick_params(labelsize=labelsize)
-            if 'Phase' in image_name:
-                colorm = 'inferno'
-                offsetdata = f[path] - np.nanmin(f[path])
-                #print(np.min(offsetdata))
-                v_min = 0
-                v_max = 180
-                pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
-            if 'Amplitude' in image_name:
-                colorm = 'binary_r'
-                offsetdata = f[path] - np.nanmin(f[path])
-                #print(np.min(offsetdata))
-                mean_val = np.nanmean(offsetdata)
-                std_val = np.nanstd(offsetdata)
-                v_min = 0
-                v_max = mean_val + std_range*std_val
-                pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
-            else:
-                colorm = 'afmhot'
-                offsetdata = f[path] - np.nanmin(f[path])
-                #print(np.min(offsetdata))
-                if std_range == "full":
-                    pos = ax.imshow(offsetdata, cmap=colorm)
-                else:
-                    try:
-                        mean_val = np.nanmean(offsetdata)
-                        std_val = np.nanstd(offsetdata)
-                        v_min = 0
-                        v_max = mean_val + std_range*std_val
-                        #print(v_max)
-                        pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
-                    except:
-                        print("error in the min, max for the image, whole range is used.")
-                        pos = plt.imshow(offsetdata, cmap=colorm)
-            if colorbar == True:
-                cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
-                cbar.ax.tick_params(labelsize=labelsize) 
-            plt.tight_layout()
-            if scalebar:
-                try:
-                    phys_size = f[path].attrs['size'][0]
-                    px = f[path].attrs['shape'][0]
-                    scalebar = ScaleBar(phys_size/px, f[path].attrs['unit'][0], location='lower right', font_properties={'size':25})
-                    fig.add_artist(scalebar)
-                except:
-                    print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
+def save_image(data, 
+               image_name='image', 
+               colorm='inferno',
+               scalebar=False,
+               physical_size = (0, 'unit'),
+               colorbar = True, 
+               size=None, 
+               labelsize=16, 
+               std_range=3, 
+               saving_path='', 
+               verbose=False): 
+    if std_range != 'full':
+        std_range = float(std_range)
+    
+        if size is None:
+            figsize = (np.array(np.shape(data))/100)[::-1]
+            if figsize[0] < 5:
+                scale_factor = np.ceil(5/figsize[0])
+                figsize = scale_factor*figsize
+            fig = plt.figure(frameon=False, figsize=figsize, dpi=100)
+        else:
+            fig = plt.figure(figsize=size)
 
-            fig.savefig(saving_path+path.rsplit('/')[-2]+'_'+str(image_name)+'.png')
-            if verbose:
-                print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
-            plt.close()
-    if erase:
-        import os
-        os.remove(filename)
-        erase = False
+        plt.tick_params(labelsize=labelsize)
+        offsetdata = data - np.nanmin(data)
+        mean_val = np.nanmean(offsetdata)
+        std_val = np.nanstd(offsetdata)
+        v_min = 0
+        v_max = mean_val + std_range*std_val
+        if std_range == 'full':
+            pos = plt.imshow(offsetdata, cmap=colorm)
+        else:
+            pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
+        if colorbar == True:
+            cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
+            cbar.ax.tick_params(labelsize=labelsize) 
+        plt.tight_layout()
+        if scalebar:
+            try:
+                phys_size = physical_size[0]
+                px = np.shape(data)[0]
+                scalebar = ScaleBar(phys_size/px, physical_size[1], location='lower right', font_properties={'size':labelsize})
+                fig.add_artist(scalebar)
+            except:
+                print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
+        fig.savefig(saving_path+str(image_name)+'.png')
+        if verbose:
+            print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
+        plt.close()
     return
 
 #FUNCTION distortion_params_

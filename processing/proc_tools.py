@@ -1,4 +1,5 @@
 import h5py
+import os 
 from datetime import datetime
 
 #FUNCTION initialise_process
@@ -299,3 +300,69 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
     dataset.attrs['time'] = str(datetime.now())
     for i in range(len(in_paths)):
         dataset.attrs['source'+str(i)] = in_paths[i]
+
+#FUNCTION m_apply
+## Take any function and handles the inputs of the function by looking into the hdf5 file
+## The input must be in the form datasets/name/channel or process/proc_name/name/channel
+## Also write the output of the function into the hdf5. The name of the path can be given into outputs_names
+#INPUTS:
+## filname : name of the hdf5 file where the datas are stored
+## function : Custom function that you want to call
+## inputs : List of the datas inputs required by the function
+## outputs_names : list of the names of the channels for the writting of the resuls
+## ** kwargs : All the non-data inputs to give to the function
+#OUTPUTS:
+## None, just write directly into the hdf5
+def m_apply(filename, function, inputs=[], outputs_names=None, **kwargs):
+    inputs_data = []
+
+    if filename.split('.')[-1] != 'hdf5':
+        if os.path.isfile(filename.split('.')[0] + '.hdf5'):
+            filename = filename.split('.')[0] + '.hdf5'
+        else:
+            try:
+                read_file.tohdf5(filename)
+                filename = filename.split('.')[0] + '.hdf5' 
+                print('The file does not have an hdf5 extension. It has been converted.')
+            except:
+                print('The given filename does not have an hdf5 extension, and it was not possible to convert it. \
+                      Please use an hdf5 file with m_apply')
+    
+    with h5py.File(filename, 'r') as f:
+        if type(inputs)==str:
+            inputs_data.append(f[inputs][:])
+        else:
+            for i in inputs:
+                inputs_data.append(f[i][:]) 
+
+    result = function(*inputs_data, **kwargs)
+    if type(result) == type(None):
+        return None
+    
+    print(np.shape(inputs_data), np.shape(result))
+    print(np.shape(inputs_data)[0], np.shape(result)[0])
+    
+    with h5py.File(filename, 'a') as f:
+
+        fproc = f.require_group('process/' + function.__name__ + '/')
+        out_dim = np.shape(result)[0]
+        if outputs_names == None:
+            if np.shape(inputs_data)[0] == out_dim:
+                for n in range(out_dim):
+                    fproc[inputs[n][1].split('.')[0]] = result[n]
+                    pass
+            else:
+                print('The number of outputs names does not correspond to the number of inputs, using the default output names')
+                for n in range(out_dim):
+                    fproc['result' + str(n)] = result[n]
+        elif len(outputs_names) == out_dim:
+            for n in range(out_dim):
+                fproc[outputs_names[n]] = result[n]
+        elif len(outputs_names) > out_dim:
+            print('The number of outputs names is bigger than the number of outputs, using the first output names')
+            for n in range(out_dim):
+                fproc[outputs_names[n]] = result[n]
+        else:
+            print('The number of outputs names is smaller than the number of outputs, using the default output names')
+            for n in range(out_dim):
+                fproc['result_' + str(n)] = result[n]
