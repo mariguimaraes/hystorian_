@@ -1,5 +1,6 @@
 import h5py
 import os 
+import numpy as np
 from datetime import datetime
 
 #FUNCTION initialise_process
@@ -338,9 +339,6 @@ def m_apply(filename, function, inputs=[], outputs_names=None, **kwargs):
     result = function(*inputs_data, **kwargs)
     if type(result) == type(None):
         return None
-    
-    print(np.shape(inputs_data), np.shape(result))
-    print(np.shape(inputs_data)[0], np.shape(result)[0])
     
     with h5py.File(filename, 'a') as f:
 

@@ -137,11 +137,22 @@ def calc_hyst_params(bias, phase):
 
 def PFM_params_map(bias,phase):
     x,y,z = np.shape(phase)
-
+    coerc_pos = np.zeros((x,y),dtype=float)
+    coerc_neg = np.zeros((x,y),dtype=float)
+    step_left = np.zeros((x,y),dtype=float)
+    step_right = np.zeros((x,y),dtype=float)
+    imprint = np.zeros((x,y),dtype=float)
+    phase_shift = np.zeros((x,y),dtype=float)
     list_values = ['coerc_pos', 'coerc_neg', 'step_left', 'step_right', 'imprint', 'phase_shift']
     for xi in range(x):
         for yi in range(y):    
             hyst_matrix = calc_hyst_params(bias[xi,yi,:],phase[xi,yi,:])
-    
-    return hyst_matrix[0], hyst_matrix[1],hyst_matrix[2],hyst_matrix[3],(hyst_matrix[0]+hyst_matrix[1])/2.0,(hyst_matrix[3]-hyst_matrix[2])
+            coerc_pos[xi,yi] = hyst_matrix[0]
+            coerc_neg[xi,yi] = hyst_matrix[1]
+            step_left[xi,yi] = hyst_matrix[2]
+            step_right[xi,yi] = hyst_matrix[3]
+            imprint[xi,yi] = (hyst_matrix[0]+hyst_matrix[1])/2.0
+            phase_shift[xi,yi] = (hyst_matrix[3]-hyst_matrix[2])
+            
+    return coerc_pos, coerc_neg, step_left, step_right, imprint, phase_shift
 
