@@ -341,26 +341,27 @@ def m_apply(filename, function, inputs=[], outputs_names=None, **kwargs):
         return None
     
     with h5py.File(filename, 'a') as f:
-
-        fproc = f.require_group('process/' + function.__name__ + '/')
+        num_proc = len(f['process'].keys()) + 1
+        fproc = f.require_group('process/' + str(num_proc) + '-' + function.__name__ + '/')
         out_dim = np.shape(result)[0]
-        if outputs_names == None:
-            if np.shape(inputs_data)[0] == out_dim:
-                for n in range(out_dim):
-                    fproc[inputs[n][1].split('.')[0]] = result[n]
-                    pass
+        for n in range(out_dim):
+            if outputs_names == None:
+                if np.shape(inputs_data)[0] == out_dim:
+                    output_path = inputs_data[n].split('/', 2)
+                else:
+                    output_path = 'result' + str(n)
+                    print('The number of outputs names does not correspond to the number of inputs, using the default output names')
+            elif len(outputs_names) == out_dim:
+                output_path = outputs_names[n]
+            elif len(outputs_names) > out_dim:
+                print('The number of outputs names is bigger than the number of outputs, using the first output names')
+                output_path = outputs_names[n]
             else:
-                print('The number of outputs names does not correspond to the number of inputs, using the default output names')
-                for n in range(out_dim):
-                    fproc['result' + str(n)] = result[n]
-        elif len(outputs_names) == out_dim:
-            for n in range(out_dim):
-                fproc[outputs_names[n]] = result[n]
-        elif len(outputs_names) > out_dim:
-            print('The number of outputs names is bigger than the number of outputs, using the first output names')
-            for n in range(out_dim):
-                fproc[outputs_names[n]] = result[n]
-        else:
-            print('The number of outputs names is smaller than the number of outputs, using the default output names')
-            for n in range(out_dim):
-                fproc['result_' + str(n)] = result[n]
+                print('The number of outputs names is smaller than the number of outputs, using the default output names')
+                output_path = 'result' + str(n)
+            
+            fproc[output_path] = result[n]
+            write_generic_attributes(fproc[output_path], 
+                        'process/' + str(num_proc) + '-' + function.__name__ + '/' + output_path, 
+                        inputs, 
+                        output_path)
