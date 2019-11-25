@@ -44,12 +44,10 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                 if not (filename.split('.')[0] + '.hdf5' in filelist):
                     try:
                         tohdf5(filename)
-                        if erase_file == 'all':
-                            os.remove(filename)
                         filename = filename.split('.')[0] + '.hdf5'
                         temporary = True
                     except:
-                        print('Warning: \''+filename+'\' is a non-hdf5 file. File has been ignored.')
+                        print('Warning: \''+filename+'\' as impossible to convert. File has been ignored.')
                         continue
                 else:
                     print('Warning: \''+filename+'\' is a non-hdf5 file, but the list containt a hdf5 file with the same name. File has been ignored.')

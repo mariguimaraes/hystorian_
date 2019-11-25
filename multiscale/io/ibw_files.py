@@ -28,41 +28,38 @@ def correct_label(label):
     return corrected_label 
 
 def ibw2hdf5(filename):
-    try:
-        tmpdata = binarywave.load(filename)['wave']
-        note = tmpdata['note']
-        label_list = correct_label(tmpdata['labels'])
+    tmpdata = binarywave.load(filename)['wave']
+    note = tmpdata['note']
+    label_list = correct_label(tmpdata['labels'])
 
-        fastsize = float(str(note).split('FastScanSize:')[-1].split('\\r')[0])
-        slowsize = float(str(note).split('SlowScanSize:')[-1].split('\\r')[0])
-        xoffset = float(str(note).split('XOffset:')[1].split('\\r')[0])
-        yoffset = float(str(note).split('YOffset:')[1].split('\\r')[0])
+    fastsize = float(str(note).split('FastScanSize:')[-1].split('\\r')[0])
+    slowsize = float(str(note).split('SlowScanSize:')[-1].split('\\r')[0])
+    xoffset = float(str(note).split('XOffset:')[1].split('\\r')[0])
+    yoffset = float(str(note).split('YOffset:')[1].split('\\r')[0])
 
-        with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-            typegrp = f.create_group("type")
-            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
-            metadatagrp = f.create_group("metadata")
-            metadatagrp.create_dataset(filename.split('.')[0], data=tmpdata['note'])
-            datagrp = f.create_group("datasets/"+filename.split('.')[0])
-            f.create_group("process")
-            for i, k in enumerate(label_list):
-                datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:,:,i].T))
+    with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
+        typegrp = f.create_group("type")
+        typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+        metadatagrp = f.create_group("metadata")
+        metadatagrp.create_dataset(filename.split('.')[0], data=tmpdata['note'])
+        datagrp = f.create_group("datasets/"+filename.split('.')[0])
+        f.create_group("process")
+        for i, k in enumerate(label_list):
+            datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:,:,i].T))
 
-                datagrp[label_list[i]].attrs['name'] = k.decode('utf8')
-                datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:,:,i].T.shape
-                datagrp[label_list[i]].attrs['size'] = (fastsize,slowsize)
-                datagrp[label_list[i]].attrs['offset'] = (xoffset,yoffset)
+            datagrp[label_list[i]].attrs['name'] = k.decode('utf8')
+            datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:,:,i].T.shape
+            datagrp[label_list[i]].attrs['size'] = (fastsize,slowsize)
+            datagrp[label_list[i]].attrs['offset'] = (xoffset,yoffset)
 
-                if "Phase" in str(k):
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
-                elif "Amplitude" in str(k):
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'V')
-                elif "Height" in str(k):
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'm')
-                else:
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'unknown')
-            #f.create_dataset("channelsdata/pxs", data=sizes)
-        
-        print('file successfully converted')
-    except:
-        print('Conversion from .ibw to .hdf5 failed.')
+            if "Phase" in str(k):
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
+            elif "Amplitude" in str(k):
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'V')
+            elif "Height" in str(k):
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'm')
+            else:
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'unknown')
+        #f.create_dataset("channelsdata/pxs", data=sizes)
+
+    print('file successfully converted')
