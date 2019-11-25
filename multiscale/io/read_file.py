@@ -1,5 +1,9 @@
 from . import ibw_files
-from . import xrdml_files
+try:
+    from . import xrdml_files
+    xrdml_bool=True
+except:
+    xrdml_bool=False
 from . import ardf_files
 import h5py
 import os
@@ -11,7 +15,10 @@ def tohdf5(filename):
         if filename.split('.')[-1] == 'ibw':
             ibw_files.ibw2hdf5(filename)
         elif filename.split('.')[-1] == 'xrdml':
-            xrdml_files.xrdml2hdf5(filename)
+            if xrdml_bool:
+                xrdml_files.xrdml2hdf5(filename)
+            else:
+                print('xrdml_files was not imported, probably due to the missing xrd_tools package. Please install it.')
         elif filename.split('.')[-1] == 'ardf' or filename.split('.')[-1] == 'ARDF':
             ardf_files.ardf2hdf5(filename)
         else:
@@ -20,12 +27,7 @@ def tohdf5(filename):
 def merge_hdf5(filelist, combined_name, erase_file='partial'):
     i = 0
     temporary = False
-    if erase_file == 'all':
-        print('CAUTION YOU RISK ERASING SOME RAW DATA FILES, ARE YOU SURE ? Due to the way python erase file, they will NOT be in the recycle bin. Please write "Yes, I am sure!" if you want to take that risk')
-        tmp_val = input()
-        if tmp_val != 'Yes, I am sure!':
-              return 
-              
+    
     with h5py.File(combined_name +'.hdf5', 'w') as f:
         typegrp = f.create_group('type')
         metadatagrp = f.create_group('metadata')
@@ -42,12 +44,10 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                 if not (filename.split('.')[0] + '.hdf5' in filelist):
                     try:
                         tohdf5(filename)
-                        if erase_file == 'all':
-                            os.remove(filename)
                         filename = filename.split('.')[0] + '.hdf5'
                         temporary = True
                     except:
-                        print('Warning: \''+filename+'\' is a non-hdf5 file. File has been ignored.')
+                        print('Warning: \''+filename+'\' as impossible to convert. File has been ignored.')
                         continue
                 else:
                     print('Warning: \''+filename+'\' is a non-hdf5 file, but the list containt a hdf5 file with the same name. File has been ignored.')
@@ -73,13 +73,10 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                 i = i + 1
         
         print('\''+filename+'\' successfully merged')
-        #print(erase_file)    
-        if erase_file == 'all':
-            print('Erasing the file')
-            os.remove(filename)
-        elif erase_file == 'partial' and temporary:
+        if erase_file == 'partial' and temporary:
             temporary = False
-            os.remove(filename)
+            if filename.split('.')[-1] == '.hdf5':
+                os.remove(filename)
             
                 
     print(str(i)+'/'+str(len(filelist))+' files merged into \'' + combined_name +'.hdf5\'')

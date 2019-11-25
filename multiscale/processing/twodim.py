@@ -2,7 +2,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib_scalebar.scalebar import ScaleBar
-from . import proc_tools as pt
+from . import core as pt
 import cv2
 import os
 
