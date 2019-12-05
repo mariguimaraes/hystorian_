@@ -1106,7 +1106,7 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
         data.attrs['thresh_factor'] = thresh_factor
     
     
-#   FUNCTION rotation_correction_
+#   FUNCTION rotation_alignment_
 # Applies a rotation matrix to an image. An option also allows for cropping to the largest common
 # area, which is found via trial and error. If one rotation matrix is given, it is applied to all
 # images given. If multiple rotation matrices are given, it applies each rotation matrix n times
@@ -1128,7 +1128,7 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
 #   TO DO:
 # Allow for true non-cropping, which would extend the border to the maximum possible limit.
         
-def rotation_correction_(filename, data_folder='datasets', selection=None,
+def rotation_alignment_(filename, data_folder='datasets', selection=None,
                          criteria=None, rm_data_folder = 'process/01-rotation_params',
                          rm_selection=None, rm_criteria=None, cropping = True):
     rm_path_list = pt.path_inputs(filename, rm_data_folder, rm_selection, rm_criteria)
@@ -1138,7 +1138,7 @@ def rotation_correction_(filename, data_folder='datasets', selection=None,
             rotation_matrices.append(np.copy(f[path]))
 
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
-    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_correction',
+    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_alignment',
                                                           in_path_list)
     if len(in_path_list)%len(rm_path_list):
         print('Error: Images to be corrected are not a multiple of the amount of\
