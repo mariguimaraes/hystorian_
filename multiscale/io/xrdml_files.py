@@ -1,4 +1,8 @@
-import xrdtools
+try:
+    import xrdtools
+    xrdtools_bool = True
+except:
+    xrdtools_bool = False
 import h5py
 import re
 import numpy as np
@@ -6,6 +10,10 @@ import numpy as np
 #XRDML conversion
 
 def xrdml2hdf5(filename):
+    if !xrdtools_bool:
+        print('Please download the xrdtools package if you want to use this function')
+        return
+
     with open(filename, 'r') as f:
         contents = f.read()
     counts = contents.split('<counts unit="counts">')[-1].split('</counts>')[0].split()
