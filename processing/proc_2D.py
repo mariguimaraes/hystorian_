@@ -99,6 +99,51 @@ def save_image(data,
         plt.close()
     return
 
+#   FUNCTION save_many_images
+# Repeatedly calls save_image to save  one .png image to the current directory, or a chosen folder
+#   INPUTS:
+# data: A 2-D array which will be converted into a png image.
+# image_name (default: 'image'): name of the image that is saved
+# colorm (default: 'inferno'): colormap to be used for image
+# scalebar (default: False): if True, add a scalebar to the image, requires three attributes : 
+#     shape, which define the pixel size of the image
+#     size, which gives the phyiscal dimension of the image
+#     unit, which give the physical unit of size
+# physical_size (default: (0, 'unit')): physical size of the image used when generating the scalebar
+# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel 
+#     per data point at 100 dpi
+# labelsize (default: 16): Size of the text in pxs
+# std_range (default: 3): Range around the mean for the colorscale, alternatively the value can be 
+#    "full", to take the full range.
+# saving_path (default: ''): The path to the folder where to save the image
+# verbose (default: False): if True, print a line each time a image is saved.
+# show (default: False): if True, the image is displayed in the kernel.
+#   OUTPUTS:
+# null
+
+def save_many_images(filename,
+               data_folder = 'datasets',
+               selection = None,
+               criteria = None, 
+               image_name='image', 
+               colorm='inferno',
+               scalebar=False,
+               physical_size = (0, 'unit'),
+               colorbar = True, 
+               size=None, 
+               labelsize=16, 
+               std_range=3, 
+               saving_path='', 
+               verbose=False,
+               show=False):
+    i = 0
+    with h5py.File(filename, "a") as f:
+        pathlist = pt.path_inputs(filename, data_folder, selection, criteria)
+        for path in pathlist:
+            proc_2D.save_image(f[path], image_name+str(i).zfill(2), colorm, scalebar, physical_size,
+                               colorbar, size, labelsize, std_range, saving_path, verbose, show)
+            i = i+1
+
 
 #   FUNCTION distortion_params_
 # determine cumulative translation matrices for distortion correction.
@@ -394,7 +439,11 @@ def array_expanded(array, xoffset, yoffset, offset_caps):
 #     the name of folders or files to be used.
 # criteria (default: channel): determines what category selection refers to
 # min_separation (default: 90): minimum distance between the two peaks assigned as 0 and 1.
+# background (default: None): number to identify where background is to correctly attribute values.
+#     If positive, tries to make everything to the left of this value background; if negative, makes
+#     everything to the right background
 # print_frequency (default: 4): number of channels processed before a a status update is printed
+# show (default: False): If True, show the data prior to saving
 #   OUTPUTS
 # null
 
@@ -402,7 +451,8 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
                                                                         'Phase1Retrace',
                                                                         'Phase2Trace',
                                                                         'Phase2Retrace'],
-                         criteria = 'channel', min_separation=90, print_frequency = 4):
+                         criteria = 'channel', min_separation=90, background = None,
+                         print_frequency = 4, show = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'phase_linearisation',
                                                           in_path_list)
@@ -454,10 +504,19 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
             # Define which points are 0 or 1 based on relative magnitude
             if np.mean(linearised_array) > 0.95:
                 linearised_array = 1-linearised_array
-            elif (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])
-                  > 2*np.mean(linearised_array)):
-                linearised_array = 1-linearised_array
-                
+            else:
+                if background is None:
+                    if (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])) \
+                          > 2*np.mean(linearised_array):
+                        linearised_array = 1-linearised_array
+                elif background < 0:
+                    if np.mean(linearised_array[:,background:]) > np.mean(linearised_array):
+                        linearised_array = 1-linearised_array
+                elif background > 0:
+                    if np.mean(linearised_array[:,:background]) > np.mean(linearised_array):
+                        linearised_array = 1-linearised_array
+            
+            pt.intermediate_plot(linearised_array, force_plot = show, text = 'Linearised Array')
             data = pt.write_output_f(f, linearised_array, out_folder_locations[index],
                                      in_path_list[index])
             data.attrs['peak values'] = [peak1_value, peak2_value]

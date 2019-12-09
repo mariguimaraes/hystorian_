@@ -233,7 +233,7 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
         f = filename_or_f
         operation_number = len(f['process'])+1
         if overwrite_if_same == True:
-            if str(operation_number-1)+'-'+process_name in f['process'].keys():
+            if str(operation_number-1).zfill(2)+'-'+process_name in f['process'].keys():
                 operation_number = operation_number-1
         if type(folder_names) != list:
             folder_names = [folder_names]
