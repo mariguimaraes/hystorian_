@@ -118,6 +118,7 @@ def save_image(data,
 # saving_path (default: ''): The path to the folder where to save the image
 # verbose (default: False): if True, print a line each time a image is saved.
 # show (default: False): if True, the image is displayed in the kernel.
+# default_name (default: False): if True, takes name from path
 #   OUTPUTS:
 # null
 
@@ -135,13 +136,23 @@ def save_many_images(filename,
                std_range=3, 
                saving_path='', 
                verbose=False,
-               show=False):
+               show=False,
+               default_name = False,
+               convert_bool = False):
     i = 0
     with h5py.File(filename, "a") as f:
         pathlist = pt.path_inputs(filename, data_folder, selection, criteria)
         for path in pathlist:
-            proc_2D.save_image(f[path], image_name+str(i).zfill(2), colorm, scalebar, physical_size,
-                               colorbar, size, labelsize, std_range, saving_path, verbose, show)
+            if default_name:
+                final_name = path.split('/')[-2]+'_'+path.split('/')[-1]
+            else:
+                final_name = image_name+str(i).zfill(2)
+            if convert_bool:
+                data = np.array((f[path])).astype(int)
+            else:
+                data = f[path]
+            save_image(data, final_name, colorm, scalebar, physical_size, colorbar, size,
+                               labelsize, std_range, saving_path, verbose, show)
             i = i+1
 
 
@@ -156,14 +167,18 @@ def save_many_images(filename,
 #     number is faster, but assumes lower distortion and thus may be incorrect.
 # read_offset (default: False): if set to True, attempts to read dataset for offset attributes to
 #     improve initial guess and thus overall accuracy
+# overwrite (default: False): if set to True, if this function was the last process run, the last
+#     run will be overwritten and replaced with this. To be used sparingly, and only if function
+#     parameters must be guessed and checked
 #   OUTPUTS
 # null
 
 def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace',
-                       criteria = 'channel', speed = 2, read_offset = False):
+                       criteria = 'channel', speed = 2, read_offset = False, overwrite = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
-                                                          in_path_list)
+                                                          in_path_list,
+                                                          overwrite_if_same = overwrite)
     tform21 = np.eye(2,3,dtype=np.float32)
     cumulative_tform21 = np.eye(2,3,dtype=np.float32)
     with h5py.File(filename, "a") as f:
@@ -492,19 +507,13 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
             
             # Create a new array whose values depend on their position on the number lines
             linearised_array = np.copy(f[path])
-            for i in range(np.shape(linearised_array)[0]):
-                for j in range(np.shape(linearised_array)[1]):
-                    if linearised_array[i,j] >= peak1_value and linearised_array[i,j] < peak2_value:
-                        linearised_array[i,j] = (linearised_array[i,j]-peak1_value)/range_1to2
-                    elif linearised_array[i,j] < peak1_value:
-                        linearised_array[i,j] = (peak1_value-linearised_array[i,j])/range_2to1
-                    else:
-                        linearised_array[i,j] = 1-((linearised_array[i,j]-peak2_value)/range_2to1)
-            
+            linearise_map = np.vectorize(linearise)
+            linearised_array = linearise_map(linearised_array, peak1_value, peak2_value,
+                                             range_1to2, range_2to1)
             # Define which points are 0 or 1 based on relative magnitude
-            if np.mean(linearised_array) > 0.95:
+            if np.mean(linearised_array) > 0.8:
                 linearised_array = 1-linearised_array
-            else:
+            elif np.mean(linearised_array) > 0.2:
                 if background is None:
                     if (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])) \
                           > 2*np.mean(linearised_array):
@@ -525,6 +534,15 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
                 print('Phase Linearisation: ' + str(index+1) + ' of ' + str(len(in_path_list))
                       + ' complete.')
 
+def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
+    if (entry >= peak1_value) and (entry < peak2_value):
+        entry = (entry-peak1_value)/range_1to2
+    elif entry < peak1_value:
+        entry = (peak1_value-entry)/range_2to1
+    else:
+        entry = 1-((entry-peak2_value)/range_2to1)
+    return entry
+                
                 
 #   FUNCTION sum_
 # Adds multiple channels together. The files are added in order, first by channel and then by
@@ -683,6 +701,8 @@ def wrap(x, low = 0, high = 360):
 # filter_width (default: 15): total width of the filter, in pixels, around the domain-wall
 #     boundaries. This is the total distance - so half this value is applied to each side.
 # thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
+# dilation (default: 2): amount of dilation steps to clean image
+# erosion (default: 4): amount of erosion steps to clean image
 # line_threshold (default: 80): minimum number of votes (intersections in Hough grid cell)
 # min_line_length (default: 80): minimum number of pixels making up a line
 # max_line_gap (default: 80): maximum gap in pixels between connectable line segments
@@ -697,7 +717,7 @@ def wrap(x, low = 0, high = 360):
 #     'erode': Binarisation data after an erosion filter is applied
 #     'lines': Lines found, and should correspond to a-domains on original amplitude image
 #     'clean': Lines found, after filtering to the most common angles
-# print_freuency (default: 4): number of channels processed before a a status update is printed
+# print_frequency (default: 4): number of channels processed before a a status update is printed
 #   OUTPUTS
 # null
 
@@ -705,8 +725,8 @@ def find_a_domains_(filename, data_folder = 'datasets',
                     selection = ['Amplitude1Retrace', 'Amplitude2Retrace'],
                     criteria = 'channel', pb_data_folder = None, pb_selection = None,
                     pb_criteria = None, direction = None, filter_width = 15, thresh_factor = 2,
-                    line_threshold = 50, min_line_length=50, max_line_gap=10, plots = None,
-                    print_frequency = 4):
+                    dilation = 2, erosion = 4, line_threshold = 50, min_line_length=50,
+                    max_line_gap=10, plots = None, print_frequency = 4):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     if pb_data_folder is not None:
         pb_path_list = pt.path_inputs(filename, pb_data_folder, pb_selection, pb_criteria)
@@ -741,7 +761,8 @@ def find_a_domains_(filename, data_folder = 'datasets',
             a_estimate, bin_thresh = estimate_a_domains(f[path], domain_wall_filter,
                                                         direction = direction,
                                                         plots = plots,
-                                                        thresh_factor = thresh_factor)
+                                                        thresh_factor = thresh_factor,
+                                                        dilation = dilation, erosion = erosion)
 
             # Find Lines
             rho = 1  # distance resolution in pixels of the Hough grid
@@ -755,7 +776,7 @@ def find_a_domains_(filename, data_folder = 'datasets',
             
             if lines is not None:
                 # Draw lines, filtering with phase filter if possible
-                valid_lines = []
+                phase_filter_lines = []
                 for line in lines:
                     for x1,y1,x2,y2 in line:
                         if pb_data_folder is not None:
@@ -764,16 +785,16 @@ def find_a_domains_(filename, data_folder = 'datasets',
                             points_outside_mask = one_line*domain_wall_filter
                             if np.sum(points_outside_mask) > 0.2*np.sum(one_line):
                                 cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
-                                valid_lines.append(line)
+                                phase_filter_lines.append(line)
                         else:
                             cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
-                            valid_lines.append(line)
+                            phase_filter_lines.append(line)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
                 pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
                 # Find angles of each line
                 angles = []
-                for line in valid_lines:
+                for line in phase_filter_lines:
                     for x1,y1,x2,y2 in line:
                         if x2 == x1:
                             angles.append(90)
@@ -788,18 +809,18 @@ def find_a_domains_(filename, data_folder = 'datasets',
                 else:
                     key_angles = find_desired_angles(angles)
 
-                # Filter To Valid Lines
-                valid_lines = []
+                # Filter To Angle-Valid Lines
+                angle_filter_lines = []
                 i = 0
                 for angle in angles:
                     for key_angle in key_angles:
                         if check_within_angle_range(angle, key_angle, 1) == True:
-                            valid_lines.append(lines[i])
+                            angle_filter_lines.append(phase_filter_lines[i])
                     i = i+1
 
                 # Draw Lines
                 line_image = np.copy(a_estimate) * 0  # creating a blank to draw lines on
-                for line in valid_lines:
+                for line in angle_filter_lines:
                     for x1,y1,x2,y2 in line:
                         cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
@@ -864,12 +885,15 @@ def create_domain_wall_filter(phase, filter_width = 15, plots = []):
 #     'second_deriv': Second derivitave of amplitude
 #     'binary': Binarisation of second derivative
 #     'erode': Binarisation data after an erosion filter is applied
+# thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
+# dilation (default: 2): amount of dilation steps to clean image
+# erosion (default: 4): amount of erosion steps to clean image
 #   OUTPUTS
 # filtered_deriv_amp: adjusted amplitude image made to highlight points of higher second derivative
 # thresh: the threshold value used to find the a-domains
 
 def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plots = [],
-                       thresh_factor = 2):
+                       thresh_factor = 2, dilation = 2, erosion = 4):
     # Raw Data
     amp = np.copy(amplitude)
     pt.intermediate_plot(amp, 'amp', plots, 'Original Data')
@@ -914,7 +938,8 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plo
     pt.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
     
     # Remove Small Points
-    filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations = 2), iterations = 4)
+    filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations = dilation),
+                                        iterations = erosion)
     pt.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
     return filtered_deriv_amp.astype(np.uint8), thresh
             
@@ -1348,6 +1373,7 @@ def distance_(filename, data_folder = 'datasets', selection = None, criteria = N
 #     'Horz': Draws horizontal lines
 # false_positives (default: None): a list of ints that defines which lines to be ignored. Each line
 #     is described by an int, starting from number 0, which is the left- or up-most line.
+# max_edge (default: 10): the distance a line will stretch to read the edge or another line
 # overwrite (default: False): if set to True, if this function was the last process run, the last
 #     run will be overwritten and replaced with this. To be used sparingly, and only if function
 #     parameters must be guessed and checked
@@ -1355,7 +1381,8 @@ def distance_(filename, data_folder = 'datasets', selection = None, criteria = N
 # null
             
 def directional_skeletonize_(filename, data_folder = 'datasets', selection = None, criteria = None,
-                             direction = 'Vert', false_positives = None, overwrite = False):
+                             direction = 'Vert', false_positives = None, max_edge = 10,
+                             overwrite = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'directional_skeletonize',
                                                           in_path_list, overwrite)
@@ -1395,10 +1422,10 @@ def directional_skeletonize_(filename, data_folder = 'datasets', selection = Non
                         if whole_line[y]==0:
                             zero_count = zero_count + 1
                         else:
-                            if zero_count <= 10:
+                            if zero_count <= max_edge:
                                 whole_line[y-zero_count:y] = 1
                             zero_count = 0
-                    if (zero_count != 0) and (zero_count <= 10):
+                    if (zero_count != 0) and (zero_count <= max_edge):
                         whole_line[-zero_count:] = 1
                     if i in false_positives:
                         bad_domains[:,x] = whole_line 
@@ -1414,10 +1441,10 @@ def directional_skeletonize_(filename, data_folder = 'datasets', selection = Non
                         if whole_line[x]==0:
                             zero_count = zero_count + 1
                         else:
-                            if zero_count <= 10:
+                            if zero_count <= max_edge:
                                 whole_line[x-zero_count:x] = 1
                             zero_count = 0
-                    if (zero_count != 0) and (zero_count <= 10):
+                    if (zero_count != 0) and (zero_count <= max_edge):
                         whole_line[-zero_count:] = 1
                     if i in false_positives:
                         bad_domains[y] = whole_line 
@@ -1872,7 +1899,6 @@ def interpolated_features_(filename, data_folder = 'process/01-switchmap', selec
             path = in_path_list[index]
             switchmap = np.copy(f[path])
             isolines = find_isolines(switchmap, nucl_centres, clos_centres)
-            
             isoline_y = []
             isoline_x = []
             isoline_z = []
@@ -1913,33 +1939,25 @@ def find_isolines(switchmap, nucl_centres, clos_centres):
             if np.isnan(switchmap[i,j]):
                 isolines[i,j] = np.nan
             if i != 0:
-                if np.isnan(switchmap[i-1,j]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i-1,j]:
+                if np.isnan(switchmap[i-1,j]) or (switchmap[i,j]>switchmap[i-1,j]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i-1,j]-1 and peak == False:
                     isolines[i,j]=switchmap[i,j]+0.5
             if i != np.shape(switchmap)[0]-1:
-                if np.isnan(switchmap[i+1,j]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i+1,j]:
+                if np.isnan(switchmap[i+1,j]) or (switchmap[i,j]>switchmap[i+1,j]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i+1,j]-1 and peak == False:
                     isolines[i,j]=switchmap[i,j]+0.5
             if j != 0:
-                if np.isnan(switchmap[i,j-1]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i,j-1]:
+                if np.isnan(switchmap[i,j-1]) or (switchmap[i,j]>switchmap[i,j-1]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i,j-1]-1 and peak == False:
                     isolines[i,j]=switchmap[i,j]+0.5
             if j != np.shape(switchmap)[1]-1:
-                if np.isnan(switchmap[i,j+1]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i,j+1]:
+                if np.isnan(switchmap[i,j+1]) or (switchmap[i,j]>switchmap[i,j+1]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i,j+1]-1 and peak == False:
