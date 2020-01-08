@@ -10,7 +10,7 @@ import numpy as np
 #XRDML conversion
 
 def xrdml2hdf5(filename):
-    if !xrdtools_bool:
+    if not xrdtools_bool:
         print('Please download the xrdtools package if you want to use this function')
         return
 
