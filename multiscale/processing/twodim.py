@@ -1,3 +1,5 @@
+#234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,20 +8,35 @@ from . import core as pt
 import cv2
 import os
 
-#FUNCTION save_image 
-#INPUTS:
-## data: A 2-D array which will be converted into a png image.
-## scalebar (default: False): Add a scalebar to the image, requires three attributes : 
-##                                                 shape, which define the pixel size of the image
-##                                                 size, which gives the phyiscal dimension of the image
-##                                                 unit, which give the physical unit of size
-## size (default: None : Dimension of the saved image. If none, the image is set to have one pixel per data point at 100 dpi
-## labelsize (default: 25) : Size of the text in pxs
-## std_range (default: 3) : Range around the mean for the colorscale, alternatively the value can be "full", to take the full range.
-## saving_path (default: '') : The path to the folder where to save the image
-## verbose (default: False) : if True, print a line each time a image is saved.
-## Output : one png images
-## TO DO: Allow for no border at all
+from scipy.signal import medfilt, cspline2d
+from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
+from scipy.ndimage.measurements import label
+from scipy import interpolate
+from skimage.morphology import skeletonize
+from random import randrange
+
+
+#   FUNCTION save_image
+# Saves one .png image to the current directory, or a chosen folder
+#   INPUTS:
+# data: A 2-D array which will be converted into a png image.
+# image_name (default: 'image'): name of the image that is saved
+# colorm (default: 'inferno'): colormap to be used for image
+# scalebar (default: False): if True, add a scalebar to the image, requires three attributes : 
+#     shape, which define the pixel size of the image
+#     size, which gives the phyiscal dimension of the image
+#     unit, which give the physical unit of size
+# physical_size (default: (0, 'unit')): physical size of the image used when generating the scalebar
+# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel 
+#     per data point at 100 dpi
+# labelsize (default: 16): Size of the text in pxs
+# std_range (default: 3): Range around the mean for the colorscale, alternatively the value can be 
+#    "full", to take the full range.
+# saving_path (default: ''): The path to the folder where to save the image
+# verbose (default: False): if True, print a line each time a image is saved.
+# show (default: False): if True, the image is displayed in the kernel.
+#   OUTPUTS:
+# null
 
 def save_image(data, 
                image_name='image', 
@@ -31,7 +48,11 @@ def save_image(data,
                labelsize=16, 
                std_range=3, 
                saving_path='', 
-               verbose=False): 
+               verbose=False,
+               show=False): 
+    if saving_path != '':
+        if saving_path[-1] != '/':
+            saving_path = saving_path +'/'
     if std_range != 'full':
         std_range = float(std_range)
     
@@ -62,30 +83,103 @@ def save_image(data,
             try:
                 phys_size = physical_size[0]
                 px = np.shape(data)[0]
-                scalebar = ScaleBar(phys_size/px, physical_size[1], location='lower right', font_properties={'size':labelsize})
-                fig.add_artist(scalebar)
+                scalebar = ScaleBar(phys_size/px, physical_size[1], location='lower right',
+                                    font_properties={'size':labelsize})
+                #scalebar = ScaleBar(f[path].attrs['scale (m/px)'], 'm', location='lower right',
+                                    #font_properties={'size':25})
+                plt.gca().add_artist(scalebar)
             except:
-                print("Error in the creation of the scalebar, please check that the attributes size and shape are correctly define for each datas channels.")
+                print("Error in the creation of the scalebar, please check that the attribute's\
+                        size and shape are correctly define for each data channel.")
         fig.savefig(saving_path+str(image_name)+'.png')
+        if show:
+            plt.show()
         if verbose:
             print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
         plt.close()
     return
 
-#FUNCTION distortion_params_
-## determine cumulative translation matrices for distortion correction.
-#INPUTS:
-## filename: name of hdf5 file containing data
-## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for correction based on topography in data from Asylum AFM.
-## criteria (default: 'channel'): determines the type of data selected. Set to 'process', 'sample' or 'channel'. Default allows for correction based on topography in data from Asylum AFM.
-## speed: determines speed and accuracy of function. An integer between 1 and 3, a higher number if faster (but needs less distortion to work)
-#OUTPUTS:
-## null
+#   FUNCTION save_many_images
+# Repeatedly calls save_image to save  one .png image to the current directory, or a chosen folder
+#   INPUTS:
+# data: A 2-D array which will be converted into a png image.
+# image_name (default: 'image'): name of the image that is saved
+# colorm (default: 'inferno'): colormap to be used for image
+# scalebar (default: False): if True, add a scalebar to the image, requires three attributes : 
+#     shape, which define the pixel size of the image
+#     size, which gives the phyiscal dimension of the image
+#     unit, which give the physical unit of size
+# physical_size (default: (0, 'unit')): physical size of the image used when generating the scalebar
+# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel 
+#     per data point at 100 dpi
+# labelsize (default: 16): Size of the text in pxs
+# std_range (default: 3): Range around the mean for the colorscale, alternatively the value can be 
+#    "full", to take the full range.
+# saving_path (default: ''): The path to the folder where to save the image
+# verbose (default: False): if True, print a line each time a image is saved.
+# show (default: False): if True, the image is displayed in the kernel.
+# default_name (default: False): if True, takes name from path
+#   OUTPUTS:
+# null
 
-def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace', criteria = 'channel', speed = 2):
+def save_many_images(filename,
+               data_folder = 'datasets',
+               selection = None,
+               criteria = None, 
+               image_name='image', 
+               colorm='inferno',
+               scalebar=False,
+               physical_size = (0, 'unit'),
+               colorbar = True, 
+               size=None, 
+               labelsize=16, 
+               std_range=3, 
+               saving_path='', 
+               verbose=False,
+               show=False,
+               default_name = False,
+               convert_bool = False):
+    i = 0
+    with h5py.File(filename, "a") as f:
+        pathlist = pt.path_inputs(filename, data_folder, selection, criteria)
+        for path in pathlist:
+            if default_name:
+                final_name = path.split('/')[-2]+'_'+path.split('/')[-1]
+            else:
+                final_name = image_name+str(i).zfill(2)
+            if convert_bool:
+                data = np.array((f[path])).astype(int)
+            else:
+                data = f[path]
+            if show:
+                print(final_name)
+            save_image(data, final_name, colorm, scalebar, physical_size, colorbar, size,
+                               labelsize, std_range, saving_path, verbose, show)
+            i = i+1
+
+
+#   FUNCTION distortion_params_
+# determine cumulative translation matrices for distortion correction.
+#   INPUTS:
+# filename: name of hdf5 file containing data
+# data_folder (default: 'datasets'): folder searched for image inputs
+# selection (default: None): determines the name of folders or files to be used.
+# criteria (default: None): determines what category selection refers to
+# speed (default: 2): int between 1 and 4, which determines speed and accuracy of function. A higher
+#     number is faster, but assumes lower distortion and thus may be incorrect.
+# read_offset (default: False): if set to True, attempts to read dataset for offset attributes to
+#     improve initial guess and thus overall accuracy
+# cumulative (default: False): determines if each image is compared to the previous image (default,
+#      False), or to the original image (True). Output format is identical.
+#   OUTPUTS
+# null
+
+def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace',
+                       criteria = 'channel', speed = 2, read_offset = False, cumulative = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
-    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params', in_path_list)
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
+                                                          in_path_list,
+                                                          overwrite_if_same = overwrite)
     tform21 = np.eye(2,3,dtype=np.float32)
     cumulative_tform21 = np.eye(2,3,dtype=np.float32)
     with h5py.File(filename, "a") as f:
@@ -94,21 +188,27 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
             if i == 0:
                 pass
             else:
-                img1 = img2cv((f[in_path_list[i-1]]))
-                img2 = img2cv((f[in_path_list[i]]))
+                print('---')
+                print('Currently reading path '+in_path_list[i])
+                if cumulative:
+                    img1 = img2cv((f[in_path_list[0]]))
+                    img2 = img2cv((f[in_path_list[i]]))
+                else:
+                    img1 = img2cv((f[in_path_list[i-1]]))
+                    img2 = img2cv((f[in_path_list[i]]))
                 
                 # try estimate offset change from attribs of img1 and img2
-                try:
+                if read_offset == True:
                     offset2 = (f[in_path_list[i]]).attrs['offset']
                     offset1 = (f[in_path_list[i-1]]).attrs['offset']
                     scan_size = (f[in_path_list[i]]).attrs['size']
                     shape = (f[in_path_list[i]]).attrs['shape']
                     offset_px = m2px(offset2-offset1, shape, scan_size)
-                except:
-                    offset_px = [0,0]
-                
+                else:
+                    offset_px = np.array([0,0])
                 if speed != 1 and speed != 2 and speed != 3 and speed != 4:
-                    print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest). Speed now set to level 2.')
+                    print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest).\
+                            Speed now set to level 2.')
                     speed = 2                
                 if len(recent_offsets) == 0:
                     offset_guess = offset_px
@@ -131,7 +231,11 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
                     elif speed == 4:
                         warp_check_range = 6
                 else:
-                    offset_guess = offset_px + recent_offsets[2]/2 + recent_offsets[1]/3 + recent_offsets[0]/6
+                    offset_guess = (offset_px + recent_offsets[2]/2 + recent_offsets[1]/3
+                                    + recent_offsets[0]/6)
+                    #if i == 9:
+                    #    offset_guess = offset_guess-np.array([20,20])
+                    #    print(offset_guess)
                     if speed == 1:
                         warp_check_range = 8
                     elif speed == 2:
@@ -140,63 +244,75 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
                         warp_check_range = 4
                     elif speed == 4:
                         warp_check_range = 2
-
-                tform21 = generate_transform_xy(img1, img2, tform21, offset_guess, warp_check_range)
+                if (offset_px[0] != 0) or (offset_px[1] != 0):
+                    print('Offset found from file attributes: ' + str(offset_px))
+                    warp_check_range = warp_check_range + 8
+                    recent_offsets = []
+                tform21 = generate_transform_xy(img1, img2, tform21, offset_guess,
+                                                warp_check_range, cumulative, cumulative_tform21)
+                if cumulative:
+                    tform21[0,2] = tform21[0,2]-cumulative_tform21[0,2]
+                    tform21[1,2] = tform21[1,2]-cumulative_tform21[1,2]
                 cumulative_tform21[0,2]=cumulative_tform21[0,2]+tform21[0,2]
                 cumulative_tform21[1,2]=cumulative_tform21[1,2]+tform21[1,2]
                 print('Scan '+str(i)+' Complete. Cumulative Transform Matrix:')
                 print(cumulative_tform21)
-                
-                recent_offsets.append([tform21[0,2], tform21[1,2]]-offset_px)
-                if len(recent_offsets)>3:
-                    recent_offsets = recent_offsets[1:]
-            pt.write_output_f(f, cumulative_tform21, out_folder_locations[i], in_path_list[i])
-        
+                if (offset_px[0] == 0) and (offset_px[1] == 0):
+                    recent_offsets.append([tform21[0,2], tform21[1,2]]-offset_px)
+                    if len(recent_offsets)>3:
+                        recent_offsets = recent_offsets[1:]
+            data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
+                                     in_path_list[i])
 
-#FUNCTION m2px
-## Converts length in metres to a length in pixels
-#INPUTS:
-## m: length in metres to be converted
-## points: number of lines or points per row
-## scan_size: total length of scan
-#OUTPUTS:
-## converted length in pixels
+
+#   FUNCTION m2px
+# Converts length in metres to a length in pixels
+#   INPUTS:
+# m: length in metres to be converted
+# points: number of lines or points per row
+# scan_size: total length of scan
+#   OUTPUTS:
+# px: converted length in pixels
         
 def m2px (m, points, scan_size):
     px = m*points/scan_size
     return px
-        
-        
-#FUNCTION img2cv
-## Converts img (numpy array, or hdf5 dataset) into cv2
-#INPUTS:
-## img1: currently used image
-## sigma_cutoff: ???
-#OUTPUTS:
-## converted image into cv2 valid format
+
+
+#   FUNCTION img2cv
+# Converts image (numpy array, or hdf5 dataset) into cv2
+#   INPUTS:
+# img1: currently used image
+# sigma_cutoff (default: 10): variation used to convert to cv-viable format
+#   OUTPUTS
+# img1: converted image into cv2 valid format
 
 def img2cv(img1, sigma_cutoff=10):
-    #img1 = np.diff(img1)
-    img1 = img1-np.min(img1)
+    img1 = img1-np.min(img1) 
     img1 = img1/np.max(img1)
     tmp1 = sigma_cutoff*np.std(img1)
     img1[img1>tmp1] = tmp1
     return img1
 
 
-#FUNCTION generate_transform_array
-## Determines transformation matrixes in x and y
-## Slow and primitive: needs updating
-#INPUTS:
-## img: currently used image (in cv2 format) to find transformation array of
-## img_orig: image (in cv2 format) to find transformation array is based off of
-## tfinit: base array passed into function
-## offset_guess: Initial estimate of distortion, in pixels
-## warp_check_range: total distance (in pixels) examined. Number of iterations = (warp_check_range+1)**2
-#OUTPUTS:
-## Transformation images used to convert img_orig into img
+#   FUNCTION generate_transform_xy
+# Determines transformation matrices in x and y coordinates
+#   INPUTS:
+# img: currently used image (in cv2 format) to find transformation array of
+# img_orig: image (in cv2 format) transformation array is based off of
+# tfinit (default: None): base array passed into function
+# offset_guess (default: [0,0]): Array showing initial estimate of distortion, in pixels
+# warp_check_range (default: 10): distance (in pixels) that the function will search to find the
+#     optimal transform matrix. Number of iterations = (warp_check_range+1)**2
+# cumulative (default: False): determines if each image is compared to the previous image (default,
+#      False), or to the original image (True). Output format is identical.
+# cumulative_tform21 (default: np.eye(2,3,dtype=np.float32)): the transformation matrix, only used
+#      if cumulative is switched to True.
+#   OUTPUTS
+# warp_matrix: transformation matrix used to convert img_orig into img
 
-def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp_check_range=10):
+def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp_check_range=10, 
+                          cumulative=False, cumulative_tform21=np.eye(2,3,dtype=np.float32)):
     # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
@@ -208,18 +324,27 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp
     number_of_iterations = 100000
     termination_eps = 1e-1#e-5
     term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
+    
+    if cumulative:
+        offset_guess[0] = offset_guess[0]+cumulative_tform21[0,2]
+        offset_guess[1] = offset_guess[1]+cumulative_tform21[1,2]
 
     criteria = (term_flags, number_of_iterations, termination_eps)
 
     diff = np.Inf
+    offset1=0
+    offset2=0
     for i in range(-warp_check_range//2,(warp_check_range//2)+1):
         for j in range(-warp_check_range//2,(warp_check_range//2)+1):
             warp_matrix[0,2] = 2*i + offset_guess[0]
             warp_matrix[1,2] = 2*j + offset_guess[1]
             try:
-                (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
-                img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP);
-                currDiff = np.sum(np.square(img_test[150:-150, 150:-150]-img_orig[150:-150, 150:-150]))
+                (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
+                                                     criteria)
+                img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR +
+                                          cv2.WARP_INVERSE_MAP);
+                currDiff = np.sum(np.square(img_test[150:-150, 150:-150]
+                                            -img_orig[150:-150, 150:-150]))
                 if currDiff < diff:
                     diff = currDiff
                     offset1 = tform21[0,2]
@@ -230,22 +355,26 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp
             warp_matrix[1,2] = offset2
     return warp_matrix
 
-#FUNCTION distortion_correction_
-## applies distortion correction params to an image
-#INPUTS:
-## filename: name of hdf5 file containing data
-## data_folder: folder searched for image inputs. eg. 'datasets', or 'process/negative'
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for correction based on topography in data from Asylum AFM.
-## selection_depth: determines what level at which to look at a selection. Default allows for correction based on topography in data from Asylum AFM.
-## dm_data_folder: folder searched for distortion matrix inputs. eg. 'datasets', or 'process/negative'
-## dm_selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings. Default allows for extraction if distortion parameters were the first processing funciton applied.
-## dm_selection_depth: determines what level at which to look at a selection. Default allows for extraction if distortion parameters were the first processing funciton applied.
-#OUTPUTS:
-## null
 
-def distortion_correction_(filename, data_folder='datasets', selection=None, criteria=None, dm_data_folder = 'process/1-distortion_params', dm_selection=None, dm_criteria=None, cropping = True):
-    #dm_path_lists = pt.initialise_process(filename, None, data_folder=dm_data_folder, selection=dm_selection, selection_depth=dm_selection_depth)
-    
+#   FUNCTION distortion_correction
+# Applies distortion correction parameters to an image. The distortion corrected data is then
+# cropped to show only the common data, or expanded to show the maximum extent of all possible data.
+#   INPUTS:
+# filename: name of hdf5 file containing data
+# data_folder (default: 'datasets'): folder searched for image inputs
+# selection (default: None): determines the name of folders or files to be used.
+# criteria (default: None): determines what category selection refers to
+# dm_data_folder (default: 'process/01-distortion_params'): folder searched for distoriton params
+# dm_selection (default: None): determines the name of folders or files to be used.
+# dm_criteria (default: None): determines what category selection refers to
+# cropping (default: True): If set to True, each dataset is cropped to show only the common area. If
+#     set to false, expands data shape to show all data points of all images.
+#   OUTPUTS
+# null
+
+def distortion_correction_(filename, data_folder='datasets', selection=None, criteria=None,
+                           dm_data_folder = 'process/01-distortion_params', dm_selection=None,
+                           dm_criteria=None, cropping = True):
     dm_path_list = pt.path_inputs(filename, dm_data_folder, dm_selection, dm_criteria)
     distortion_matrices = []
     with h5py.File(filename, "a") as f:
@@ -258,11 +387,12 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, cri
             yoffsets.append(np.array(matrix[1,2]))
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
-    #path_lists = pt.initialise_process(filename, 'distortion_correction', data_folder=data_folder, selection=selection, selection_depth=selection_depth)
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
-    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction', in_path_list)
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
+                                                          in_path_list)
     if len(in_path_list)%len(dm_path_list):
-        print('Error: Images to be corrected are not a multiple of the amount of distortion matrices')
+        print('Error: Images to be corrected are not a multiple of the amount of distortion\
+                matrices')
         return
 
     number_of_images_for_each_matrix = len(in_path_list)//len(dm_path_list)
@@ -276,20 +406,22 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, cri
                 final_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
             else:
                 final_image = array_expanded(orig_image, xoffsets[j], yoffsets[j], offset_caps)
-            pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i], dm_path_list[j]])
-            
-            #pt.generic_write(f, in_path_list[i], final_image, 'source (distortion params)', dm_path_list[j], 'distortion_params', distortion_matrices[j])
-
-            
-#FUNCTION array_cropped
-## crops a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set, to include only valid data shared by all arrays
-#INPUTS:
-## array: the array to be cropped
-## xoffset: the xoffset of the array
-## yoffset: the yoffset of the array
-## offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset minimum, yoffset maximum, and yoffset minimum fo all arrays
-#OUTPUTS:
-## the cropped array
+            data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
+                                                                               dm_path_list[j]])
+            pt.propagate_scale_attrs(data, f[in_path_list[i]])
+    
+    
+#   FUNCTION array_cropped
+# crops a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set,
+# to include only valid data shared by all arrays
+#   INPUTS:
+# array: the array to be cropped
+# xoffset: the xoffset of the array
+# yoffset: the yoffset of the array
+# offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset
+# minimum, yoffset maximum, and yoffset minimum fo all arrays
+#   OUTPUTS:
+# cropped_array: the cropped array
 
 def array_cropped(array, xoffset, yoffset, offset_caps):
     if offset_caps != [0,0,0,0]:
@@ -307,15 +439,17 @@ def array_cropped(array, xoffset, yoffset, offset_caps):
     return cropped_array
 
 
-#FUNCTION array_expanded
-## expands a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set, to include all points of each array. Empty data is set to be NaN
-#INPUTS:
-## array: the array to be expanded
-## xoffset: the xoffset of the array
-## yoffset: the yoffset of the array
-## offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset minimum, yoffset maximum, and yoffset minimum fo all arrays
-#OUTPUTS:
-## the expanded
+#   FUNCTION array_expanded
+# expands a numpy_array given the offsets of the array, and the minimum and maximum offsets of a
+# set, to include all points of each array. Empty data is set to be NaN
+#   INPUTS:
+# array: the array to be expanded
+# xoffset: the xoffset of the array
+# yoffset: the yoffset of the array
+# offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset
+# minimum, yoffset maximum, and yoffset minimum fo all arrays
+#   OUTPUTS:
+# expanded_array: the expanded array
 
 def array_expanded(array, xoffset, yoffset, offset_caps):
     height = int(np.shape(array)[0]+np.ceil(offset_caps[2])-np.floor(offset_caps[3]))
@@ -334,8 +468,8 @@ def array_expanded(array, xoffset, yoffset, offset_caps):
 # Converts each entry of a 2D phase channel (rotating 360 degrees with an arbitrary 0 point) into a
 # float between 0 and 1.  The most common values become 0 or 1, and other values are a linear
 # interpolation between these two values. 0 and 1 are chosen such that the mean of the entire 
-# channel does not become greater than 0.95, and such that the edgemost pixels are more 0 than the
-# centre.
+# channel does not become greater than a value defined by flip_proportion, and such that the 
+# edgemost pixels are more 0 than the centre.
 #   INPUTS:
 # filename: name of hdf5 file containing data
 # data_folder (default: 'datasets'): folder searched for image inputs
@@ -343,7 +477,12 @@ def array_expanded(array, xoffset, yoffset, offset_caps):
 #     the name of folders or files to be used.
 # criteria (default: channel): determines what category selection refers to
 # min_separation (default: 90): minimum distance between the two peaks assigned as 0 and 1.
+# background (default: None): number to identify where background is to correctly attribute values.
+#     If positive, tries to make everything to the left of this value background; if negative, makes
+#     everything to the right background
+# flip_proportion (default: 0.8): threshold, above which the data is flipped to (1-data)
 # print_frequency (default: 4): number of channels processed before a a status update is printed
+# show (default: False): If True, show the data prior to saving
 #   OUTPUTS
 # null
 
@@ -351,7 +490,8 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
                                                                         'Phase1Retrace',
                                                                         'Phase2Trace',
                                                                         'Phase2Retrace'],
-                         criteria = 'channel', min_separation=90, print_frequency = 4):
+                         criteria = 'channel', min_separation=90, background = None,
+                         flip_proportion = 0.8, print_frequency = 4, show = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'phase_linearisation',
                                                           in_path_list)
@@ -391,30 +531,54 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
             
             # Create a new array whose values depend on their position on the number lines
             linearised_array = np.copy(f[path])
-            for i in range(np.shape(linearised_array)[0]):
-                for j in range(np.shape(linearised_array)[1]):
-                    if linearised_array[i,j] >= peak1_value and linearised_array[i,j] < peak2_value:
-                        linearised_array[i,j] = (linearised_array[i,j]-peak1_value)/range_1to2
-                    elif linearised_array[i,j] < peak1_value:
-                        linearised_array[i,j] = (peak1_value-linearised_array[i,j])/range_2to1
-                    else:
-                        linearised_array[i,j] = 1-((linearised_array[i,j]-peak2_value)/range_2to1)
-            
+            linearise_map = np.vectorize(linearise)
+            linearised_array = linearise_map(linearised_array, peak1_value, peak2_value,
+                                             range_1to2, range_2to1)
             # Define which points are 0 or 1 based on relative magnitude
-            if np.mean(linearised_array) > 0.95:
+            if np.mean(linearised_array) > flip_proportion:
                 linearised_array = 1-linearised_array
-            elif (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])
-                  > 2*np.mean(linearised_array)):
-                linearised_array = 1-linearised_array
-                
-            data = pt.write_output_f(f, linearised_array, out_folder_locations[index],
-                                     in_path_list[index])
+            elif np.mean(linearised_array) > 1-flip_proportion:
+                if background is None:
+                    if (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])) \
+                          > 2*np.mean(linearised_array):
+                        linearised_array = 1-linearised_array
+                elif background < 0:
+                    if np.mean(linearised_array[:,background:]) > np.mean(linearised_array):
+                        linearised_array = 1-linearised_array
+                elif background > 0:
+                    if np.mean(linearised_array[:,:background]) > np.mean(linearised_array):
+                        linearised_array = 1-linearised_array
+            pt.intermediate_plot(linearised_array, force_plot = show, text = 'Linearised Array')
+            data = pt.write_output_f(f, medfilt(cv2.blur(linearised_array, (7,7)),7),
+                                     out_folder_locations[index], in_path_list[index])
             data.attrs['peak values'] = [peak1_value, peak2_value]
             pt.propagate_scale_attrs(data, f[path])
             if (index+1)%print_frequency == 0:
                 print('Phase Linearisation: ' + str(index+1) + ' of ' + str(len(in_path_list))
                       + ' complete.')
 
+                
+#   FUNCTION linearise
+# Converts a phase entry (rotating 360 degrees with an arbitrary 0 point) into a float between 0 
+# and 1, given the values of the two extremes, and the ranges between them
+#   INPUTS:
+# entry: the phase entry to be converted
+# peak1_value: the phase value that would be linearised to 0
+# peak2_value: the phase value that would be linearised to 1
+# range_1to2: the distance in phase from peak1 to peak2
+# range_1to2: the distance in phase from peak2 to peak1
+#   OUTPUTS
+# entry: the phase entry that has been converted
+                
+def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
+    if (entry >= peak1_value) and (entry < peak2_value):
+        entry = (entry-peak1_value)/range_1to2
+    elif entry < peak1_value:
+        entry = (peak1_value-entry)/range_2to1
+    else:
+        entry = 1-((entry-peak2_value)/range_2to1)
+    return entry
+                
                 
 #   FUNCTION sum_
 # Adds multiple channels together. The files are added in order, first by channel and then by
@@ -462,7 +626,7 @@ def sum_(filename, data_folder='datasets', selection = None, criteria = None, en
                                          source_list, output_name)
                 pt.propagate_scale_attrs(data, f[path])
 
-                
+
 #   FUNCTION phase_binarisation_
 # Converts each entry of an array that is between two values to either 0 or 1. Designed for use
 # with linearised phase data, where peaks exist at endpoints.
@@ -473,12 +637,15 @@ def sum_(filename, data_folder='datasets', selection = None, criteria = None, en
 # criteria (default: channel): determines what category selection refers to
 # thresh_estimate (default: 2): initial guess for where the threshold should be placed
 # thresh_search_range (default: 0.8): range of thresholds searched around the estimate
+# keep_name (default: False): if set to True, the data channel will maintain the same name as its
+#      source. Otherwise, the data channel is renamed to BinarisedPhase
 # print_frequency (default: 4): number of channels processed before a a status update is printed
 #    OUTPUTS
 # null
                 
 def phase_binarisation_(filename, data_folder='datasets', selection = None, criteria = None,
-                        thresh_estimate = 2, thresh_search_range = 0.4, print_frequency = 4):
+                        thresh_estimate = 2, thresh_search_range = 0.4, keep_name = False,
+                        print_frequency = 4):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'phase_binarisation',
                                                           in_path_list)
@@ -492,8 +659,11 @@ def phase_binarisation_(filename, data_folder='datasets', selection = None, crit
 
             if np.mean(binary) > 0.95:
                 binary = 1-binary
-            data = pt.write_output_f(f, binary, out_folder_locations[i], in_path_list[i],
-                                     'BinarisedPhase')
+            if keep_name:
+                data = pt.write_output_f(f, binary, out_folder_locations[i], in_path_list[i])
+            else:
+                data = pt.write_output_f(f, binary, out_folder_locations[i], in_path_list[i],
+                                         'BinarisedPhase')
             data.attrs['threshold'] = best_thresh
             pt.propagate_scale_attrs(data, f[path])
             if (i+1)%print_frequency == 0:
@@ -516,6 +686,7 @@ def threshold_noise(image, old_guess, thresh_range, iterations, old_diff = None)
     if old_diff is None:
         binary = image>old_guess
         binary_filt = medfilt(binary, 3)
+        #binary_filt = contour_closure(binary_filt)
         old_diff = np.sum(np.abs(binary_filt-binary))
     if iterations > 0:
         new_guesses = [old_guess-thresh_range, old_guess+thresh_range]
@@ -523,6 +694,7 @@ def threshold_noise(image, old_guess, thresh_range, iterations, old_diff = None)
         for thresh in new_guesses:
             binary = image>thresh
             binary_filt = medfilt(binary, 3)
+            #binary_filt = contour_closure(binary_filt)
             diffs.append(np.sum(np.abs(binary_filt-binary)))
         best_i = np.argmin(diffs)
         best_guess = threshold_noise(image, new_guesses[best_i], thresh_range/2, iterations-1,
@@ -550,7 +722,59 @@ def wrap(x, low = 0, high = 360):
         x = x-angle_range
     return x
             
-    
+
+#   FUNCTION contour_closure_
+# Removes regions on a binarised image with an area less than a value defined by size_threshold.
+# This is performed by finding the contours and the area of the contours, thus providing no change
+# to the bulk of the image itself (as a morphological closure would)
+#   INPUTS:
+# filename: name of hdf5 file containing data
+# data_folder (default: 'datasets'): folder searched for image inputs
+# selection (default: ['Amplitude1Retrace', 'Amplitude2Retrace']): determines the name of folders or
+#     files to be used.
+# criteria (default: channel): determines what category selection refers to
+# size_threshold (default: 100): area in pixels that a contour is compared to before being closed
+# type_bool (default: True): sets data to a boolean type
+#   OUTPUTS
+# null
+
+def contour_closure_(filename, data_folder = 'datasets', selection = None, criteria = None, 
+                     size_threshold = 100, type_bool = True):
+    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
+    out_folder_locations = pt.find_output_folder_location(filename, 'contour_closure',
+                                                              in_path_list)
+    with h5py.File(filename, "a") as f:
+        for i in range(len(in_path_list)):
+            image = contour_closure(f[in_path_list[i]],
+                                    size_threshold = size_threshold, type_bool = type_bool)
+            data=pt.write_output_f(f, image, out_folder_locations[i], in_path_list[i])
+            data.attrs['size_threshold'] = size_threshold
+            pt.propagate_scale_attrs(data, f[in_path_list[i]])    
+        
+#   FUNCTION contour_closure
+# Removes regions on a binarised image with an area less than a value defined by size_threshold.
+# This is performed by finding the contours and the area of the contours, thus providing no change
+# to the bulk of the image itself (as a morphological closure would)
+#   INPUTS:
+# source: image to be closed
+# size_threshold (default: 100): area in pixels that a contour is compared to before being closed
+# type_bool (default: True): sets data to a boolean type
+#   OUTPUTS
+# null
+
+def contour_closure(source, size_threshold = 50, type_bool = True):
+    source = np.array(source).astype('uint8')
+    image = np.zeros_like(source)
+    cv2_image,contours,hierarchy = cv2.findContours(source,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    new_contours = []
+    for contour in contours:
+        if cv2.contourArea(contour) > size_threshold:
+            new_contours.append(contour)
+    cv2.drawContours(image,new_contours,-1, (1), thickness=cv2.FILLED)
+    if type_bool:
+        image = image.astype(bool)
+    return image
+        
 #   FUNCTION find_a_domains_
 # Determines the a-domains in an amplitude image, by looking for points of high second derivative.
 # These points are then fit to lines, and these lines filtered to the most common lines that are 
@@ -573,6 +797,8 @@ def wrap(x, low = 0, high = 360):
 # filter_width (default: 15): total width of the filter, in pixels, around the domain-wall
 #     boundaries. This is the total distance - so half this value is applied to each side.
 # thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
+# dilation (default: 2): amount of dilation steps to clean image
+# erosion (default: 4): amount of erosion steps to clean image
 # line_threshold (default: 80): minimum number of votes (intersections in Hough grid cell)
 # min_line_length (default: 80): minimum number of pixels making up a line
 # max_line_gap (default: 80): maximum gap in pixels between connectable line segments
@@ -587,7 +813,7 @@ def wrap(x, low = 0, high = 360):
 #     'erode': Binarisation data after an erosion filter is applied
 #     'lines': Lines found, and should correspond to a-domains on original amplitude image
 #     'clean': Lines found, after filtering to the most common angles
-# print_freuency (default: 4): number of channels processed before a a status update is printed
+# print_frequency (default: 4): number of channels processed before a a status update is printed
 #   OUTPUTS
 # null
 
@@ -595,8 +821,8 @@ def find_a_domains_(filename, data_folder = 'datasets',
                     selection = ['Amplitude1Retrace', 'Amplitude2Retrace'],
                     criteria = 'channel', pb_data_folder = None, pb_selection = None,
                     pb_criteria = None, direction = None, filter_width = 15, thresh_factor = 2,
-                    line_threshold = 50, min_line_length=50, max_line_gap=10, plots = None,
-                    print_frequency = 4):
+                    dilation = 2, erosion = 4, line_threshold = 50, min_line_length=50,
+                    max_line_gap=10, plots = None, print_frequency = 4):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     if pb_data_folder is not None:
         pb_path_list = pt.path_inputs(filename, pb_data_folder, pb_selection, pb_criteria)
@@ -631,7 +857,8 @@ def find_a_domains_(filename, data_folder = 'datasets',
             a_estimate, bin_thresh = estimate_a_domains(f[path], domain_wall_filter,
                                                         direction = direction,
                                                         plots = plots,
-                                                        thresh_factor = thresh_factor)
+                                                        thresh_factor = thresh_factor,
+                                                        dilation = dilation, erosion = erosion)
 
             # Find Lines
             rho = 1  # distance resolution in pixels of the Hough grid
@@ -645,7 +872,7 @@ def find_a_domains_(filename, data_folder = 'datasets',
             
             if lines is not None:
                 # Draw lines, filtering with phase filter if possible
-                valid_lines = []
+                phase_filter_lines = []
                 for line in lines:
                     for x1,y1,x2,y2 in line:
                         if pb_data_folder is not None:
@@ -654,16 +881,16 @@ def find_a_domains_(filename, data_folder = 'datasets',
                             points_outside_mask = one_line*domain_wall_filter
                             if np.sum(points_outside_mask) > 0.2*np.sum(one_line):
                                 cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
-                                valid_lines.append(line)
+                                phase_filter_lines.append(line)
                         else:
                             cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
-                            valid_lines.append(line)
+                            phase_filter_lines.append(line)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
                 pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
                 # Find angles of each line
                 angles = []
-                for line in valid_lines:
+                for line in phase_filter_lines:
                     for x1,y1,x2,y2 in line:
                         if x2 == x1:
                             angles.append(90)
@@ -678,18 +905,18 @@ def find_a_domains_(filename, data_folder = 'datasets',
                 else:
                     key_angles = find_desired_angles(angles)
 
-                # Filter To Valid Lines
-                valid_lines = []
+                # Filter To Angle-Valid Lines
+                angle_filter_lines = []
                 i = 0
                 for angle in angles:
                     for key_angle in key_angles:
                         if check_within_angle_range(angle, key_angle, 1) == True:
-                            valid_lines.append(lines[i])
+                            angle_filter_lines.append(phase_filter_lines[i])
                     i = i+1
 
                 # Draw Lines
                 line_image = np.copy(a_estimate) * 0  # creating a blank to draw lines on
-                for line in valid_lines:
+                for line in angle_filter_lines:
                     for x1,y1,x2,y2 in line:
                         cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
@@ -754,12 +981,15 @@ def create_domain_wall_filter(phase, filter_width = 15, plots = []):
 #     'second_deriv': Second derivitave of amplitude
 #     'binary': Binarisation of second derivative
 #     'erode': Binarisation data after an erosion filter is applied
+# thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
+# dilation (default: 2): amount of dilation steps to clean image
+# erosion (default: 4): amount of erosion steps to clean image
 #   OUTPUTS
 # filtered_deriv_amp: adjusted amplitude image made to highlight points of higher second derivative
 # thresh: the threshold value used to find the a-domains
 
 def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plots = [],
-                       thresh_factor = 2):
+                       thresh_factor = 2, dilation = 2, erosion = 4):
     # Raw Data
     amp = np.copy(amplitude)
     pt.intermediate_plot(amp, 'amp', plots, 'Original Data')
@@ -804,7 +1034,8 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plo
     pt.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
     
     # Remove Small Points
-    filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations = 2), iterations = 4)
+    filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations = dilation),
+                                        iterations = erosion)
     pt.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
     return filtered_deriv_amp.astype(np.uint8), thresh
             
@@ -926,6 +1157,8 @@ def check_within_angle_range(angle, key_angle, angle_range, low = -180, high = 1
 # filter_width (default: 15): total width of the filter, in pixels, around the domain-wall
 #     boundaries. This is the total distance - so half this value is applied to each side.
 # thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
+# dilation (default: 2): amount of dilation steps to clean image
+# erosion (default: 4): amount of erosion steps to clean image
 # line_threshold (default: 80): minimum number of votes (intersections in Hough grid cell)
 # min_line_length (default: 80): minimum number of pixels making up a line
 # max_line_gap (default: 80): maximum gap in pixels between connectable line segments
@@ -946,8 +1179,9 @@ def check_within_angle_range(angle, key_angle, angle_range, low = -180, high = 1
 def find_a_domain_angle_(filename, data_folder = 'datasets',
                          selection = ['Amplitude1Retrace', 'Amplitude2Retrace'],
                          criteria = 'channel', pb_data_folder = None, pb_selection = None,
-                         pb_criteria = None, filter_width = 15, thresh_factor=2, line_threshold=80,
-                         min_line_length=80, max_line_gap=80, plots = None, print_frequency = 4):
+                         pb_criteria = None, filter_width = 15, thresh_factor=2, dilation=2,
+                         erosion=4,line_threshold=80, min_line_length=80, max_line_gap=80,
+                         plots = None, print_frequency = 4):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     if pb_data_folder is not None:
         pb_path_list = pt.path_inputs(filename, pb_data_folder, pb_selection, pb_criteria)
@@ -981,7 +1215,9 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
                 domain_wall_filter = np.zeros_like(f[path])+1
             a_estimate, bin_thresh = estimate_a_domains(f[path], domain_wall_filter,
                                                         plots = plots,
-                                                        thresh_factor = thresh_factor)
+                                                        thresh_factor = thresh_factor,
+                                                        dilation = dilation,
+                                                        erosion = erosion)
             
             # Find Lines
             rho = 1  # distance resolution in pixels of the Hough grid
@@ -1004,10 +1240,12 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
                             points_outside_mask = one_line*domain_wall_filter
                             if np.sum(points_outside_mask) > 0.2*np.sum(one_line):
                                 cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
-                                valid_lines.append(line)
+                                if (x1 != x2) and (y1 != y2):
+                                    valid_lines.append(line)
                         else:
                             cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
-                            valid_lines.append(line)
+                            if (x1 != x2) and (y1 != y2):
+                                valid_lines.append(line)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
                 pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
@@ -1020,7 +1258,7 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
                         else:
                             angles.append((180*np.arctan((y2-y1)/(x2-x1))/np.pi))
                 key_angles = find_desired_angles(angles)
-
+                
                 # Refine angle estimate
                 for repetitions in range(3):
                     valid_lines = []
@@ -1040,8 +1278,10 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
                 print('Finding a-domain angle. Scan ' + str(index+1) + ' of ' +
                       str(len(in_path_list)) + ' complete.')
         
-        rotation_list = sorted(rotation_list)
-        average_angle = rotation_list[int(len(rotation_list)/2)]
+        
+        rotation_array = np.array(rotation_list)
+        rotation_array = sorted(rotation_array[~np.isnan(rotation_array)])
+        average_angle = rotation_array[int(len(rotation_array)/2)]
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
         warp_matrix=cv2.getRotationMatrix2D((orig_x/2, orig_y/2), average_angle, 1)
         data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
@@ -1131,6 +1371,8 @@ def rotation_alignment_(filename, data_folder='datasets', selection=None,
                             best_top = top
                             best_left = int((orig_x/2)-width)
                 new_img = new_img[best_top:orig_y-best_top, best_left:orig_x-best_left]
+                while np.isnan(sum(new_img[-1])):
+                    new_img = new_img[:-1]
             
             if array_is_bool:
                 new_img = new_img.astype(bool)
@@ -1238,6 +1480,7 @@ def distance_(filename, data_folder = 'datasets', selection = None, criteria = N
 #     'Horz': Draws horizontal lines
 # false_positives (default: None): a list of ints that defines which lines to be ignored. Each line
 #     is described by an int, starting from number 0, which is the left- or up-most line.
+# max_edge (default: 10): the distance a line will stretch to read the edge or another line
 # overwrite (default: False): if set to True, if this function was the last process run, the last
 #     run will be overwritten and replaced with this. To be used sparingly, and only if function
 #     parameters must be guessed and checked
@@ -1245,7 +1488,8 @@ def distance_(filename, data_folder = 'datasets', selection = None, criteria = N
 # null
             
 def directional_skeletonize_(filename, data_folder = 'datasets', selection = None, criteria = None,
-                             direction = 'Vert', false_positives = None, overwrite = False):
+                             direction = 'Vert', false_positives = None, max_edge = 10,
+                             overwrite = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'directional_skeletonize',
                                                           in_path_list, overwrite)
@@ -1285,10 +1529,10 @@ def directional_skeletonize_(filename, data_folder = 'datasets', selection = Non
                         if whole_line[y]==0:
                             zero_count = zero_count + 1
                         else:
-                            if zero_count <= 10:
+                            if zero_count <= max_edge:
                                 whole_line[y-zero_count:y] = 1
                             zero_count = 0
-                    if (zero_count != 0) and (zero_count <= 10):
+                    if (zero_count != 0) and (zero_count <= max_edge):
                         whole_line[-zero_count:] = 1
                     if i in false_positives:
                         bad_domains[:,x] = whole_line 
@@ -1304,10 +1548,10 @@ def directional_skeletonize_(filename, data_folder = 'datasets', selection = Non
                         if whole_line[x]==0:
                             zero_count = zero_count + 1
                         else:
-                            if zero_count <= 10:
+                            if zero_count <= max_edge:
                                 whole_line[x-zero_count:x] = 1
                             zero_count = 0
-                    if (zero_count != 0) and (zero_count <= 10):
+                    if (zero_count != 0) and (zero_count <= max_edge):
                         whole_line[-zero_count:] = 1
                     if i in false_positives:
                         bad_domains[y] = whole_line 
@@ -1431,7 +1675,7 @@ def final_a_domains_(filename, data_folder = 'datasets',
                                 horz_list.append([x1, y, x-1, y])
                                 line_found = False
                         if line_found == True:
-                            horz_list.append([x1, y, np.shape(new_horz)[1]-1], y)
+                            horz_list.append([x1, y, np.shape(new_horz)[1]-1, y])
                                 
             new_all = np.maximum(new_vert, new_horz)
             
@@ -1762,7 +2006,6 @@ def interpolated_features_(filename, data_folder = 'process/01-switchmap', selec
             path = in_path_list[index]
             switchmap = np.copy(f[path])
             isolines = find_isolines(switchmap, nucl_centres, clos_centres)
-            
             isoline_y = []
             isoline_x = []
             isoline_z = []
@@ -1803,33 +2046,25 @@ def find_isolines(switchmap, nucl_centres, clos_centres):
             if np.isnan(switchmap[i,j]):
                 isolines[i,j] = np.nan
             if i != 0:
-                if np.isnan(switchmap[i-1,j]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i-1,j]:
+                if np.isnan(switchmap[i-1,j]) or (switchmap[i,j]>switchmap[i-1,j]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i-1,j]-1 and peak == False:
                     isolines[i,j]=switchmap[i,j]+0.5
             if i != np.shape(switchmap)[0]-1:
-                if np.isnan(switchmap[i+1,j]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i+1,j]:
+                if np.isnan(switchmap[i+1,j]) or (switchmap[i,j]>switchmap[i+1,j]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i+1,j]-1 and peak == False:
                     isolines[i,j]=switchmap[i,j]+0.5
             if j != 0:
-                if np.isnan(switchmap[i,j-1]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i,j-1]:
+                if np.isnan(switchmap[i,j-1]) or (switchmap[i,j]>switchmap[i,j-1]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i,j-1]-1 and peak == False:
                     isolines[i,j]=switchmap[i,j]+0.5
             if j != np.shape(switchmap)[1]-1:
-                if np.isnan(switchmap[i,j+1]):
-                    isolines[i,j] = np.nan
-                elif switchmap[i,j]>switchmap[i,j+1]:
+                if np.isnan(switchmap[i,j+1]) or (switchmap[i,j]>switchmap[i,j+1]):
                     isolines[i,j]=switchmap[i,j]
                     peak = True
                 elif switchmap[i,j]<switchmap[i,j+1]-1 and peak == False:
