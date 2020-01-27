@@ -7,6 +7,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 from . import core as pt
 import cv2
 import os
+import time
 
 from scipy.signal import medfilt, cspline2d
 from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
@@ -178,15 +179,14 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
                        criteria = 'channel', speed = 2, read_offset = False, cumulative = False):
     in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
-                                                          in_path_list,
-                                                          overwrite_if_same = overwrite)
+                                                          in_path_list)
     tform21 = np.eye(2,3,dtype=np.float32)
     cumulative_tform21 = np.eye(2,3,dtype=np.float32)
     with h5py.File(filename, "a") as f:
         recent_offsets=[]
         for i in range(len(in_path_list)):
             if i == 0:
-                pass
+                start_time = time.time()
             else:
                 print('---')
                 print('Currently reading path '+in_path_list[i])
@@ -263,6 +263,8 @@ def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetr
                         recent_offsets = recent_offsets[1:]
             data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
                                      in_path_list[i])
+            pt.progress_report(i+1, len(in_path_list), start_time, 'distortion_params',
+                            in_path_list[i], clear = False)
 
 
 #   FUNCTION m2px
@@ -398,6 +400,7 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, cri
     number_of_images_for_each_matrix = len(in_path_list)//len(dm_path_list)
     with h5py.File(filename, "a") as f:
         j = -1
+        start_time = time.time()
         for i in range(len(in_path_list)):
             if i%number_of_images_for_each_matrix == 0:
                 j = j+1
@@ -409,6 +412,8 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, cri
             data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
                                                                                dm_path_list[j]])
             pt.propagate_scale_attrs(data, f[in_path_list[i]])
+            pt.progress_report(i+1, len(in_path_list), start_time, 'distortion_correction',
+                            in_path_list[i])
     
     
 #   FUNCTION array_cropped
@@ -557,6 +562,83 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
                 print('Phase Linearisation: ' + str(index+1) + ' of ' + str(len(in_path_list))
                       + ' complete.')
 
+                
+#   FUNCTION phase_linearisation
+# As phase_linearisation, but designed for use with pt.l_apply.
+# Converts each entry of a 2D phase channel (rotating 360 degrees with an arbitrary 0 point) into a
+# float between 0 and 1.  The most common values become 0 or 1, and other values are a linear
+# interpolation between these two values. 0 and 1 are chosen such that the mean of the entire 
+# channel does not become greater than a value defined by flip_proportion, and such that the 
+# edgemost pixels are more 0 than the centre.
+#   INPUTS:
+# image: array that contains data
+# min_separation (default: 90): minimum distance between the two peaks assigned as 0 and 1.
+# background (default: None): number to identify where background is to correctly attribute values.
+#     If positive, tries to make everything to the left of this value background; if negative, makes
+#     everything to the right background
+# flip_proportion (default: 0.8): threshold, above which the data is flipped to (1-data)
+# print_frequency (default: 4): number of channels processed before a a status update is printed
+# show (default: False): If True, show the data prior to saving
+#   OUTPUTS
+# result: dict containing data and attributes
+                
+def phase_linearisation(image, min_separation=90, background = None,
+                         flip_proportion = 0.8, show = False):
+    phase_flat = np.array(image).ravel()
+    min_phase = int(np.floor(np.min(phase_flat)))
+    max_phase = min_phase+360
+
+    # Convert original data into histograms and find largest peak
+    ydata, bin_edges = np.histogram(phase_flat, bins=360, range=[min_phase, max_phase])
+    peak1_index = np.argmax(ydata)
+
+    # Find next largest peak a distance away from original peak
+    peak1_exclude_left = wrap(peak1_index-min_separation, 0,360) 
+    peak1_exclude_right = wrap(peak1_index+min_separation, 0,360)
+    if peak1_exclude_left < peak1_exclude_right:
+        peak2_search_region = np.delete(ydata,
+                                        np.arange(peak1_exclude_left,peak1_exclude_right))
+        peak2_index = np.argmax(peak2_search_region)
+        if peak2_index < peak1_exclude_left:
+            pass
+        else:
+            peak2_index = peak2_index + 2*min_separation
+    else:
+        peak2_search_region = ydata[peak1_exclude_right:peak1_exclude_left]
+        peak2_index = np.argmax(peak2_search_region) + peak1_exclude_right -1
+
+    # Split wrapped dataset into two number lines; one going up and one down
+    if peak1_index > peak2_index:
+        peak1_index, peak2_index = peak2_index, peak1_index
+    peak1_value = peak1_index+min_phase
+    peak2_value = peak2_index+min_phase
+    range_1to2 = peak2_value-peak1_value
+    range_2to1 = 360 - range_1to2
+
+    # Create a new array whose values depend on their position on the number lines
+    linearised_array = np.copy(image)
+    linearise_map = np.vectorize(linearise)
+    linearised_array = linearise_map(linearised_array, peak1_value, peak2_value,
+                                     range_1to2, range_2to1)
+    # Define which points are 0 or 1 based on relative magnitude
+    if np.mean(linearised_array) > flip_proportion:
+        linearised_array = 1-linearised_array
+    elif np.mean(linearised_array) > 1-flip_proportion:
+        if background is None:
+            if (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])) \
+                  > 2*np.mean(linearised_array):
+                linearised_array = 1-linearised_array
+        elif background < 0:
+            if np.mean(linearised_array[:,background:]) > np.mean(linearised_array):
+                linearised_array = 1-linearised_array
+        elif background > 0:
+            if np.mean(linearised_array[:,:background]) > np.mean(linearised_array):
+                linearised_array = 1-linearised_array
+    pt.intermediate_plot(linearised_array, force_plot = show, text = 'Linearised Array')
+    linearised = medfilt(cv2.blur(linearised_array, (7,7)),7)
+    result = pt.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
+    return result
+                
                 
 #   FUNCTION linearise
 # Converts a phase entry (rotating 360 degrees with an arbitrary 0 point) into a float between 0 
