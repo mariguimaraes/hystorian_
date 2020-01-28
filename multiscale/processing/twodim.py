@@ -21,7 +21,8 @@ from random import randrange
 # Saves one .png image to the current directory, or a chosen folder
 #   INPUTS:
 # data: A 2-D array which will be converted into a png image.
-# image_name (default: 'image'): name of the image that is saved
+# image_name (default: None): name of the image that is saved. By default, tries to pull name from
+#     source_path. If this cannot be done, sets name to 'image'
 # colorm (default: 'inferno'): colormap to be used for image
 # scalebar (default: False): if True, add a scalebar to the image, requires three attributes : 
 #     shape, which define the pixel size of the image
@@ -36,11 +37,14 @@ from random import randrange
 # saving_path (default: ''): The path to the folder where to save the image
 # verbose (default: False): if True, print a line each time a image is saved.
 # show (default: False): if True, the image is displayed in the kernel.
+# source_path (default: None): if set, and image_name not set, this variable will be used to
+#     generate the file name
 #   OUTPUTS:
 # null
 
-def save_image(data, 
-               image_name='image', 
+
+def save_image(data,
+               image_name=None, 
                colorm='inferno',
                scalebar=False,
                physical_size = (0, 'unit'),
@@ -50,7 +54,16 @@ def save_image(data,
                std_range=3, 
                saving_path='', 
                verbose=False,
-               show=False): 
+               show=False,
+               source_path=None,
+               source_scale_m_per_px=None):
+    if data.dtype == 'bool':
+         data = data.astype(int)
+    if image_name is None:
+        if source_path is not None:
+            image_name = source_path.replace('/','_')
+        else:
+            image_name = 'image'
     if saving_path != '':
         if saving_path[-1] != '/':
             saving_path = saving_path +'/'
@@ -82,9 +95,13 @@ def save_image(data,
         plt.tight_layout()
         if scalebar:
             try:
-                phys_size = physical_size[0]
-                px = np.shape(data)[0]
-                scalebar = ScaleBar(phys_size/px, physical_size[1], location='lower right',
+                if source_scale_m_per_px is None:
+                    phys_size = physical_size[0]
+                    px = np.shape(data)[0]
+                    scalebar = ScaleBar(phys_size/px, physical_size[1], location='lower right',
+                                    font_properties={'size':labelsize})
+                else:
+                    scalebar = ScaleBar(source_scale_m_per_px, 'm', location='lower right',
                                     font_properties={'size':labelsize})
                 #scalebar = ScaleBar(f[path].attrs['scale (m/px)'], 'm', location='lower right',
                                     #font_properties={'size':25})
@@ -99,64 +116,6 @@ def save_image(data,
             print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
         plt.close()
     return
-
-#   FUNCTION save_many_images
-# Repeatedly calls save_image to save  one .png image to the current directory, or a chosen folder
-#   INPUTS:
-# data: A 2-D array which will be converted into a png image.
-# image_name (default: 'image'): name of the image that is saved
-# colorm (default: 'inferno'): colormap to be used for image
-# scalebar (default: False): if True, add a scalebar to the image, requires three attributes : 
-#     shape, which define the pixel size of the image
-#     size, which gives the phyiscal dimension of the image
-#     unit, which give the physical unit of size
-# physical_size (default: (0, 'unit')): physical size of the image used when generating the scalebar
-# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel 
-#     per data point at 100 dpi
-# labelsize (default: 16): Size of the text in pxs
-# std_range (default: 3): Range around the mean for the colorscale, alternatively the value can be 
-#    "full", to take the full range.
-# saving_path (default: ''): The path to the folder where to save the image
-# verbose (default: False): if True, print a line each time a image is saved.
-# show (default: False): if True, the image is displayed in the kernel.
-# default_name (default: False): if True, takes name from path
-#   OUTPUTS:
-# null
-
-def save_many_images(filename,
-               data_folder = 'datasets',
-               selection = None,
-               criteria = None, 
-               image_name='image', 
-               colorm='inferno',
-               scalebar=False,
-               physical_size = (0, 'unit'),
-               colorbar = True, 
-               size=None, 
-               labelsize=16, 
-               std_range=3, 
-               saving_path='', 
-               verbose=False,
-               show=False,
-               default_name = False,
-               convert_bool = False):
-    i = 0
-    with h5py.File(filename, "a") as f:
-        pathlist = pt.path_inputs(filename, data_folder, selection, criteria)
-        for path in pathlist:
-            if default_name:
-                final_name = path.split('/')[-2]+'_'+path.split('/')[-1]
-            else:
-                final_name = image_name+str(i).zfill(2)
-            if convert_bool:
-                data = np.array((f[path])).astype(int)
-            else:
-                data = f[path]
-            if show:
-                print(final_name)
-            save_image(data, final_name, colorm, scalebar, physical_size, colorbar, size,
-                               labelsize, std_range, saving_path, verbose, show)
-            i = i+1
 
 
 #   FUNCTION distortion_params_
@@ -175,9 +134,8 @@ def save_many_images(filename,
 #   OUTPUTS
 # null
 
-def distortion_params_(filename, data_folder='datasets', selection = 'HeightRetrace',
-                       criteria = 'channel', speed = 2, read_offset = False, cumulative = False):
-    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
+def distortion_params_(filename, all_input_criteria, speed = 2, read_offset = False, cumulative = False):
+    in_path_list = pt.path_search(filename, all_input_criteria)[0]
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
                                                           in_path_list)
     tform21 = np.eye(2,3,dtype=np.float32)
@@ -374,10 +332,11 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp
 #   OUTPUTS
 # null
 
-def distortion_correction_(filename, data_folder='datasets', selection=None, criteria=None,
-                           dm_data_folder = 'process/01-distortion_params', dm_selection=None,
-                           dm_criteria=None, cropping = True):
-    dm_path_list = pt.path_inputs(filename, dm_data_folder, dm_selection, dm_criteria)
+def distortion_correction_(filename, all_input_criteria, cropping = True):
+    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
+    in_path_list = all_in_path_list[0]
+    dm_path_list = all_in_path_list[1]
+    
     distortion_matrices = []
     with h5py.File(filename, "a") as f:
         for path in dm_path_list[:]:
@@ -389,31 +348,86 @@ def distortion_correction_(filename, data_folder='datasets', selection=None, cri
             yoffsets.append(np.array(matrix[1,2]))
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
-    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
                                                           in_path_list)
-    if len(in_path_list)%len(dm_path_list):
-        print('Error: Images to be corrected are not a multiple of the amount of distortion\
-                matrices')
-        return
 
-    number_of_images_for_each_matrix = len(in_path_list)//len(dm_path_list)
     with h5py.File(filename, "a") as f:
-        j = -1
         start_time = time.time()
         for i in range(len(in_path_list)):
-            if i%number_of_images_for_each_matrix == 0:
-                j = j+1
             orig_image = f[in_path_list[i]]
             if cropping == True:
-                final_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+                final_image = array_cropped(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             else:
-                final_image = array_expanded(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+                final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
-                                                                               dm_path_list[j]])
-            pt.propagate_scale_attrs(data, f[in_path_list[i]])
+                                                                               dm_path_list[i]])
+            propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i+1, len(in_path_list), start_time, 'distortion_correction',
                             in_path_list[i])
+
+            
+
+#   FUNCTION propagate_scale_attrs
+# Attempts to write the scale attributes to a new dataset. This is done by directly copying from
+# an old dataset. If this is not possible, then it attempts to generate this from the old dataset
+# by calculating from the 'size' and 'shape' attributes.
+#   INPUTS:
+# new_data: new dataset to write to
+# old_data: old dataset to read from
+#   OUTPUTS
+# null
+
+def propagate_scale_attrs(new_data, old_data):
+    if 'scale (m/px)' in old_data.attrs:
+        new_data.attrs['scale_m_per_px'] = old_data.attrs['scale_m_per_px']
+    else:
+        if ('size' in old_data.attrs) and ('shape' in old_data.attrs):
+            scan_size = old_data.attrs['size']
+            shape = old_data.attrs['shape']
+            new_data.attrs['scale_m_per_px'] = scan_size[0] / shape[0]
+
+            
+#def distortion_correction_(filename, data_folder='datasets', selection=None, criteria=None,
+#                           dm_data_folder = 'process/01-distortion_params', dm_selection=None,
+#                           dm_criteria=None, cropping = True):
+#    
+#    dm_path_list = pt.path_inputs(filename, dm_data_folder, dm_selection, dm_criteria)
+#    distortion_matrices = []
+#    with h5py.File(filename, "a") as f:
+#        for path in dm_path_list[:]:
+#            distortion_matrices.append(np.copy(f[path]))
+#        xoffsets = []
+#        yoffsets = []
+#        for matrix in distortion_matrices:
+#            xoffsets.append(np.array(matrix[0,2]))
+#            yoffsets.append(np.array(matrix[1,2]))
+#    offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
+#
+#    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
+#    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
+#                                                          in_path_list)
+#    if len(in_path_list)%len(dm_path_list):
+#       print('Error: Images to be corrected are not a multiple of the amount of distortion\
+#                matrices')
+#        return
+
+#    number_of_images_for_each_matrix = len(in_path_list)//len(dm_path_list)
+#    with h5py.File(filename, "a") as f:
+#        j = -1
+#        start_time = time.time()
+#        for i in range(len(in_path_list)):
+#            if i%number_of_images_for_each_matrix == 0:
+#                j = j+1
+#            orig_image = f[in_path_list[i]]
+#            if cropping == True:
+#                final_image = array_cropped(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+#            else:
+#                final_image = array_expanded(orig_image, xoffsets[j], yoffsets[j], offset_caps)
+#            data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
+#                                                                               dm_path_list[j]])
+#            propagate_scale_attrs(data, f[in_path_list[i]])
+#            pt.progress_report(i+1, len(in_path_list), start_time, 'distortion_correction',
+#                            in_path_list[i])
     
     
 #   FUNCTION array_cropped
@@ -557,7 +571,7 @@ def phase_linearisation_(filename, data_folder='datasets', selection = ['Phase1T
             data = pt.write_output_f(f, medfilt(cv2.blur(linearised_array, (7,7)),7),
                                      out_folder_locations[index], in_path_list[index])
             data.attrs['peak values'] = [peak1_value, peak2_value]
-            pt.propagate_scale_attrs(data, f[path])
+            propagate_scale_attrs(data, f[path])
             if (index+1)%print_frequency == 0:
                 print('Phase Linearisation: ' + str(index+1) + ' of ' + str(len(in_path_list))
                       + ' complete.')
@@ -706,8 +720,23 @@ def sum_(filename, data_folder='datasets', selection = None, criteria = None, en
             if i % entry_count == entry_count-1:
                 data = pt.write_output_f(f, sum_array, out_folder_locations[i-(entry_count-1)],
                                          source_list, output_name)
-                pt.propagate_scale_attrs(data, f[path])
+                propagate_scale_attrs(data, f[path])
 
+#   FUNCTION m_sum_
+# Adds multiple channels together. The files are added in order, first by channel and then by
+# sample. The amount of source files in each destination file defined by entry_count. Replaces sum_
+#   INPUTS:
+# *args: arrays to be summed
+#   OUTPUTS
+# result: dict containing data and attributes
+                
+def m_sum(*args):
+    total = 0
+    for arg in args:
+        total = total+arg
+    input_count = len(args)
+    result = pt.hdf5_dict(total, input_count=input_count)
+    return result
 
 #   FUNCTION phase_binarisation_
 # Converts each entry of an array that is between two values to either 0 or 1. Designed for use
@@ -747,10 +776,30 @@ def phase_binarisation_(filename, data_folder='datasets', selection = None, crit
                 data = pt.write_output_f(f, binary, out_folder_locations[i], in_path_list[i],
                                          'BinarisedPhase')
             data.attrs['threshold'] = best_thresh
-            pt.propagate_scale_attrs(data, f[path])
+            propagate_scale_attrs(data, f[path])
             if (i+1)%print_frequency == 0:
                 print('Binarisation: ' + str(i+1) + ' of ' + str(len(in_path_list)) + ' complete.')
 
+                
+def phase_binarisation (phase, thresh_estimate = None, thresh_search_range = None, source_input_count = None):
+    if thresh_estimate is None:
+        if source_input_count is not None:
+            thresh_estimate = source_input_count/2
+        else:
+            thresh_estimate = 0.5
+    if thresh_search_range is None:
+        if source_input_count is not None:
+            thresh_search_range = source_input_count/10
+        else:
+            thresh_search_range = 0.1
+    blurred_phase = cv2.blur(phase, (7,7))
+    best_thresh = threshold_noise(blurred_phase, thresh_estimate, thresh_search_range/2, 5)
+    binary = blurred_phase > best_thresh
+
+    if np.mean(binary) > 0.95:
+        binary = 1-binary
+    result = pt.hdf5_dict(binary, threshold=best_thresh)
+    return result
                 
 #   FUNCTION threshold_noise
 # Iterative threshold function designed for phase_binarisation). Decides threshold based on what
@@ -831,7 +880,7 @@ def contour_closure_(filename, data_folder = 'datasets', selection = None, crite
                                     size_threshold = size_threshold, type_bool = type_bool)
             data=pt.write_output_f(f, image, out_folder_locations[i], in_path_list[i])
             data.attrs['size_threshold'] = size_threshold
-            pt.propagate_scale_attrs(data, f[in_path_list[i]])    
+            propagate_scale_attrs(data, f[in_path_list[i]])    
         
 #   FUNCTION contour_closure
 # Removes regions on a binarised image with an area less than a value defined by size_threshold.
@@ -1012,7 +1061,7 @@ def find_a_domains_(filename, data_folder = 'datasets',
             data.attrs['min_line_length'] = min_line_length
             data.attrs['max_line_gap'] = max_line_gap
             data.attrs['thresh_factor'] = thresh_factor
-            pt.propagate_scale_attrs(data, f[path])
+            propagate_scale_attrs(data, f[path])
             if (index+1)%print_frequency == 0:
                 print('Finding a-Domains. Scan ' + str(index+1) + ' of ' + str(len(in_path_list))
                       + ' complete.')
@@ -1280,6 +1329,7 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
     else:
         phase_filter = False
     with h5py.File(filename, "a") as f:
+        start_time = time.time()
         for index in range(len(in_path_list)):
             path = in_path_list[index]
             
@@ -1356,9 +1406,8 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
                 rotation_deg = -key_angles[np.argmin(np.abs(key_angles))]
                 rotation_list.append(rotation_deg)
                 average_angle = np.mean(rotation_list)
-            if (index+1)%print_frequency == 0:
-                print('Finding a-domain angle. Scan ' + str(index+1) + ' of ' +
-                      str(len(in_path_list)) + ' complete.')
+            pt.progress_report(index+1, len(in_path_list), start_time, 'a_angle',
+                            in_path_list[index])
         
         
         rotation_array = np.array(rotation_list)
@@ -1375,7 +1424,7 @@ def find_a_domain_angle_(filename, data_folder = 'datasets',
         data.attrs['min_line_length'] = min_line_length
         data.attrs['max_line_gap'] = max_line_gap
         data.attrs['thresh_factor'] = thresh_factor
-    
+        
     
 #   FUNCTION rotation_alignment_
 # Applies a rotation matrix to an image. An option also allows for cropping to the largest common
@@ -1417,6 +1466,7 @@ def rotation_alignment_(filename, data_folder='datasets', selection=None,
         return
     number_of_images_for_each_matrix = len(in_path_list)//len(rm_path_list)
     with h5py.File(filename, "a") as f:
+        start_time = time.time()
         j = -1
         for i in range(len(in_path_list)):
             if i%number_of_images_for_each_matrix == 0:
@@ -1461,7 +1511,9 @@ def rotation_alignment_(filename, data_folder='datasets', selection=None,
             
             data = pt.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
                                                                            rm_path_list[j]])
-            pt.propagate_scale_attrs(data, f[in_path_list[i]])
+            propagate_scale_attrs(data, f[in_path_list[i]])
+            pt.progress_report(i+1, len(in_path_list), start_time, 'a_alignment',
+                            in_path_list[i])
 
             
 #   FUNCTION threshold_
@@ -1494,7 +1546,7 @@ def threshold_(filename, data_folder = 'datasets', selection = None, criteria = 
                                      in_path_list[index], output_name = 'BinarisedADomains')
             data.attrs['threshold'] = real_threshold
             data.attrs['thresh ratio'] = thresh_ratio
-            pt.propagate_scale_attrs(data, f[in_path_list[index]])
+            propagate_scale_attrs(data, f[in_path_list[index]])
             
             
 #   FUNCTION skeletonize_
@@ -1517,7 +1569,7 @@ def skeletonize_(filename, data_folder = 'datasets', selection = None, criteria 
             skeleton_data = skeletonize(raw_data)
             data = pt.write_output_f(f, skeleton_data, out_folder_locations[index],
                                      in_path_list[index])
-            pt.propagate_scale_attrs(data, f[in_path_list[index]])
+            propagate_scale_attrs(data, f[in_path_list[index]])
 
             
 #   FUNCTION distance_
@@ -1543,7 +1595,7 @@ def distance_(filename, data_folder = 'datasets', selection = None, criteria = N
             final_distance = distance_transform_edt(~raw_data)
             data = pt.write_output_f(f, final_distance, out_folder_locations[index],
                                      in_path_list[index], 'FeatureDistance')
-            pt.propagate_scale_attrs(data, f[in_path_list[index]])
+            propagate_scale_attrs(data, f[in_path_list[index]])
             
             
 #   FUNCTION directional_skeletonize_
@@ -1840,7 +1892,7 @@ def switchmap_(filename, data_folder = 'process/01-phase_binarisation', selectio
                         print('Error: Invalid method submitted')
                     switchmap[i,j] = switch_scan        
         data = pt.write_output_f(f, switchmap, out_folder_locations[0], in_path_list, 'Switchmap')
-        pt.propagate_scale_attrs(data, f[in_path_list[index]])
+        propagate_scale_attrs(data, f[in_path_list[index]])
         if voltage_in_title:
             data.attrs['voltage (mV)'] = voltage_list
             
@@ -2018,7 +2070,7 @@ def switch_type_(filename, data_folder = 'process/01-switchmap', selection = Non
             current_folder_location = out_folder_locations[0]+name
             data = pt.write_output_f(f, totalmap, current_folder_location, in_path_list,
                                      'Switchmap')
-            pt.propagate_scale_attrs(data, f[in_path_list[0]])
+            propagate_scale_attrs(data, f[in_path_list[0]])
         
         gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
         data = pt.write_output_f(f, nucl_centres, gen_loc, in_path_list, 'NucleationCentres')
@@ -2104,7 +2156,7 @@ def interpolated_features_(filename, data_folder = 'process/01-switchmap', selec
                                                  fill_value = np.nan)
             data = pt.write_output_f(f, interpolation, out_folder_locations[index],
                                      [in_path_list, centre_path_list])
-            pt.propagate_scale_attrs(data, f[in_path_list[index]])
+            propagate_scale_attrs(data, f[in_path_list[index]])
             
             
 #   FUNCTION find_isolines
@@ -2188,7 +2240,7 @@ def differentiate_(filename, data_folder = 'datasets', selection = None, criteri
             deriv = np.sqrt(deriv[0]**2+deriv[1]**2)
             data = pt.write_output_f(f, deriv, out_folder_locations[index], in_path_list,
                                      'AbsDerivative')
-            pt.propagate_scale_attrs(data, f[in_path_list[index]])
+            propagate_scale_attrs(data, f[in_path_list[index]])
             data.attrs['dimension'] = 'Abs'
             
             if all_directions:
@@ -2196,6 +2248,6 @@ def differentiate_(filename, data_folder = 'datasets', selection = None, criteri
                 for i in range(len(np.shape(raw_data))):
                     data = pt.write_output_f(f, deriv[i], out_folder_locations[index], in_path_list,
                                              'Derivative'+str(i))
-                    pt.propagate_scale_attrs(data, f[in_path_list[index]])
+                    propagate_scale_attrs(data, f[in_path_list[index]])
                     data.attrs['dimension'] = i
                     

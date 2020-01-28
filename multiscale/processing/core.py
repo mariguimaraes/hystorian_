@@ -25,6 +25,8 @@ import time
 #     By default, copies names from the first of the in_paths
 # folder_names (default: None): list of the names of the folder containing results data channels.
 #     By default, copies names from the first of the in_paths
+# use_attrs (default: None): string, or list of strings, that are the names of attributes that will
+#     be copied from in_paths, and passed into the function as a kwarg for use. 
 # prop_attrs (default: None): string, or list of strings, that are the names of attributes that will
 #     be copied from in_paths, into each output file. If the same attribute name is in multiple
 #     in_paths, the first in_path with the attribute name will be copied from.
@@ -34,7 +36,7 @@ import time
 # result: the datafile produced after running the custom function
 
 def m_apply(filename, function, in_paths, output_names=None, folder_names = None,
-            prop_attrs = None, increment_proc = True, **kwargs):
+            use_attrs = None, prop_attrs = None, increment_proc = True, **kwargs):
     
     #Convert in_paths to a list if not already
     if type(in_paths) != list:
@@ -56,6 +58,11 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
     if prop_attrs is not None:
         if type(prop_attrs) != list:
             prop_attrs = [prop_attrs]
+            
+    #Convert use_attrs to list if it exists, but not already a list
+    if use_attrs is not None:
+        if type(use_attrs) != list:
+            use_attrs = [use_attrs]
     
     #Convert file to hdf5 if not already
     if filename.split('.')[-1] != 'hdf5':
@@ -74,6 +81,8 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
     data_list = []
     prop_attr_keys = []
     prop_attr_vals = []
+    use_attr_keys = []
+    use_attr_vals = []
     with h5py.File(filename, 'r') as f:
         for path in in_paths:
             data_list.append(np.array(f[path]))
@@ -82,6 +91,14 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
                     if (prop_attr not in prop_attr_keys) and (prop_attr in f[path].attrs):
                         prop_attr_keys.append(prop_attr)
                         prop_attr_vals.append(f[path].attrs[prop_attr])
+            if use_attrs is not None:
+                for use_attr in use_attrs:
+                    if (use_attr not in use_attr_keys) and (use_attr in f[path].attrs):
+                        use_attr_keys.append(use_attr)
+                        use_attr_vals.append(f[path].attrs[use_attr])
+                for key_num in range(len(use_attr_keys)):
+                    use_attr_dict = {'source_'+use_attr_keys[key_num]:use_attr_vals[key_num]}
+                kwargs.update(use_attr_dict)
         result = function(*data_list, **kwargs)
     
     #End function if no result is calculated
@@ -118,7 +135,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
                     dataset = f[out_folder_location].create_dataset(name, data=data)
                     if prop_attrs is not None:
                         dataset = propagate_attrs(dataset, prop_attr_keys, prop_attr_vals)
-                write_generic_attributes(fproc[name], out_folder_location + name, in_paths, name)
+                write_generic_attributes(fproc[name], out_folder_location+'/', in_paths, name)
         else:
             print('Error: Unequal amount of outputs and output names')
         for key, value in kwargs.items():
@@ -146,6 +163,8 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
 #     By default, copies names from the first of the in_paths
 # folder_names (default: None): list of the names of the folder containing results data channels.
 #     By default, copies names from the first of the in_paths
+# use_attrs (default: None): string, or list of strings, that are the names of attributes that will
+#     be copied from in_paths, and passed into the function as a kwarg for use. 
 # prop_attrs (default: None): string, or list of strings, that are the names of attributes that will
 #     be copied from in_paths, into each output file. If the same attribute name is in multiple
 #     in_paths, the first in_path with the attribute name will be copied from.
@@ -162,6 +181,45 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
 
 def l_apply(filename, function, all_input_criteria, output_names = None, folder_names = None, 
             prop_attrs = None, repeat = None, **kwargs):
+    all_in_path_list = path_search(filename, all_input_criteria, repeat)
+    all_in_path_list = list(map(list, zip(*all_in_path_list)))
+    increment_proc = True
+    start_time = time.time()
+    for path_num in range(len(all_in_path_list)):
+        m_apply(filename, function, all_in_path_list[path_num], output_names = output_names,
+                folder_names = folder_names, increment_proc = increment_proc,
+                prop_attrs = prop_attrs, **kwargs)
+        progress_report(path_num+1, len(all_in_path_list), start_time, function.__name__,
+                        all_in_path_list[path_num])
+        increment_proc = False    
+        
+        
+#   FUNCTION path_search
+# Uses regex expressions to search for all paths. Useful when writing complicated custom functions
+# that cannot use m_apply or l_apply
+#   INPUTS:
+# filename : name of the hdf5 file where the datas are stored
+# all_input_criteria : Regex expression to describe the inputs searched for. Can be composed as a
+#     list of a list of strings, with extra list parenthesis automatically generated. Eg:
+#         'process*Trace1*' would pass to m_apply all files that contain 'process*Trace1*'.
+#         ['process*Trace1*'] as above
+#         [['process*Trace1*']] as above
+#         [['process*Trace1*', 'process*Trace2*']] would pass to m_apply all files that contain 
+#             'process*Trace1*' and 'process*Trace2*' in a single list.
+#         [['process*Trace1*'], ['process*Trace2*']] would pass to m_apply all files that contain 
+#             'process*Trace1*' and 'process*Trace2*' in two different lists; and thus will operate
+#             differently on each of these lists.
+# repeat (default: None): determines what to do if path_lists generated are of different lengths.
+#     None: Default, no special action is taken, and extra entries are removed. ie, given lists
+#         IJKL and AB, IJKL -> IJ.
+#     'alt': The shorter lists of path names are repeated to be equal in length to the longest list.
+#         ie, given IJKL and AB, AB -> ABAB
+#     'block': Each entry of the shorter list of path names is repeated to be equal in length to the
+#         longest list. ie, given IJKL and AB, AB -> AABB.
+#    OUTPUTS:
+# all_in_path_list: list of paths (paths are strings)
+
+def path_search(filename, all_input_criteria, repeat = None):
     if type(all_input_criteria) != list:
         all_input_criteria = [all_input_criteria]
     if type(all_input_criteria[0]) != list:
@@ -181,41 +239,33 @@ def l_apply(filename, function, all_input_criteria, output_names = None, folder_
                         in_path_list.append(path)
             all_in_path_list.append(in_path_list)
             list_lengths.append(len(in_path_list))
-        if len(set(list_lengths)) == 0:
-            print('No Input Datafiles found!')
-        elif len(set(list_lengths)) != 1:
-            if repeat is None:
-                print('Input lengths not equal, and repeat not set! Extra files will be omitted.')
-            else:
-                largest_list_length = np.max(list_lengths)
-                list_multiples = []
-                for length in list_lengths:
-                    if largest_list_length%length != 0:
-                        print('At least one path list length is not a factor of the largest path'\
-                              'list length. Extra files will be omitted.')
-                    list_multiples.append(largest_list_length//length)
-                if (repeat == 'block') or (repeat == 'b'):
-                    for list_num in range(len(list_multiples)):
-                        all_in_path_list[list_num] = np.repeat(all_in_path_list[list_num],
-                                                               list_multiples[list_num])
-                if (repeat == 'alt') or (repeat == 'a'):
-                    for list_num in range(len(list_multiples)):
-                        old_path_list = all_in_path_list[list_num]
-                        new_path_list = []
-                        for repeat_iter in range(list_multiples[list_num]):
-                            new_path_list.extend(old_path_list)
-                        all_in_path_list[list_num] = new_path_list
-        all_in_path_list = list(map(list, zip(*all_in_path_list)))
-        
-    increment_proc = True
-    start_time = time.time()
-    for path_num in range(len(all_in_path_list)):
-        m_apply(filename, function, all_in_path_list[path_num], output_names = output_names,
-                folder_names = folder_names, increment_proc = increment_proc,
-                prop_attrs = prop_attrs, **kwargs)
-        progress_report(path_num+1, len(all_in_path_list), start_time, function.__name__,
-                        all_in_path_list[path_num])
-        increment_proc = False    
+        if len(list_lengths) == 1:
+            if list_lengths[0] == 0:
+                print('No Input Datafiles found!')
+        else:
+            if len(set(list_lengths)) != 1:
+                if repeat is None:
+                    print('Input lengths not equal, and repeat not set! Extra files will be omitted.')
+                else:
+                    largest_list_length = np.max(list_lengths)
+                    list_multiples = []
+                    for length in list_lengths:
+                        if largest_list_length%length != 0:
+                            print('At least one path list length is not a factor of the largest path'\
+                                  'list length. Extra files will be omitted.')
+                        list_multiples.append(largest_list_length//length)
+                    if (repeat == 'block') or (repeat == 'b'):
+                        for list_num in range(len(list_multiples)):
+                            all_in_path_list[list_num] = np.repeat(all_in_path_list[list_num],
+                                                                   list_multiples[list_num])
+                    if (repeat == 'alt') or (repeat == 'a'):
+                        for list_num in range(len(list_multiples)):
+                            old_path_list = all_in_path_list[list_num]
+                            new_path_list = []
+                            for repeat_iter in range(list_multiples[list_num]):
+                                new_path_list.extend(old_path_list)
+                            all_in_path_list[list_num] = new_path_list
+    return all_in_path_list
     
         
 #   FUNCTION create_dataset_from_dict
@@ -294,13 +344,14 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
     if type(in_paths) != list:
         in_paths = [in_paths]
     operation_name = out_folder_location.split('/')[1]
+    
+    dataset.attrs['path'] = out_folder_location+output_name
     dataset.attrs['shape'] = dataset.shape
     dataset.attrs['name'] = output_name
     dataset.attrs['operation name'] = operation_name.split('-')[1]
     dataset.attrs['operation number'] = operation_name.split('-')[0]
     dataset.attrs['time'] = str(datetime.now())
-    for i in range(len(in_paths)):
-        dataset.attrs['source' + str(i)] = in_paths[i]
+    dataset.attrs['source'] = in_paths
 
         
 #   FUNCTION progress_report
@@ -332,10 +383,11 @@ def progress_report(processes_complete, processes_total, start_time = None,
         else:
             print(str_progress)
     if processes_complete == processes_total:
-        str_final = (process_name+' complete! '+str(processes_complete)+' processes performed in '
-                     + str(round(time.time()-start_time)) +'s')
+        str_final = (process_name+' complete at ' + time.strftime('%H:%M', time.localtime()) + '! '
+                     +str(processes_complete)+' processes performed in '
+                     +str(round(time.time()-start_time)) +'s.')
         if clear:
-            print(str_final+' '*100, sep=' ', end='\r', file=sys.stdout, flush=False)
+            print(str_final+' '*1000, sep=' ', end='\r', file=sys.stdout, flush=False)
         else:
             print(str_final)
         
@@ -369,8 +421,7 @@ def intermediate_plot(data, condition='', plotlist=[], text='Intermediate Plot',
             plt.close()
 
 
-           
-#   FUNCTION find_paths_of_all_subgroups
+# FUNCTION find_paths_of_all_subgroups
 # Recursively determines list of paths for all datafiles in current_path, as well as datafiles in
 # all  subfolders (and sub-subfolders and...) of current path
 #   INPUTS:
@@ -416,25 +467,6 @@ def negative(filename, data_folder='datasets', selection=None, criteria=0):
 # ONCE IT IS DONE WE SHOULD THINK IF WE NEED TO KEEP THEM OR NOT
 ####################################################################################################
 ####################################################################################################
-
-#   FUNCTION propagate_scale_attrs
-# Attempts to write the scale attributes to a new dataset. This is done by directly copying from
-# an old dataset. If this is not possible, then it attempts to generate this from the old dataset
-# by calculating from the 'size' and 'shape' attributes.
-#   INPUTS:
-# new_data: new dataset to write to
-# old_data: old dataset to read from
-#   OUTPUTS
-# null
-
-def propagate_scale_attrs(new_data, old_data):
-    if 'scale (m/px)' in old_data.attrs:
-        new_data.attrs['scale (m/px)'] = old_data.attrs['scale (m/px)']
-    else:
-        if ('size' in old_data.attrs) and ('shape' in old_data.attrs):
-            scan_size = old_data.attrs['size']
-            shape = old_data.attrs['shape']
-            new_data.attrs['scale (m/px)'] = scan_size[0] / shape[0]
 
 
 #   FUNCTION path_inputs
@@ -575,8 +607,10 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
         if overwrite_if_same == True:
             if str(operation_number - 1) + '-' + process_name in f['process'].keys():
                 operation_number = operation_number - 1
-        if type(folder_names) != list:
+        if (type(folder_names) != list) and (type(folder_names) != np.ndarray):
+            print(type(folder_names))
             folder_names = [folder_names]
+            
         for folder in folder_names:
             if '/' in folder:
                 folder_root, output_filename = folder.rsplit('/', 1)
@@ -608,10 +642,10 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
 
 def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
     f.require_group(out_folder_location)
-    if type(in_paths) != list:
+    if (type(in_paths) != list) and (type(in_paths) != np.ndarray):
         in_paths = [in_paths]
     if output_name is None:
-        if type(in_paths[0]) == str:
+        if (type(in_paths[0]) == str) or (type(in_paths[0]) == np.str_):
             output_name = in_paths[0].rsplit('/', 1)[1]
         else:
             output_name = in_paths[0][0].rsplit('/', 1)[1]
