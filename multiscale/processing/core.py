@@ -1,4 +1,4 @@
-# 234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+#234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
 
 import h5py
 import os
@@ -114,8 +114,15 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
         num_proc = len(f['process'].keys())
         if increment_proc:
             num_proc = num_proc + 1
-        out_folder_location = ('process/' + str(num_proc).zfill(3) + '-' + function.__name__ + '/'
-                               + folder_names)
+            out_folder_location = ('process/' + str(num_proc).zfill(3) + '-' + function.__name__ +
+                                   '/' + folder_names)
+        else:
+            out_folder_location = ('process/' + str(num_proc).zfill(3) + '-' + function.__name__ +
+                                   '/'  + folder_names)
+            if out_folder_location.split('/')[1] not in f['process'].keys():
+                out_folder_location = ('process/' + str(num_proc+1).zfill(3) + '-' +
+                                       function.__name__ + '/' + folder_names)
+                
         fproc = f.require_group(out_folder_location)
         
         if (len(output_names) == len(result)):
@@ -128,18 +135,20 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
                         if prop_attrs is not None:
                             dataset = propagate_attrs(dataset, prop_attr_keys, prop_attr_vals)
                     else:
-                        dataset = f[out_folder_location].create_dataset(name, data=data)
+                        dataset = create_dataset_with_name_check(f[out_folder_location], name, data)
                         if prop_attrs is not None:
                             dataset = propagate_attrs(dataset, prop_attr_keys, prop_attr_vals)
                 else:
-                    dataset = f[out_folder_location].create_dataset(name, data=data)
+                    dataset = create_dataset_with_name_check(f[out_folder_location], name, data)
                     if prop_attrs is not None:
                         dataset = propagate_attrs(dataset, prop_attr_keys, prop_attr_vals)
                 write_generic_attributes(fproc[name], out_folder_location+'/', in_paths, name)
+                for key, value in kwargs.items():
+                    if value is None:
+                        value = 'None'
+                    dataset.attrs[key] = value
         else:
             print('Error: Unequal amount of outputs and output names')
-        for key, value in kwargs.items():
-            dataset.attrs[key] = value
     return result
 
 
@@ -178,9 +187,11 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names = None
 # **kwargs : All the non-data inputs to give to the function
 #    OUTPUTS:
 # null
+#    TO DO:
+# Can we force a None to be passed?
 
 def l_apply(filename, function, all_input_criteria, output_names = None, folder_names = None, 
-            prop_attrs = None, repeat = None, **kwargs):
+            use_attrs = None, prop_attrs = None, repeat = None, **kwargs):
     all_in_path_list = path_search(filename, all_input_criteria, repeat)
     all_in_path_list = list(map(list, zip(*all_in_path_list)))
     increment_proc = True
@@ -188,7 +199,7 @@ def l_apply(filename, function, all_input_criteria, output_names = None, folder_
     for path_num in range(len(all_in_path_list)):
         m_apply(filename, function, all_in_path_list[path_num], output_names = output_names,
                 folder_names = folder_names, increment_proc = increment_proc,
-                prop_attrs = prop_attrs, **kwargs)
+                use_attrs = use_attrs, prop_attrs = prop_attrs, **kwargs)
         progress_report(path_num+1, len(all_in_path_list), start_time, function.__name__,
                         all_in_path_list[path_num])
         increment_proc = False    
@@ -245,14 +256,15 @@ def path_search(filename, all_input_criteria, repeat = None):
         else:
             if len(set(list_lengths)) != 1:
                 if repeat is None:
-                    print('Input lengths not equal, and repeat not set! Extra files will be omitted.')
+                    print('Input lengths not equal, and repeat not set! Extra files will be'\
+                          'omitted.')
                 else:
                     largest_list_length = np.max(list_lengths)
                     list_multiples = []
                     for length in list_lengths:
                         if largest_list_length%length != 0:
-                            print('At least one path list length is not a factor of the largest path'\
-                                  'list length. Extra files will be omitted.')
+                            print('At least one path list length is not a factor of the largest'\
+                                  'path list length. Extra files will be omitted.')
                         list_multiples.append(largest_list_length//length)
                     if (repeat == 'block') or (repeat == 'b'):
                         for list_num in range(len(list_multiples)):
@@ -267,10 +279,40 @@ def path_search(filename, all_input_criteria, repeat = None):
                             all_in_path_list[list_num] = new_path_list
     return all_in_path_list
     
-        
+
+#   FUNCTION e_apply
+# A modified form of m_apply that runs m_apply with path_search to increase the ease of operation
+#   INPUTS:
+# filename : name of the hdf5 file where the datas are stored
+# function : Custom function that you want to call
+# all_input_criteria: input criteria used by path_search
+# outputs_names (default: None): list of the names of the channels the results are written in.
+#     By default, copies names from the first of the in_paths
+# folder_names (default: None): list of the names of the folder containing results data channels.
+#     By default, copies names from the first of the in_paths
+# use_attrs (default: None): string, or list of strings, that are the names of attributes that will
+#     be copied from in_paths, and passed into the function as a kwarg for use. 
+# prop_attrs (default: None): string, or list of strings, that are the names of attributes that will
+#     be copied from in_paths, into each output file. If the same attribute name is in multiple
+#     in_paths, the first in_path with the attribute name will be copied from.
+# increment_proc (default: True): determines whether to increment the process counter
+# **kwargs : All the non-data inputs to give to the function
+#    OUTPUTS:
+# result: the datafile produced after running the custom function
+
+def e_apply(filename, function, all_input_criteria, output_names = None, folder_names = None, 
+            use_attrs = None, prop_attrs = None, increment_proc = True, **kwargs):
+    all_in_path_list = path_search(filename, all_input_criteria)
+    all_in_path_list = list(map(list, zip(*all_in_path_list)))[0]
+    m_apply(filename, function, all_in_path_list, output_names = output_names,
+            folder_names = folder_names, increment_proc = increment_proc,
+            use_attrs = None, prop_attrs = prop_attrs, **kwargs)
+    
+    
 #   FUNCTION create_dataset_from_dict
 # Subfunction used in m_apply. Converts the hdf5_dict output file into a dataset that is written to
-# the hdf5 file, with all attributes encoded.
+# the hdf5 file, with all attributes encoded. Also checks if a folder of the same name is present,
+# and if it should be written.
 #   INPUTS:
 # dataset: Path to the datasets in the hdf5 file that contain the input.
 # name: name of the channel the results are written in.
@@ -279,11 +321,42 @@ def path_search(filename, all_input_criteria, repeat = None):
 #   OUTPUTS:
 # dataset: The dataset written to
 
-def create_dataset_from_dict (dataset, name, dict_data):
-    dataset = dataset.create_dataset(name, data = dict_data['data'])
+def create_dataset_from_dict(dataset, name, dict_data):
+    if name in dataset:
+        print(str(name) + ' already exists in'  + dataset.name +'.')
+        response = input(' Would you like to overwrite the dataset? (y/n)')
+        if response != 'y':
+            return dataset
+        else:
+            dataset[name][...] = dict_data['data']
+    else:
+        dataset = dataset.create_dataset(name, data = dict_data['data'])
     for key, value in dict_data.items():
         if (key != 'hdf5_dict') and (key != 'data'):
             dataset.attrs[key] = value
+    return dataset
+
+#   FUNCTION create_dataset_with_name_check
+# Subfunction used in m_apply. Writes the output, but also checks if a folder of the same name is
+# present, and if it should be written.
+#   INPUTS:
+# dataset: Path to the datasets in the hdf5 file that contain the input.
+# name: name of the channel the results are written in.
+# dict_data: the dict that contains the data written. This should include both the actual data
+#     to be written, as well as additional attributes.
+#   OUTPUTS:
+# dataset: The dataset written to
+
+def create_dataset_with_name_check(dataset, name, data):
+    if name in dataset:
+        print(str(name) + ' already exists in ' + dataset.name +'.')
+        response = input(' Would you like to overwrite the dataset? (y/n)')
+        if response != 'y':
+            return dataset
+        else:
+            dataset[name][...] = data
+    else:
+        dataset = dataset.create_dataset(name, data=data)
     return dataset
 
         
@@ -360,8 +433,8 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
 # processes_complete: number of processes that have currently been run
 # processes_total: total number of processes that have been and will be run
 # start_time: time at which the process began
-# process_name: name of the process run
-# identifier: name of the particular iteration of the process
+# process_name (default: 'undefined_process'): name of the process run
+# identifier (default: '[unidentified_sample]'): name of the particular iteration of the process
 # clear (default: True): Decides whether to overwrite existing print statements
 #   OUTPUTS
 # null
@@ -379,17 +452,15 @@ def progress_report(processes_complete, processes_total, start_time = None,
             str_progress = (process_name+': ' +str(processes_complete)+' of '+str(processes_total) +
                             ' Complete. Unknown time remaining. '+str(identifier))
         if clear:
-            print(str_progress+' '*len(str_progress), sep=' ', end='\r', file=sys.stdout, flush=False)
+            print(str_progress+' '*len(str_progress), sep=' ', end='\r', file=sys.stdout,
+                  flush=False)
         else:
             print(str_progress)
     if processes_complete == processes_total:
         str_final = (process_name+' complete at ' + time.strftime('%H:%M', time.localtime()) + '! '
                      +str(processes_complete)+' processes performed in '
                      +str(round(time.time()-start_time)) +'s.')
-        if clear:
-            print(str_final+' '*1000, sep=' ', end='\r', file=sys.stdout, flush=False)
-        else:
-            print(str_final)
+        print(str_final+' '*1000)
         
 
 #   FUNCTION intermediate_plot
@@ -439,143 +510,11 @@ def find_paths_of_all_subgroups(f, current_path):
             path_list.append(current_path + '/' + sub_group)
     return path_list
 
-
-# FUNCTION negative_
-## Processes an array determine negatives of all values
-## Trivial sample function to show how to use proc_tools
-# INPUTS:
-## filename: name of hdf5 file containing data
-## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## criteria: determines category of files to search
-# OUTPUTS:
-## null
-
-def negative(filename, data_folder='datasets', selection=None, criteria=0):
-    # Trivial sample function to show how to use proc_tools
-    # Processes an array determine negatives of all values
-    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
-    out_folder_locations = find_output_folder_location(filename, 'negative', in_path_list)
-    with h5py.File(filename, "a") as f:
-        for i in range(len(in_path_list)):
-            neg = -np.array(f[in_path_list[i]])
-            pt.write_output_f(f, neg, out_folder_locations[i], in_path_list[i])
-
-####################################################################################################
-####################################################################################################
-# MOST USAGE OF THE BELOW FUNTIONS SHOULD BE REPLACED BY THE USE OF M_APPLY
-# ONCE IT IS DONE WE SHOULD THINK IF WE NEED TO KEEP THEM OR NOT
-####################################################################################################
-####################################################################################################
-
-
-#   FUNCTION path_inputs
-# Find paths to all input files
-#   INPUTS:
-# filename or f: either the open datafile, or the filename of an .hdf5 file that can be opened.
-# data_folder (default: 'datasets'): folder searched for source data
-# selection (default: None): determines the name of folders or files to be used.
-# criteria: determines what category selection refers to. Can be either:
-#     'process': an entire process folder
-#     'sample': the next subfile after 'process' or 'dataset'; originally used for samples
-#     'channel': the next subfile after 'sample'; originally the actual dataset, named after the
-#         source channel.
-#   OUTPUTS:
-# in_path_list: list of paths to datafiles
-
-def path_inputs(filename_or_f, data_folder='datasets', selection=None, criteria=None):
-    if type(filename_or_f) == str:
-        filename = filename_or_f
-        with h5py.File(filename, 'a') as f:
-            in_path_list = path_inputs(f, data_folder, selection, criteria)
-    elif type(filename_or_f) == h5py._hl.files.File:
-        f = filename_or_f
-        in_path_list = find_paths_of_all_subgroups(f, data_folder)
-        if selection is not None:
-            in_path_list = criteria_selection(in_path_list, selection, criteria)
-    else:
-        print('Error: First argument should either be the filename of an hdf5 file, or an open\
-                hdf5 file.')
-        in_path_list = []
-    return in_path_list
-
-#   FUNCTION criteria_selection
-# From a given list of paths, returns a shorter list that has been refined by particular criteria
-#   INPUTS:
-# path_list: a list of all possible paths
-# selection: determines the name of folders or files to be used.
-# criteria: determines what category selection refers to. Can be either:
-#     'process': an entire process folder
-#     'sample': the next subfile after 'process' or 'dataset'; originally used for samples
-#     'channel': the next subfile after 'sample'; originally the actual dataset, named after the
-#         source channel.
-#   OUTPUTS:
-# valid_path_list: shorter list of paths
-
-def criteria_selection(path_list, selection, criteria):
-    valid_path_list = []
-    if type(selection) != list:
-        selection = [selection]
-    if criteria == 'process' or criteria == 'Process' or criteria == 'p':
-        for path in path_list:
-            split_path = path.split('/')
-            if split_path[0] == 'process':
-                if is_valid_path(split_path, selection, 1):
-                    valid_path_list.append(path)
-            else:
-                print('Error: \'process\' criteria given, but path not linking to \'process\' '\
-                        'folder. Path considered invalid.')
-
-    elif criteria == 'sample' or criteria == 'Sample' or criteria == 's':
-        for path in path_list:
-            split_path = path.split('/')
-            if split_path[0] == 'process':
-                if is_valid_path(split_path, selection, 2):
-                    valid_path_list.append(path)
-            elif split_path[0] == 'datasets':
-                if is_valid_path(split_path, selection, 1):
-                    valid_path_list.append(path)
-            else:
-                print('Error: Path not linking to \'process\' or \'datasets\' folder. Path '\
-                         'considered invalid.')
-    elif criteria == 'channel' or criteria == 'Channel' or criteria == 'c':
-        for path in path_list:
-            split_path = path.split('/')
-            if split_path[0] == 'process':
-                if is_valid_path(split_path, selection, 3):
-                    valid_path_list.append(path)
-            elif split_path[0] == 'datasets':
-                if is_valid_path(split_path, selection, 2):
-                    valid_path_list.append(path)
-            else:
-                print('Error: Path not linking to \'process\' or \'datasets\' folder. Path '\
-                         'considered invalid.')
-    elif criteria is None:
-        for path in path_list:
-            split_path = path.split('/')
-            if is_valid_path(split_path, selection, 0):
-                valid_path_list.append(path)
-    else:
-        print('Error: Criteria should be either \'process\', \'sample\', or \'channel\'. No '\
-                 'selection was performed.')
-        valid_path_list = path_list
-    return valid_path_list
-
-#   FUNCTION is_valid_path
-# Determines if the path is one of the selected, valid paths.
-#   INPUTS:
-# split_path: the path, split in a list along each iteration of the character '/'
-# selection: string that is required for the path to be valid
-# check_index: index of the split path checked to contain the selection
-#   OUTPUTS:
-# valid: bool that states if the path is valid or not
-
-def is_valid_path(split_path, selection, check_index):
-    valid = False
-    for valid_name in selection:
-        if split_path[check_index] == valid_name:
-            valid = True
-    return valid
+#####################################################################################################
+#                                                                                                   #
+#                    THESE FUNCTIONS ARE USEFUL FOR HARDCODING COMPLEX FUNCTIONS                    #
+#                                                                                                   #
+#####################################################################################################
 
 
 #   FUNCTION find_output_folder_location
@@ -605,10 +544,9 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
         f = filename_or_f
         operation_number = len(f['process']) + 1
         if overwrite_if_same == True:
-            if str(operation_number - 1) + '-' + process_name in f['process'].keys():
+            if str(operation_number - 1).zfill(3) + '-' + process_name in f['process'].keys():
                 operation_number = operation_number - 1
         if (type(folder_names) != list) and (type(folder_names) != np.ndarray):
-            print(type(folder_names))
             folder_names = [folder_names]
             
         for folder in folder_names:
@@ -623,10 +561,11 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
                            'datasets or process')
             else:
                 folder_centre = folder
-            out_folder_location = ('process/' + str(operation_number).zfill(3) + '-' + process_name + '/'
-                                   + folder_centre + '/')
+            out_folder_location = ('process/' + str(operation_number).zfill(3) + '-' + process_name
+                                   + '/' + folder_centre + '/')
             out_folder_location_list.append(out_folder_location)
     return out_folder_location_list
+
 
 #   FUNCTION write_output_f
 # Writes the output to an open datafile
@@ -658,144 +597,3 @@ def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
     dataset = f[out_folder_location][output_name]
     write_generic_attributes(dataset, out_folder_location, in_paths, output_name)
     return dataset
-
-
-####################################################################################################
-####################################################################################################
-# DEPRACATED FILES
-# DO NOT USE
-####################################################################################################
-####################################################################################################
-# DELETE WHEN NO LONGER USED BY ANY FUNCTIONS
-
-
-# FUNCTION initialise_process
-## Initialises typical processes by finding paths to inputs, creating output folder, and finding their path
-# INPUTS:
-## filename: name of hdf5 file containing data
-## process_name: name of the folder created
-## create_groups: if True, creates folders, otherwise does not. Used for debugging.
-## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## selection_depth: determines what level at which to look at a selection.
-## labelsize (default: 25) : Size of the text in pxs
-## std_range (default: 3) : Range around the mean for the colorscale, alternatively the value can be "full", to take the full range.
-## saving_path (default: '') : The path to the folder where to save the image
-# OUTPUTS:
-## Returns a list for each file input. Each entry of this list is a three entry list.
-## This sublist consists of the path to the file input, the path to the file output, and the name of the file output
-## If process_name is left as None, the output folder creation is bypassed, and a simple list of in_paths are provided
-
-def initialise_process(filename, process_name=None, data_folder='datasets', selection=None, selection_depth=0,
-                       create_groups=True):
-    with h5py.File(filename, 'a') as f:
-        operation_number = str(len(f['process']) + 1)
-        # Find Inputs
-        in_path_list = find_paths_of_all_subgroups(f, data_folder)
-        if selection is not None:
-            in_path_list = select_certain_data(in_path_list, selection, selection_depth)
-        # print(f['process'])
-
-        if process_name is not None:
-            # Create Output Folder
-            out_path_list = []
-            output_filename_list = []
-            for path in in_path_list:
-                path_root, output_filename = path.rsplit('/', 1)
-                output_filename_list.append(output_filename)
-                out_folder = path_root[len(data_folder):]  # Skips initial nesting
-                out_folder = 'process/' + operation_number + '-' + process_name + out_folder + '/'
-                out_path_list.append(out_folder)
-                if create_groups == True:
-                    try:
-                        curr_group = f.create_group(out_folder)
-                    except:
-                        pass
-
-            in_out_list_of_lists = []
-            for i in range(len(in_path_list)):
-                in_out_list_of_lists.append([in_path_list[i], out_path_list[i], output_filename_list[i]])
-        else:
-            in_out_list_of_lists = in_path_list
-    return in_out_list_of_lists
-
-
-# FUNCTION select_certain_data
-## Selects valid paths from a list of larger paths
-# INPUTS:
-## path_list: initial (longer) list of paths
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## selection_depth: determines what level at which to look at a selection.
-# OUTPUTS:
-## shortened list of paths
-
-def select_certain_data(path_list, selection, selection_depth):
-    # Given a list of paths, returns a shorter list given the selection_params. See initialise_process
-    if type(selection) != list:
-        selection = [selection]
-    valid_path_list = []
-    for i in range(len(path_list)):
-        split_path = path_list[i].split('/')
-        valid = False
-        for valid_name in selection:
-            if split_path[selection_depth] == valid_name:
-                valid = True
-        if valid == True:
-            valid_path_list.append(path_list[i])
-    return valid_path_list
-
-
-# FUNCTION generic_write
-# Writes output for most "generic" datafiles, overwriting by default
-# Logs source folder, written name, shape, operation name and number, and current time in attributes
-# INPUTS:
-## f: open hdf5 file
-## data: data to be written into hdf5
-## path: path list of lists; the output of initialise_process
-# OUTPUTS:
-## null
-
-def generic_write(f, path, data=None, *arg):
-    if data != None:
-        try:
-            # By default doesn't allow overwrite, so delete before writing
-            del f[path[1]][path[2]]
-        except:
-            pass
-        f[path[1]].create_dataset(path[2], data=data)
-        f[path[1]][path[2]].attrs['shape'] = data.shape
-
-    operation_name = path[1].split('/')[1]
-    f[path[1]][path[2]].attrs['name'] = path[2]
-    f[path[1]][path[2]].attrs['operation name'] = operation_name.split('-')[1]
-    f[path[1]][path[2]].attrs['operation number'] = operation_name.split('-')[0]
-    f[path[1]][path[2]].attrs['source'] = path[0]
-    f[path[1]][path[2]].attrs['time'] = str(datetime.now())
-
-    if data == None:
-        f[path[1]][path[2]].attrs['shape'] = f[path[1]][path[2]][()].shape
-    if len(arg) % 2 != 0:
-        print('Error: Odd amount of input arguments')
-    else:
-        for i in range(len(arg) // 2):
-            f[path[1]][path[2]].attrs[str(arg[2 * i])] = arg[2 * i + 1]
-
-
-# FUNCTION find_data_path_structure
-## Helper/debugger function.
-## Prints paths to valid datafiles given a filename, a data_folder to look in, and selection params
-## Intended to help user to determine selection params for initialise_process
-# INPUTS:
-## filename: name of hdf5 file containing data
-## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## selection_depth: determines what level at which to look at a selection.
-# OUTPUTS:
-## null
-
-def find_data_path_structure(filename, data_folder='datasets', selection=None, selection_depth=0):
-    with h5py.File(filename, 'a') as f:
-        in_path_list = find_paths_of_all_subgroups(f, data_folder)
-        if selection is not None:
-            in_path_list = select_certain_data(in_path_list, selection, selection_depth)
-    print(in_path_list)
