@@ -26,6 +26,7 @@ def debug_print_error(s):
         return
     print("[" + str(inspect.stack()[1][3]) + "] Error: " + str(s))
 
+
 def parse_header(header_data):
     header_dict = {}
 
@@ -120,6 +121,7 @@ def get_channels(channel_info, fd, data_start_pos, pixels_x, pixels_y):
             channel_data[c["Full Name"]] = trace_data
     return channel_data
 
+
 def load_sxm(filename):
     header_start_token = ':NANONIS_VERSION:'
     header_end_token = ':SCANIT_END:\n\n\n'
@@ -152,6 +154,7 @@ def load_sxm(filename):
 
     return [header, channel_info, channel_data]
 
+
 def sxm2hdf5(filename):
     header, channel_info, channel_data = load_sxm(filename)
     print(channel_info)
@@ -164,7 +167,7 @@ def sxm2hdf5(filename):
 
         f.create_group("process")
 
-        datagrp = f.create_group("datasets/"+filename.split('.')[0])
+        datagrp = f.create_group("datasets/" + filename.split('.')[0])
         for indx, key in enumerate(channel_data.keys()):
             datagrp.create_dataset(key, data=channel_data[key])
             for info in channel_info:
@@ -173,9 +176,9 @@ def sxm2hdf5(filename):
                         datagrp[key].attrs[k2] = info[k2]
                 continue
 
-
-                        #for key2 in channel_info[indx]:
+                # for key2 in channel_info[indx]:
             #    datagrp[key].attrs[key2] = channel_info[indx][key2]
+
 
 '''filename = 'B19020D_10um_002.sxm'
 header, info, data = load_sxm(filename)

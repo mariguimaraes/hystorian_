@@ -1,4 +1,4 @@
-#234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+# 234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
 
 import h5py
 import matplotlib.pyplot as plt
@@ -44,37 +44,37 @@ from random import randrange
 # null
 
 def save_image(data,
-               image_name=None, 
+               image_name=None,
                colorm='inferno',
                scalebar=False,
-               physical_size = (0, 'unit'),
-               colorbar = True, 
-               size=None, 
-               labelsize=16, 
-               std_range=3, 
-               saving_path='', 
+               physical_size=(0, 'unit'),
+               colorbar=True,
+               size=None,
+               labelsize=16,
+               std_range=3,
+               saving_path='',
                verbose=False,
                show=False,
                source_path=None,
                source_scale_m_per_px=None):
     if data.dtype == 'bool':
-         data = data.astype(int)
+        data = data.astype(int)
     if image_name is None:
         if source_path is not None:
-            image_name = source_path.replace('/','_')
+            image_name = source_path.replace('/', '_')
         else:
             image_name = 'image'
     if saving_path != '':
         if saving_path[-1] != '/':
-            saving_path = saving_path +'/'
+            saving_path = saving_path + '/'
     if std_range != 'full':
         std_range = float(std_range)
-    
+
         if size is None:
-            figsize = (np.array(np.shape(data))/100)[::-1]
+            figsize = (np.array(np.shape(data)) / 100)[::-1]
             if figsize[0] < 5:
-                scale_factor = np.ceil(5/figsize[0])
-                figsize = scale_factor*figsize
+                scale_factor = np.ceil(5 / figsize[0])
+                figsize = scale_factor * figsize
             fig = plt.figure(frameon=False, figsize=figsize, dpi=100)
         else:
             fig = plt.figure(figsize=size)
@@ -84,36 +84,36 @@ def save_image(data,
         mean_val = np.nanmean(offsetdata)
         std_val = np.nanstd(offsetdata)
         v_min = 0
-        v_max = mean_val + std_range*std_val
+        v_max = mean_val + std_range * std_val
         if std_range == 'full':
             pos = plt.imshow(offsetdata, cmap=colorm)
         else:
             pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
-        if colorbar == True:
-            cbar = plt.colorbar(pos,fraction=0.046, pad=0.04)
-            cbar.ax.tick_params(labelsize=labelsize) 
+        if colorbar:
+            cbar = plt.colorbar(pos, fraction=0.046, pad=0.04)
+            cbar.ax.tick_params(labelsize=labelsize)
         plt.tight_layout()
         if scalebar:
             try:
                 if source_scale_m_per_px is None:
                     phys_size = physical_size[0]
                     px = np.shape(data)[0]
-                    scalebar = ScaleBar(phys_size/px, physical_size[1], location='lower right',
-                                    font_properties={'size':labelsize})
+                    scalebar = ScaleBar(phys_size / px, physical_size[1], location='lower right',
+                                        font_properties={'size': labelsize})
                 else:
                     scalebar = ScaleBar(source_scale_m_per_px, 'm', location='lower right',
-                                    font_properties={'size':labelsize})
-                #scalebar = ScaleBar(f[path].attrs['scale (m/px)'], 'm', location='lower right',
-                                    #font_properties={'size':25})
+                                        font_properties={'size': labelsize})
+                # scalebar = ScaleBar(f[path].attrs['scale (m/px)'], 'm', location='lower right',
+                # font_properties={'size':25})
                 plt.gca().add_artist(scalebar)
             except:
                 print("Error in the creation of the scalebar, please check that the attribute's\
                         size and shape are correctly define for each data channel.")
-        fig.savefig(saving_path+str(image_name)+'.png')
+        fig.savefig(saving_path + str(image_name) + '.png')
         if show:
             plt.show()
         if verbose:
-            print(filename.split('.')[0]+'_'+str(image_name)+'.png saved.')
+            print(str(image_name) + '.png saved.')
         plt.close()
     return
 
@@ -133,41 +133,41 @@ def save_image(data,
 #   OUTPUTS
 # null
 
-def distortion_params_(filename, all_input_criteria, speed = 2, read_offset = False,
-                       cumulative = False):
+def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
+                       cumulative=False):
     in_path_list = pt.path_search(filename, all_input_criteria)[0]
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
                                                           in_path_list)
-    tform21 = np.eye(2,3,dtype=np.float32)
-    cumulative_tform21 = np.eye(2,3,dtype=np.float32)
+    tform21 = np.eye(2, 3, dtype=np.float32)
+    cumulative_tform21 = np.eye(2, 3, dtype=np.float32)
     with h5py.File(filename, "a") as f:
-        recent_offsets=[]
+        recent_offsets = []
         for i in range(len(in_path_list)):
             if i == 0:
                 start_time = time.time()
             else:
                 print('---')
-                print('Currently reading path '+in_path_list[i])
+                print('Currently reading path ' + in_path_list[i])
                 if cumulative:
                     img1 = img2cv((f[in_path_list[0]]))
                     img2 = img2cv((f[in_path_list[i]]))
                 else:
-                    img1 = img2cv((f[in_path_list[i-1]]))
+                    img1 = img2cv((f[in_path_list[i - 1]]))
                     img2 = img2cv((f[in_path_list[i]]))
-                
+
                 # try estimate offset change from attribs of img1 and img2
-                if read_offset == True:
+                if read_offset:
                     offset2 = (f[in_path_list[i]]).attrs['offset']
-                    offset1 = (f[in_path_list[i-1]]).attrs['offset']
+                    offset1 = (f[in_path_list[i - 1]]).attrs['offset']
                     scan_size = (f[in_path_list[i]]).attrs['size']
                     shape = (f[in_path_list[i]]).attrs['shape']
-                    offset_px = m2px(offset2-offset1, shape, scan_size)
+                    offset_px = m2px(offset2 - offset1, shape, scan_size)
                 else:
-                    offset_px = np.array([0,0])
+                    offset_px = np.array([0, 0])
                 if speed != 1 and speed != 2 and speed != 3 and speed != 4:
                     print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest).\
                             Speed now set to level 2.')
-                    speed = 2                
+                    speed = 2
                 if len(recent_offsets) == 0:
                     offset_guess = offset_px
                     if speed == 1:
@@ -189,9 +189,9 @@ def distortion_params_(filename, all_input_criteria, speed = 2, read_offset = Fa
                     elif speed == 4:
                         warp_check_range = 6
                 else:
-                    offset_guess = (offset_px + recent_offsets[2]/2 + recent_offsets[1]/3
-                                    + recent_offsets[0]/6)
-                    #if i == 9:
+                    offset_guess = (offset_px + recent_offsets[2] / 2 + recent_offsets[1] / 3
+                                    + recent_offsets[0] / 6)
+                    # if i == 9:
                     #    offset_guess = offset_guess-np.array([20,20])
                     #    print(offset_guess)
                     if speed == 1:
@@ -209,20 +209,20 @@ def distortion_params_(filename, all_input_criteria, speed = 2, read_offset = Fa
                 tform21 = generate_transform_xy(img1, img2, tform21, offset_guess,
                                                 warp_check_range, cumulative, cumulative_tform21)
                 if cumulative:
-                    tform21[0,2] = tform21[0,2]-cumulative_tform21[0,2]
-                    tform21[1,2] = tform21[1,2]-cumulative_tform21[1,2]
-                cumulative_tform21[0,2]=cumulative_tform21[0,2]+tform21[0,2]
-                cumulative_tform21[1,2]=cumulative_tform21[1,2]+tform21[1,2]
-                print('Scan '+str(i)+' Complete. Cumulative Transform Matrix:')
+                    tform21[0, 2] = tform21[0, 2] - cumulative_tform21[0, 2]
+                    tform21[1, 2] = tform21[1, 2] - cumulative_tform21[1, 2]
+                cumulative_tform21[0, 2] = cumulative_tform21[0, 2] + tform21[0, 2]
+                cumulative_tform21[1, 2] = cumulative_tform21[1, 2] + tform21[1, 2]
+                print('Scan ' + str(i) + ' Complete. Cumulative Transform Matrix:')
                 print(cumulative_tform21)
                 if (offset_px[0] == 0) and (offset_px[1] == 0):
-                    recent_offsets.append([tform21[0,2], tform21[1,2]]-offset_px)
-                    if len(recent_offsets)>3:
+                    recent_offsets.append([tform21[0, 2], tform21[1, 2]] - offset_px)
+                    if len(recent_offsets) > 3:
                         recent_offsets = recent_offsets[1:]
             data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
                                      in_path_list[i])
-            pt.progress_report(i+1, len(in_path_list), start_time, 'distortion_params',
-                            in_path_list[i], clear = False)
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_params',
+                               in_path_list[i], clear=False)
 
 
 #   FUNCTION m2px
@@ -233,9 +233,9 @@ def distortion_params_(filename, all_input_criteria, speed = 2, read_offset = Fa
 # scan_size: total length of scan
 #   OUTPUTS:
 # px: converted length in pixels
-        
-def m2px (m, points, scan_size):
-    px = m*points/scan_size
+
+def m2px(m, points, scan_size):
+    px = m * points / scan_size
     return px
 
 
@@ -248,10 +248,10 @@ def m2px (m, points, scan_size):
 # img1: converted image into cv2 valid format
 
 def img2cv(img1, sigma_cutoff=10):
-    img1 = img1-np.min(img1) 
-    img1 = img1/np.max(img1)
-    tmp1 = sigma_cutoff*np.std(img1)
-    img1[img1>tmp1] = tmp1
+    img1 = img1 - np.min(img1)
+    img1 = img1 / np.max(img1)
+    tmp1 = sigma_cutoff * np.std(img1)
+    img1[img1 > tmp1] = tmp1
     return img1
 
 
@@ -271,8 +271,8 @@ def img2cv(img1, sigma_cutoff=10):
 #   OUTPUTS
 # warp_matrix: transformation matrix used to convert img_orig into img
 
-def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp_check_range=10, 
-                          cumulative=False, cumulative_tform21=np.eye(2,3,dtype=np.float32)):
+def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_check_range=10,
+                          cumulative=False, cumulative_tform21=np.eye(2, 3, dtype=np.float32)):
     # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
@@ -280,39 +280,39 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp
     if tfinit is not None:
         warp_matrix = tfinit
     else:
-        warp_matrix = np.eye(2,3,dtype=np.float32)
+        warp_matrix = np.eye(2, 3, dtype=np.float32)
     number_of_iterations = 100000
-    termination_eps = 1e-1#e-5
+    termination_eps = 1e-1  # e-5
     term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
-    
+
     if cumulative:
-        offset_guess[0] = offset_guess[0]+cumulative_tform21[0,2]
-        offset_guess[1] = offset_guess[1]+cumulative_tform21[1,2]
+        offset_guess[0] = offset_guess[0] + cumulative_tform21[0, 2]
+        offset_guess[1] = offset_guess[1] + cumulative_tform21[1, 2]
 
     criteria = (term_flags, number_of_iterations, termination_eps)
 
     diff = np.Inf
-    offset1=0
-    offset2=0
-    for i in range(-warp_check_range//2,(warp_check_range//2)+1):
-        for j in range(-warp_check_range//2,(warp_check_range//2)+1):
-            warp_matrix[0,2] = 2*i + offset_guess[0]
-            warp_matrix[1,2] = 2*j + offset_guess[1]
+    offset1 = 0
+    offset2 = 0
+    for i in range(-warp_check_range // 2, (warp_check_range // 2) + 1):
+        for j in range(-warp_check_range // 2, (warp_check_range // 2) + 1):
+            warp_matrix[0, 2] = 2 * i + offset_guess[0]
+            warp_matrix[1, 2] = 2 * j + offset_guess[1]
             try:
                 (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
                                                      criteria)
-                img_test = cv2.warpAffine(img, tform21, (512,512), flags=cv2.INTER_LINEAR +
-                                          cv2.WARP_INVERSE_MAP);
+                img_test = cv2.warpAffine(img, tform21, (512, 512), flags=cv2.INTER_LINEAR +
+                                                                          cv2.WARP_INVERSE_MAP)
                 currDiff = np.sum(np.square(img_test[150:-150, 150:-150]
-                                            -img_orig[150:-150, 150:-150]))
+                                            - img_orig[150:-150, 150:-150]))
                 if currDiff < diff:
                     diff = currDiff
-                    offset1 = tform21[0,2]
-                    offset2 = tform21[1,2]
+                    offset1 = tform21[0, 2]
+                    offset2 = tform21[1, 2]
             except:
                 pass
-            warp_matrix[0,2] = offset1
-            warp_matrix[1,2] = offset2
+            warp_matrix[0, 2] = offset1
+            warp_matrix[1, 2] = offset2
     return warp_matrix
 
 
@@ -328,11 +328,11 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess = [0,0], warp
 #   OUTPUTS
 # null
 
-def distortion_correction_(filename, all_input_criteria, cropping = True):
+def distortion_correction_(filename, all_input_criteria, cropping=True):
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     dm_path_list = all_in_path_list[1]
-    
+
     distortion_matrices = []
     with h5py.File(filename, "a") as f:
         for path in dm_path_list[:]:
@@ -340,8 +340,8 @@ def distortion_correction_(filename, all_input_criteria, cropping = True):
         xoffsets = []
         yoffsets = []
         for matrix in distortion_matrices:
-            xoffsets.append(np.array(matrix[0,2]))
-            yoffsets.append(np.array(matrix[1,2]))
+            xoffsets.append(np.array(matrix[0, 2]))
+            yoffsets.append(np.array(matrix[1, 2]))
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
@@ -351,15 +351,15 @@ def distortion_correction_(filename, all_input_criteria, cropping = True):
         start_time = time.time()
         for i in range(len(in_path_list)):
             orig_image = f[in_path_list[i]]
-            if cropping == True:
+            if cropping:
                 final_image = array_cropped(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             else:
                 final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
                                                                                dm_path_list[i]])
             propagate_scale_attrs(data, f[in_path_list[i]])
-            pt.progress_report(i+1, len(in_path_list), start_time, 'distortion_correction',
-                            in_path_list[i])
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
+                               in_path_list[i])
 
 
 #   FUNCTION propagate_scale_attrs
@@ -380,8 +380,8 @@ def propagate_scale_attrs(new_data, old_data):
             scan_size = old_data.attrs['size']
             shape = old_data.attrs['shape']
             new_data.attrs['scale_m_per_px'] = scan_size[0] / shape[0]
-            
-    
+
+
 #   FUNCTION array_cropped
 # crops a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set,
 # to include only valid data shared by all arrays
@@ -395,11 +395,11 @@ def propagate_scale_attrs(new_data, old_data):
 # cropped_array: the cropped array
 
 def array_cropped(array, xoffset, yoffset, offset_caps):
-    if offset_caps != [0,0,0,0]:
-        left = int(np.ceil(offset_caps[0])-np.floor(xoffset))
-        right = int(np.floor(offset_caps[1])-np.floor(xoffset))
-        top = int(np.ceil(offset_caps[2])-np.floor(yoffset))
-        bottom = int(np.floor(offset_caps[3])-np.floor(yoffset))
+    if offset_caps != [0, 0, 0, 0]:
+        left = int(np.ceil(offset_caps[0]) - np.floor(xoffset))
+        right = int(np.floor(offset_caps[1]) - np.floor(xoffset))
+        top = int(np.ceil(offset_caps[2]) - np.floor(yoffset))
+        bottom = int(np.floor(offset_caps[3]) - np.floor(yoffset))
         if right == 0:
             right = np.shape(array)[1]
         if bottom == 0:
@@ -423,14 +423,14 @@ def array_cropped(array, xoffset, yoffset, offset_caps):
 # expanded_array: the expanded array
 
 def array_expanded(array, xoffset, yoffset, offset_caps):
-    height = int(np.shape(array)[0]+np.ceil(offset_caps[2])-np.floor(offset_caps[3]))
-    length = int(np.shape(array)[1]+np.ceil(offset_caps[0])-np.floor(offset_caps[1]))
+    height = int(np.shape(array)[0] + np.ceil(offset_caps[2]) - np.floor(offset_caps[3]))
+    length = int(np.shape(array)[1] + np.ceil(offset_caps[0]) - np.floor(offset_caps[1]))
     expanded_array = np.empty([height, length])
     expanded_array[:] = np.nan
-    left = int(-np.floor(offset_caps[1])+xoffset)
-    right = int(length-np.ceil(offset_caps[0])+xoffset)
-    top = int(-np.floor(offset_caps[3])+yoffset)
-    bottom= int(height-np.ceil(offset_caps[2])+yoffset)
+    left = int(-np.floor(offset_caps[1]) + xoffset)
+    right = int(length - np.ceil(offset_caps[0]) + xoffset)
+    top = int(-np.floor(offset_caps[3]) + yoffset)
+    bottom = int(height - np.ceil(offset_caps[2]) + yoffset)
     expanded_array[top:bottom, left:right] = array
     return expanded_array
 
@@ -452,38 +452,38 @@ def array_expanded(array, xoffset, yoffset, offset_caps):
 # show (default: False): If True, show the data prior to saving
 #   OUTPUTS
 # result: hdf5_dict containing linearised data and peak values as attributes
-                
-def phase_linearisation(image, min_separation=90, background = None,
-                         flip_proportion = 0.8, show = False):
+
+def phase_linearisation(image, min_separation=90, background=None,
+                        flip_proportion=0.8, show=False):
     phase_flat = np.array(image).ravel()
     min_phase = int(np.floor(np.min(phase_flat)))
-    max_phase = min_phase+360
+    max_phase = min_phase + 360
 
     # Convert original data into histograms and find largest peak
     ydata, bin_edges = np.histogram(phase_flat, bins=360, range=[min_phase, max_phase])
     peak1_index = np.argmax(ydata)
 
     # Find next largest peak a distance away from original peak
-    peak1_exclude_left = wrap(peak1_index-min_separation, 0,360) 
-    peak1_exclude_right = wrap(peak1_index+min_separation, 0,360)
+    peak1_exclude_left = wrap(peak1_index - min_separation, 0, 360)
+    peak1_exclude_right = wrap(peak1_index + min_separation, 0, 360)
     if peak1_exclude_left < peak1_exclude_right:
         peak2_search_region = np.delete(ydata,
-                                        np.arange(peak1_exclude_left,peak1_exclude_right))
+                                        np.arange(peak1_exclude_left, peak1_exclude_right))
         peak2_index = np.argmax(peak2_search_region)
         if peak2_index < peak1_exclude_left:
             pass
         else:
-            peak2_index = peak2_index + 2*min_separation
+            peak2_index = peak2_index + 2 * min_separation
     else:
         peak2_search_region = ydata[peak1_exclude_right:peak1_exclude_left]
-        peak2_index = np.argmax(peak2_search_region) + peak1_exclude_right -1
+        peak2_index = np.argmax(peak2_search_region) + peak1_exclude_right - 1
 
     # Split wrapped dataset into two number lines; one going up and one down
     if peak1_index > peak2_index:
         peak1_index, peak2_index = peak2_index, peak1_index
-    peak1_value = peak1_index+min_phase
-    peak2_value = peak2_index+min_phase
-    range_1to2 = peak2_value-peak1_value
+    peak1_value = peak1_index + min_phase
+    peak2_value = peak2_index + min_phase
+    range_1to2 = peak2_value - peak1_value
     range_2to1 = 360 - range_1to2
 
     # Create a new array whose values depend on their position on the number lines
@@ -493,24 +493,24 @@ def phase_linearisation(image, min_separation=90, background = None,
                                      range_1to2, range_2to1)
     # Define which points are 0 or 1 based on relative magnitude
     if np.mean(linearised_array) > flip_proportion:
-        linearised_array = 1-linearised_array
-    elif np.mean(linearised_array) > 1-flip_proportion:
+        linearised_array = 1 - linearised_array
+    elif np.mean(linearised_array) > 1 - flip_proportion:
         if background is None:
-            if (np.mean(linearised_array[:,:10])+np.mean(linearised_array[:,-10:])) \
-                  > 2*np.mean(linearised_array):
-                linearised_array = 1-linearised_array
+            if (np.mean(linearised_array[:, :10]) + np.mean(linearised_array[:, -10:])) \
+                    > 2 * np.mean(linearised_array):
+                linearised_array = 1 - linearised_array
         elif background < 0:
-            if np.mean(linearised_array[:,background:]) > np.mean(linearised_array):
-                linearised_array = 1-linearised_array
+            if np.mean(linearised_array[:, background:]) > np.mean(linearised_array):
+                linearised_array = 1 - linearised_array
         elif background > 0:
-            if np.mean(linearised_array[:,:background]) > np.mean(linearised_array):
-                linearised_array = 1-linearised_array
-    pt.intermediate_plot(linearised_array, force_plot = show, text = 'Linearised Array')
-    linearised = medfilt(cv2.blur(linearised_array, (7,7)),7)
+            if np.mean(linearised_array[:, :background]) > np.mean(linearised_array):
+                linearised_array = 1 - linearised_array
+    pt.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
+    linearised = medfilt(cv2.blur(linearised_array, (7, 7)), 7)
     result = pt.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
     return result
-                
-                
+
+
 #   FUNCTION linearise
 # Converts a phase entry (rotating 360 degrees with an arbitrary 0 point) into a float between 0 
 # and 1, given the values of the two extremes, and the ranges between them
@@ -522,17 +522,17 @@ def phase_linearisation(image, min_separation=90, background = None,
 # range_1to2: the distance in phase from peak2 to peak1
 #   OUTPUTS
 # entry: the phase entry that has been converted
-                
+
 def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
     if (entry >= peak1_value) and (entry < peak2_value):
-        entry = (entry-peak1_value)/range_1to2
+        entry = (entry - peak1_value) / range_1to2
     elif entry < peak1_value:
-        entry = (peak1_value-entry)/range_2to1
+        entry = (peak1_value - entry) / range_2to1
     else:
-        entry = 1-((entry-peak2_value)/range_2to1)
+        entry = 1 - ((entry - peak2_value) / range_2to1)
     return entry
-                
-                
+
+
 #   FUNCTION m_sum
 # Adds multiple channels together. The files are added in order, first by channel and then by
 # sample. The amount of source files in each destination file defined by entry_count. Replaces sum_
@@ -540,7 +540,7 @@ def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
 # *args: arrays to be summed
 #   OUTPUTS
 # result: hdf5_dict containing summed data and amount of inputs as attributes
-                
+
 def m_sum(*args):
     if (args[0].dtype == 'uint8') or (args[0].dtype == 'bool'):
         convert = True
@@ -552,7 +552,7 @@ def m_sum(*args):
     for arg in args:
         if convert:
             arg = arg.astype(int)
-        total = total+arg
+        total = total + arg
     input_count = len(args)
     result = pt.hdf5_dict(total, input_count=input_count)
     return result
@@ -568,25 +568,25 @@ def m_sum(*args):
 # source_input_count: number of phases summed, used to estimate threshold
 #    OUTPUTS
 # result: hdf5_dict containing the binarised phase, as well as the threshold in attributes
-                
-def phase_binarisation(phase, thresh_estimate = None, thresh_search_range = None,
-                       source_input_count = None):
+
+def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None,
+                       source_input_count=None):
     if thresh_estimate is None:
         if source_input_count is not None:
-            thresh_estimate = source_input_count/2
+            thresh_estimate = source_input_count / 2
         else:
             thresh_estimate = 0.5
     if thresh_search_range is None:
         if source_input_count is not None:
-            thresh_search_range = source_input_count/10
+            thresh_search_range = source_input_count / 10
         else:
             thresh_search_range = 0.1
-    blurred_phase = cv2.blur(phase, (7,7))
-    best_thresh = threshold_noise(blurred_phase, thresh_estimate, thresh_search_range/2, 5)
+    blurred_phase = cv2.blur(phase, (7, 7))
+    best_thresh = threshold_noise(blurred_phase, thresh_estimate, thresh_search_range / 2, 5)
     binary = blurred_phase > best_thresh
 
     if np.mean(binary) > 0.95:
-        binary = 1-binary
+        binary = 1 - binary
     result = pt.hdf5_dict(binary, threshold=best_thresh)
     return result
 
@@ -603,28 +603,28 @@ def phase_binarisation(phase, thresh_estimate = None, thresh_search_range = None
 #   OUTPUTS
 # best_guess: final guess for best threshold
 
-def threshold_noise(image, old_guess, thresh_range, iterations, old_diff = None):
+def threshold_noise(image, old_guess, thresh_range, iterations, old_diff=None):
     if old_diff is None:
-        binary = image>old_guess
+        binary = image > old_guess
         binary_filt = medfilt(binary, 3)
-        #binary_filt = contour_closure(binary_filt)
-        old_diff = np.sum(np.abs(binary_filt-binary))
+        # binary_filt = contour_closure(binary_filt)
+        old_diff = np.sum(np.abs(binary_filt - binary))
     if iterations > 0:
-        new_guesses = [old_guess-thresh_range, old_guess+thresh_range]
+        new_guesses = [old_guess - thresh_range, old_guess + thresh_range]
         diffs = []
         for thresh in new_guesses:
-            binary = image>thresh
+            binary = image > thresh
             binary_filt = medfilt(binary, 3)
-            #binary_filt = contour_closure(binary_filt)
-            diffs.append(np.sum(np.abs(binary_filt-binary)))
+            # binary_filt = contour_closure(binary_filt)
+            diffs.append(np.sum(np.abs(binary_filt - binary)))
         best_i = np.argmin(diffs)
-        best_guess = threshold_noise(image, new_guesses[best_i], thresh_range/2, iterations-1,
+        best_guess = threshold_noise(image, new_guesses[best_i], thresh_range / 2, iterations - 1,
                                      diffs[best_i])
     else:
         best_guess = old_guess
     return best_guess
-                
-    
+
+
 #   FUNCTION wrap
 # Extended modulo function. Converts a number outside of a range between two numbers by continually
 # adding or substracting the span between these numbers.
@@ -635,12 +635,12 @@ def threshold_noise(image, old_guess, thresh_range, iterations, old_diff = None)
 #   OUTPUTS
 # x: wrapped number
 
-def wrap(x, low = 0, high = 360):
-    angle_range = high-low
+def wrap(x, low=0, high=360):
+    angle_range = high - low
     while x <= low:
-        x = x+angle_range
+        x = x + angle_range
     while x > high:
-        x = x-angle_range
+        x = x - angle_range
     return x
 
 
@@ -655,20 +655,20 @@ def wrap(x, low = 0, high = 360):
 #   OUTPUTS
 # image: data with contours closed
 
-def contour_closure(source, size_threshold = 50, type_bool = True):
+def contour_closure(source, size_threshold=50, type_bool=True):
     source = np.array(source).astype('uint8')
     image = np.zeros_like(source)
-    cv2_image,contours,hierarchy = cv2.findContours(source,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    cv2_image, contours, hierarchy = cv2.findContours(source, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     new_contours = []
     for contour in contours:
         if cv2.contourArea(contour) > size_threshold:
             new_contours.append(contour)
-    cv2.drawContours(image,new_contours,-1, (1), thickness=cv2.FILLED)
+    cv2.drawContours(image, new_contours, -1, 1, thickness=cv2.FILLED)
     if type_bool:
         image = image.astype(bool)
     return image
-        
-    
+
+
 #   FUNCTION find_a_domains
 # Determines the a-domains in an amplitude image, by looking for points of high second derivative.
 # These points are then fit to lines, and these lines filtered to the most common lines that are 
@@ -702,25 +702,25 @@ def contour_closure(source, size_threshold = 50, type_bool = True):
 #     'clean': Lines found, after filtering to the most common angles
 #   OUTPUTS
 # result: hdf5_dict containing the predicted a-domains, and the binarisation threshold in attributes
-                
-def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_width = 15,
-                   thresh_factor = 2, dilation = 2, erosion = 4, line_threshold = 50,
-                   min_line_length=50, max_line_gap=10, plots = None):
+
+def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width=15,
+                   thresh_factor=2, dilation=2, erosion=4, line_threshold=50,
+                   min_line_length=50, max_line_gap=10, plots=None):
     if plots is not None:
         print('-----')
-        print(path)       
+        print(path)
 
     if binarised_phase is not None:
         domain_wall_filter = create_domain_wall_filter(binarised_phase,
-                                                       filter_width = filter_width,
-                                                       plots = plots)
+                                                       filter_width=filter_width,
+                                                       plots=plots)
     else:
-        domain_wall_filter = np.zeros_like(f[path])+1
+        domain_wall_filter = np.zeros_like(f[path]) + 1
     a_estimate, bin_thresh = estimate_a_domains(amplitude, domain_wall_filter,
-                                                direction = direction,
-                                                plots = plots,
-                                                thresh_factor = thresh_factor,
-                                                dilation = dilation, erosion = erosion)
+                                                direction=direction,
+                                                plots=plots,
+                                                thresh_factor=thresh_factor,
+                                                dilation=dilation, erosion=erosion)
 
     # Find Lines
     rho = 1  # distance resolution in pixels of the Hough grid
@@ -736,16 +736,16 @@ def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_w
         # Draw lines, filtering with phase filter if possible
         phase_filter_lines = []
         for line in lines:
-            for x1,y1,x2,y2 in line:
+            for x1, y1, x2, y2 in line:
                 if binarised_phase is not None:
                     blank = np.zeros_like(line_image)
-                    one_line = cv2.line(blank,(x1,y1),(x2,y2),(255,0,0),5)
-                    points_outside_mask = one_line*domain_wall_filter
-                    if np.sum(points_outside_mask) > 0.2*np.sum(one_line):
-                        cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
+                    one_line = cv2.line(blank, (x1, y1), (x2, y2), (255, 0, 0), 5)
+                    points_outside_mask = one_line * domain_wall_filter
+                    if np.sum(points_outside_mask) > 0.2 * np.sum(one_line):
+                        cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                         phase_filter_lines.append(line)
                 else:
-                    cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
+                    cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                     phase_filter_lines.append(line)
         lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
         pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
@@ -753,11 +753,11 @@ def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_w
         # Find angles of each line
         angles = []
         for line in phase_filter_lines:
-            for x1,y1,x2,y2 in line:
+            for x1, y1, x2, y2 in line:
                 if x2 == x1:
                     angles.append(90)
                 else:
-                    angles.append((180*np.arctan((y2-y1)/(x2-x1))/np.pi))
+                    angles.append((180 * np.arctan((y2 - y1) / (x2 - x1)) / np.pi))
 
         # Find first angle guess
         if direction == 'Vert':
@@ -772,22 +772,22 @@ def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_w
         i = 0
         for angle in angles:
             for key_angle in key_angles:
-                if check_within_angle_range(angle, key_angle, 1) == True:
+                if check_within_angle_range(angle, key_angle, 1):
                     angle_filter_lines.append(phase_filter_lines[i])
-            i = i+1
+            i = i + 1
 
         # Draw Lines
         line_image = np.copy(a_estimate) * 0  # creating a blank to draw lines on
         for line in angle_filter_lines:
-            for x1,y1,x2,y2 in line:
-                cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
+            for x1, y1, x2, y2 in line:
+                cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
         lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
         pt.intermediate_plot(line_image, 'clean', plots, 'Lines Found, after filtering')
 
-    result = pt.hdf5_dict(line_image, binarisation_threshold = bin_thresh)
+    result = pt.hdf5_dict(line_image, binarisation_threshold=bin_thresh)
     return result
-                
-                
+
+
 #   FUNCTION create_domain_wall_filter
 # Creates a filter from the phase binarisation data, which can be used to find a-domains
 #   INPUTS:
@@ -800,15 +800,15 @@ def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_w
 #   OUTPUTS
 # domain_wall_filter: filter made from phase binarisation data
 
-def create_domain_wall_filter(phase, filter_width = 15, plots = []):
+def create_domain_wall_filter(phase, filter_width=15, plots=[]):
     # Binarised_Phase
     binPhase = np.copy(phase)
     pt.intermediate_plot(binPhase, 'phase', plots, 'Binarised Phase')
-    
+
     # Create Filter
-    ite = filter_width//2
-    domain_wall_filter = ~(binary_dilation(binPhase, iterations = ite)^
-                           binary_erosion(binPhase, iterations = ite, border_value=1))
+    ite = filter_width // 2
+    domain_wall_filter = ~(binary_dilation(binPhase, iterations=ite) ^
+                           binary_erosion(binPhase, iterations=ite, border_value=1))
     pt.intermediate_plot(domain_wall_filter, 'filter', plots, 'Domain Wall Filter')
     return domain_wall_filter
 
@@ -840,23 +840,23 @@ def create_domain_wall_filter(phase, filter_width = 15, plots = []):
 # filtered_deriv_amp: adjusted amplitude image made to highlight points of higher second derivative
 # thresh: the threshold value used to find the a-domains
 
-def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plots = [],
-                       thresh_factor = 2, dilation = 2, erosion = 4):
+def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots=[],
+                       thresh_factor=2, dilation=2, erosion=4):
     # Raw Data
     amp = np.copy(amplitude)
     pt.intermediate_plot(amp, 'amp', plots, 'Original Data')
-        
+
     # Row Alignment, if direction set
     if direction == 'Vert':
         amp = align_rows(amp, domain_wall_filter)
     elif direction == 'Horz':
-        amp = align_rows(amp, domain_wall_filter, cols = True)
+        amp = align_rows(amp, domain_wall_filter, cols=True)
     pt.intermediate_plot(amp, 'row_align', plots, 'Row Aligned Data')
 
     # Fit to a spline (reduce high frequency noise)
     spline_amp = cspline2d(amp, 2.0)
     pt.intermediate_plot(spline_amp, 'spline', plots, 'Spline Fitted Data')
-            
+
     # Find derivatives to highlight peaks
     if direction == 'Vert':
         first_deriv = np.gradient(spline_amp)[1]
@@ -873,25 +873,25 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plo
             print('Direction should be set to either \'Vert\', \'Horz\' or None. Behaviour\
                     defaulting to None')
         first_deriv = np.gradient(spline_amp)
-        pt.intermediate_plot(first_deriv[0]+first_deriv[1], 'first_deriv', plots,
+        pt.intermediate_plot(first_deriv[0] + first_deriv[1], 'first_deriv', plots,
                              'First Derivatives')
         second_deriv_y = np.gradient(first_deriv[0])[0]
         second_deriv_x = np.gradient(first_deriv[1])[1]
-        deriv_amp = second_deriv_y+second_deriv_x
+        deriv_amp = second_deriv_y + second_deriv_x
         pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
-    
+
     # Binarise second derivative
     thresh = threshold_after_peak(deriv_amp, thresh_factor)
     binary = (deriv_amp > thresh)
     pt.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
-    
+
     # Remove Small Points
-    filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations = dilation),
-                                        iterations = erosion)
+    filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations=dilation),
+                                        iterations=erosion)
     pt.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
     return filtered_deriv_amp.astype(np.uint8), thresh
-            
-    
+
+
 #   FUNCTION align_rows
 # Aligns rows (or cols) of an array, with a mask provided
 #   INPUTS:
@@ -900,8 +900,8 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction = None, plo
 # cols (default: False): If set to true, the columns are instead aligned
 #   OUTPUTS
 # new_array: the row (or col) aligned array
-    
-def align_rows(array, mask = None, cols = False):
+
+def align_rows(array, mask=None, cols=False):
     if mask is None:
         mask = 1 + zeros_like(array)
     if cols:
@@ -911,15 +911,15 @@ def align_rows(array, mask = None, cols = False):
     masked_array = np.where(mask == 0, np.nan, masked_array)
     new_array = np.zeros_like(array)
     for i in range(np.shape(array)[0]):
-        if all(np.isnan(masked_array[i])) or (np.mean(mask[i])<0.05):
-            new_array[i] = array[i]-np.nanmean(array[i])
+        if all(np.isnan(masked_array[i])) or (np.mean(mask[i]) < 0.05):
+            new_array[i] = array[i] - np.nanmean(array[i])
         else:
-            new_array[i] = array[i]-np.nanmean(masked_array[i])
+            new_array[i] = array[i] - np.nanmean(masked_array[i])
     if cols:
         new_array = np.transpose(new_array)
     return new_array
-    
-    
+
+
 #   FUNCTION threshold_after_peak
 # Creates a threshold value, used when finding a-domains. This works by creatinga histogram of all
 # valid values, and finding the maximum value of this histogram. The threshold is the point where
@@ -931,19 +931,19 @@ def align_rows(array, mask = None, cols = False):
 #     number gives fewer valid points.
 #   OUTPUTS
 # thresh: the determined value of the optimal threshold
-                
-def threshold_after_peak(deriv_amp, factor = 4):
-    deriv_hist = np.histogram(deriv_amp.ravel(), bins = 256)
+
+def threshold_after_peak(deriv_amp, factor=4):
+    deriv_hist = np.histogram(deriv_amp.ravel(), bins=256)
     max_counts = np.max(deriv_hist[0])
     found_max = False
     i = 0
     for count in deriv_hist[0]:
         if count == max_counts:
             found_max = True
-        if found_max == True and count < max_counts/factor:
+        if found_max == True and count < max_counts / factor:
             found_max = False
             thresh = deriv_hist[1][i]
-        i = i+1
+        i = i + 1
     return thresh
 
 
@@ -959,9 +959,9 @@ def threshold_after_peak(deriv_amp, factor = 4):
 def find_desired_angles(raw_data):
     angles = np.zeros(4)
     ydata, bin_edges = np.histogram(raw_data, bins=360, range=[-180, 180])
-    base_angle = (np.argmax(ydata))-180
+    base_angle = (np.argmax(ydata)) - 180
     for i in range(4):
-        angles[i] = wrap(base_angle+90*i, -180, 180)
+        angles[i] = wrap(base_angle + 90 * i, -180, 180)
     return angles
 
 
@@ -977,9 +977,9 @@ def find_desired_angles(raw_data):
 #   OUTPUTS
 # status: a bool stating whether the angles are in range (True) or not (False)
 
-def check_within_angle_range(angle, key_angle, angle_range, low = -180, high = 180):
-    low_angle = wrap(key_angle-angle_range, low, high)
-    high_angle = wrap(key_angle+angle_range, low, high)
+def check_within_angle_range(angle, key_angle, angle_range, low=-180, high=180):
+    low_angle = wrap(key_angle - angle_range, low, high)
+    high_angle = wrap(key_angle + angle_range, low, high)
     status = False
     if low_angle < angle:
         if angle < high_angle:
@@ -1022,38 +1022,37 @@ def check_within_angle_range(angle, key_angle, angle_range, low = -180, high = 1
 #    OUTPUTS
 # null
 
-def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh_factor=2,
-                         dilation=2, erosion=4,line_threshold=80, min_line_length=80,
-                         max_line_gap=80, plots = None):
-    
+def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_factor=2,
+                         dilation=2, erosion=4, line_threshold=80, min_line_length=80,
+                         max_line_gap=80, plots=None):
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     pb_path_list = all_in_path_list[1]
-    
+
     out_folder_locations = pt.find_output_folder_location(filename, 'rotation_params', in_path_list)
-    
+
     rotation_list = []
     with h5py.File(filename, "a") as f:
         start_time = time.time()
         for index in range(len(in_path_list)):
             path = in_path_list[index]
-            
+
             if plots is not None:
                 print('-----')
-                print(path)       
-        
+                print(path)
+
             if pb_path_list is not None:
                 domain_wall_filter = create_domain_wall_filter(f[pb_path_list[index]],
-                                                               filter_width = filter_width,
-                                                               plots = plots)
+                                                               filter_width=filter_width,
+                                                               plots=plots)
             else:
-                domain_wall_filter = np.zeros_like(f[path])+1
+                domain_wall_filter = np.zeros_like(f[path]) + 1
             a_estimate, bin_thresh = estimate_a_domains(f[path], domain_wall_filter,
-                                                        plots = plots,
-                                                        thresh_factor = thresh_factor,
-                                                        dilation = dilation,
-                                                        erosion = erosion)
-            
+                                                        plots=plots,
+                                                        thresh_factor=thresh_factor,
+                                                        dilation=dilation,
+                                                        erosion=erosion)
+
             # Find Lines
             rho = 1  # distance resolution in pixels of the Hough grid
             theta = np.pi / 180  # angular resolution in radians of the Hough grid
@@ -1063,22 +1062,22 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh
             # Output "lines" is an array containing endpoints of detected line segments
             lines = cv2.HoughLinesP(a_estimate, rho, theta, line_threshold, np.array([]),
                                     min_line_length, max_line_gap)
-            
+
             if lines is not None:
                 # Draw lines, filtering with phase filter if possible
                 valid_lines = []
                 for line in lines:
-                    for x1,y1,x2,y2 in line:
+                    for x1, y1, x2, y2 in line:
                         if pb_path_list is not None:
                             blank = np.zeros_like(line_image)
-                            one_line = cv2.line(blank,(x1,y1),(x2,y2),(255,0,0),5)
-                            points_outside_mask = one_line*domain_wall_filter
-                            if np.sum(points_outside_mask) > 0.2*np.sum(one_line):
-                                cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
+                            one_line = cv2.line(blank, (x1, y1), (x2, y2), (255, 0, 0), 5)
+                            points_outside_mask = one_line * domain_wall_filter
+                            if np.sum(points_outside_mask) > 0.2 * np.sum(one_line):
+                                cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                                 if (x1 != x2) and (y1 != y2):
                                     valid_lines.append(line)
                         else:
-                            cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),5)
+                            cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                             if (x1 != x2) and (y1 != y2):
                                 valid_lines.append(line)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
@@ -1087,13 +1086,13 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh
                 # Find first angle guess
                 angles = []
                 for line in valid_lines:
-                    for x1,y1,x2,y2 in line:
+                    for x1, y1, x2, y2 in line:
                         if x2 == x1:
                             angles.append(90)
                         else:
-                            angles.append((180*np.arctan((y2-y1)/(x2-x1))/np.pi))
+                            angles.append((180 * np.arctan((y2 - y1) / (x2 - x1)) / np.pi))
                 key_angles = find_desired_angles(angles)
-                
+
                 # Refine angle estimate
                 for repetitions in range(3):
                     valid_lines = []
@@ -1101,22 +1100,22 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh
                     i = 0
                     for angle in angles:
                         for key_angle in key_angles:
-                            if check_within_angle_range(angle, key_angle, 2.5) == True:
+                            if check_within_angle_range(angle, key_angle, 2.5):
                                 valid_lines.append(lines[i])
-                                angle_offsets.append(angles[i]-key_angle)
-                        i = i+1
+                                angle_offsets.append(angles[i] - key_angle)
+                        i = i + 1
                     key_angles = key_angles + np.mean(angle_offsets)
                 rotation_deg = -key_angles[np.argmin(np.abs(key_angles))]
                 rotation_list.append(rotation_deg)
                 average_angle = np.mean(rotation_list)
-            pt.progress_report(index+1, len(in_path_list), start_time, 'a_angle',
-                            in_path_list[index])
-        
+            pt.progress_report(index + 1, len(in_path_list), start_time, 'a_angle',
+                               in_path_list[index])
+
         rotation_array = np.array(rotation_list)
         rotation_array = sorted(rotation_array[~np.isnan(rotation_array)])
-        average_angle = rotation_array[int(len(rotation_array)/2)]
+        average_angle = rotation_array[int(len(rotation_array) / 2)]
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
-        warp_matrix=cv2.getRotationMatrix2D((orig_x/2, orig_y/2), average_angle, 1)
+        warp_matrix = cv2.getRotationMatrix2D((orig_x / 2, orig_y / 2), average_angle, 1)
         data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
                                  filename.split('.')[0])
         data.attrs['angle offset (degs)'] = average_angle
@@ -1126,8 +1125,8 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh
         data.attrs['min_line_length'] = min_line_length
         data.attrs['max_line_gap'] = max_line_gap
         data.attrs['thresh_factor'] = thresh_factor
-        
-    
+
+
 #   FUNCTION rotation_alignment_
 # Applies a rotation matrix to an image. An option also allows for cropping to the largest common
 # area, which is found via trial and error. If one rotation matrix is given, it is applied to all
@@ -1145,12 +1144,12 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh
 # null
 #   TO DO:
 # Allow for true non-cropping, which would extend the border to the maximum possible limit.
-        
-def rotation_alignment_(filename, all_input_criteria, cropping = True):
+
+def rotation_alignment_(filename, all_input_criteria, cropping=True):
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     rm_path_list = all_in_path_list[1]
-    
+
     rotation_matrices = []
     with h5py.File(filename, "a") as f:
         for path in rm_path_list[:]:
@@ -1162,50 +1161,50 @@ def rotation_alignment_(filename, all_input_criteria, cropping = True):
         start_time = time.time()
         for i in range(len(in_path_list)):
             orig_img = np.copy(f[in_path_list[i]])
-            
+
             orig_y, orig_x = (f[in_path_list[i]].attrs['shape'])
-            
+
             if orig_img.dtype == bool:
                 array_is_bool = True
                 orig_img = orig_img.astype(float)
             else:
                 array_is_bool = False
-            
-            new_img = cv2.warpAffine(orig_img, rotation_matrices[i], (orig_x,orig_y),
+
+            new_img = cv2.warpAffine(orig_img, rotation_matrices[i], (orig_x, orig_y),
                                      flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
-                                     borderValue = np.nan);
-            
+                                     borderValue=np.nan)
+
             largest_area = 0
             if cropping:
                 if i == 0:
-                    for top in range(int(np.floor(orig_y/2))):
+                    for top in range(int(np.floor(orig_y / 2))):
                         width_left = 0
                         for x in range(len(new_img[top])):
-                            if np.isnan(new_img[top][x]) == False:
+                            if not np.isnan(new_img[top][x]):
                                 if width_left == 0:
-                                    width_left = (orig_x/2)-x
-                                width_right = x+1-(orig_x/2)
-                        height = (orig_y/2)-top
+                                    width_left = (orig_x / 2) - x
+                                width_right = x + 1 - (orig_x / 2)
+                        height = (orig_y / 2) - top
                         width = np.min([width_left, width_right])
-                        area = height*width
+                        area = height * width
                         if area > largest_area:
                             largest_area = area
                             best_top = top
-                            best_left = int((orig_x/2)-width)
-                new_img = new_img[best_top:orig_y-best_top, best_left:orig_x-best_left]
+                            best_left = int((orig_x / 2) - width)
+                new_img = new_img[best_top:orig_y - best_top, best_left:orig_x - best_left]
                 while np.isnan(sum(new_img[-1])):
                     new_img = new_img[:-1]
-            
+
             if array_is_bool:
                 new_img = new_img.astype(bool)
-            
+
             data = pt.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
                                                                            rm_path_list[i]])
             propagate_scale_attrs(data, f[in_path_list[i]])
-            pt.progress_report(i+1, len(in_path_list), start_time, 'a_alignment',
-                            in_path_list[i])
-            
-            
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
+                               in_path_list[i])
+
+
 #   FUNCTION threshold_ratio
 # Thresholds an image by passing in a ratio between the minimum and maximum values of this image
 #   INPUTS:
@@ -1213,16 +1212,16 @@ def rotation_alignment_(filename, all_input_criteria, cropping = True):
 # thresh_ratio (default: 0.5): ratio between the minimum and maximum of the image to threshold
 #   OUTPUTS
 # result: hdf5_dict thresholded image, and the threshold value in attrs
-            
-def threshold_ratio(image, thresh_ratio = 0.5):
+
+def threshold_ratio(image, thresh_ratio=0.5):
     max_level = np.nanmax(image)
     min_level = np.nanmin(image)
-    real_threshold = min_level+(thresh_ratio*(max_level-min_level))
-    thresh_data = image>real_threshold
-    result = pt.hdf5_dict(thresh_data, threshold = real_threshold)
+    real_threshold = min_level + (thresh_ratio * (max_level - min_level))
+    thresh_data = image > real_threshold
+    result = pt.hdf5_dict(thresh_data, threshold=real_threshold)
     return result
-            
-    
+
+
 #   FUNCTION directional_skeletonize
 # 'skeletonizes' a binary image either vertically or horizontally. This is done by finding the
 # contours of each shape. The centre of each of these contours are then taken and extended either
@@ -1240,21 +1239,20 @@ def threshold_ratio(image, thresh_ratio = 0.5):
 #   OUTPUTS
 # all_domains: image showing all domains found
 # good_domains: image showing only good domains that have not been filtered
-                
-def directional_skeletonize(domain_guess, direction = 'Vert', false_positives = None, max_edge=10):
+
+def directional_skeletonize(domain_guess, direction='Vert', false_positives=None, max_edge=10):
     if (direction != 'Vert') and (direction != 'Horz'):
         print('direction should be set to either \'Vert\' or \'Horz\'')
         return
-    
+
     if type(false_positives) != list:
         false_positives = [false_positives]
-        
-    
+
     if domain_guess.dtype != 'uint8':
         domain_guess = domain_guess.astype('uint8')
-    
+
     # find contours in the binary image
-    image, contours, hierarchy = cv2.findContours(domain_guess,cv2.RETR_TREE,
+    image, contours, hierarchy = cv2.findContours(domain_guess, cv2.RETR_TREE,
                                                   cv2.CHAIN_APPROX_SIMPLE)
     x_centres = []
     y_centres = []
@@ -1276,18 +1274,18 @@ def directional_skeletonize(domain_guess, direction = 'Vert', false_positives = 
             whole_line = domain_guess[:, x]
             zero_count = 0
             for y in range(len(whole_line)):
-                if whole_line[y]==0:
+                if whole_line[y] == 0:
                     zero_count = zero_count + 1
                 else:
                     if zero_count <= max_edge:
-                        whole_line[y-zero_count:y] = 1
+                        whole_line[y - zero_count:y] = 1
                     zero_count = 0
             if (zero_count != 0) and (zero_count <= max_edge):
                 whole_line[-zero_count:] = 1
             if i in false_positives:
-                bad_domains[:,x] = whole_line 
+                bad_domains[:, x] = whole_line
             else:
-                good_domains[:,x] = whole_line
+                good_domains[:, x] = whole_line
     elif direction == 'Horz':
         y_centres = sorted(y_centres)
         for i in range(len(y_centres)):
@@ -1295,23 +1293,23 @@ def directional_skeletonize(domain_guess, direction = 'Vert', false_positives = 
             whole_line = domain_guess[y]
             zero_count = 0
             for x in range(len(whole_line)):
-                if whole_line[x]==0:
+                if whole_line[x] == 0:
                     zero_count = zero_count + 1
                 else:
                     if zero_count <= max_edge:
-                        whole_line[x-zero_count:x] = 1
+                        whole_line[x - zero_count:x] = 1
                     zero_count = 0
             if (zero_count != 0) and (zero_count <= max_edge):
                 whole_line[-zero_count:] = 1
             if i in false_positives:
-                bad_domains[y] = whole_line 
+                bad_domains[y] = whole_line
             else:
                 good_domains[y] = whole_line
 
-    all_domains = bad_domains+good_domains
+    all_domains = bad_domains + good_domains
     return all_domains, good_domains
-                
-    
+
+
 #   FUNCTION final_a_domains_
 # Creates a folder with all a-domain data from the directionally skeletonized binary images (both
 # horz and vert). This includes the final cleaning steps, where both vertical and horizontal lines
@@ -1333,84 +1331,84 @@ def directional_skeletonize(domain_guess, direction = 'Vert', false_positives = 
 # np.array(vert_list): coordinates of end points of vert a-domains
 # np.array(horz_list): coordinates of end points of horz a-domains
 
-def final_a_domains(orig_vert, orig_horz, closing_distance = 50):
+def final_a_domains(orig_vert, orig_horz, closing_distance=50):
     new_vert = np.copy(orig_vert)
-    #Lines defined by x1, y1, x2, y2
+    # Lines defined by x1, y1, x2, y2
     vert_list = []
     for x in range(np.shape(new_vert)[1]):
-        if np.sum(orig_vert[:,x]) != 0:
-            if np.sum(orig_vert[:,x]) == np.shape(new_vert)[0]:
-                vert_list.append([x, 0, x, np.shape(new_vert)[0]-1])
-            elif np.sum(orig_horz[:,x]) != 0:
-                domains_list = np.where(orig_horz[:,x]==1)[0]
+        if np.sum(orig_vert[:, x]) != 0:
+            if np.sum(orig_vert[:, x]) == np.shape(new_vert)[0]:
+                vert_list.append([x, 0, x, np.shape(new_vert)[0] - 1])
+            elif np.sum(orig_horz[:, x]) != 0:
+                domains_list = np.where(orig_horz[:, x] == 1)[0]
                 for domain in domains_list:
-                    min_index = np.max([0, domain-closing_distance])
-                    max_index = np.min([domain+1+closing_distance, len(orig_horz[:,x])])
-                    vert_top_segment = new_vert[min_index:domain+1, x]
+                    min_index = np.max([0, domain - closing_distance])
+                    max_index = np.min([domain + 1 + closing_distance, len(orig_horz[:, x])])
+                    vert_top_segment = new_vert[min_index:domain + 1, x]
                     if (np.sum(vert_top_segment) != 0) and (np.sum(vert_top_segment) !=
                                                             np.shape(vert_top_segment)[0]):
                         if vert_top_segment[0] == 1:
-                            new_vert[min_index:domain+1,x]=np.zeros_like(vert_top_segment)+1
+                            new_vert[min_index:domain + 1, x] = np.zeros_like(vert_top_segment) + 1
                         else:
-                            new_vert[min_index:domain+1,x]=np.zeros_like(vert_top_segment)
+                            new_vert[min_index:domain + 1, x] = np.zeros_like(vert_top_segment)
                     vert_bot_segment = new_vert[domain:max_index, x]
                     if (np.sum(vert_bot_segment) != 0) and (np.sum(vert_bot_segment) !=
                                                             np.shape(vert_bot_segment)[0]):
                         if vert_bot_segment[-1] == 1:
-                            new_vert[domain:max_index, x]=np.zeros_like(vert_bot_segment)+1
+                            new_vert[domain:max_index, x] = np.zeros_like(vert_bot_segment) + 1
                         else:
-                            new_vert[domain:max_index, x]=np.zeros_like(vert_bot_segment)
+                            new_vert[domain:max_index, x] = np.zeros_like(vert_bot_segment)
                 line_found = False
                 for y in range(np.shape(new_vert)[0]):
-                    if (new_vert[y,x] == 1) and (not line_found):
+                    if (new_vert[y, x] == 1) and (not line_found):
                         line_found = True
                         y1 = y
-                    if (new_vert[y,x] == 0) and line_found:
-                        vert_list.append([x, y1, x, y-1])
+                    if (new_vert[y, x] == 0) and line_found:
+                        vert_list.append([x, y1, x, y - 1])
                         line_found = False
-                if line_found == True:
-                    vert_list.append([x, y1, x, np.shape(new_vert)[0]-1])
+                if line_found:
+                    vert_list.append([x, y1, x, np.shape(new_vert)[0] - 1])
 
     new_horz = np.copy(orig_horz)
     horz_list = []
     for y in range(np.shape(new_horz)[0]):
-        if np.sum(orig_horz[y,:]) != 0:
-            if np.sum(orig_horz[y,:]) == np.shape(new_horz)[1]:
-                horz_list.append([0, y, np.shape(new_horz)[1]-1, y])
-            elif np.sum(orig_vert[y,:]) != 0:
-                domains_list = np.where(orig_vert[y,:]==1)[0]
+        if np.sum(orig_horz[y, :]) != 0:
+            if np.sum(orig_horz[y, :]) == np.shape(new_horz)[1]:
+                horz_list.append([0, y, np.shape(new_horz)[1] - 1, y])
+            elif np.sum(orig_vert[y, :]) != 0:
+                domains_list = np.where(orig_vert[y, :] == 1)[0]
                 for domain in domains_list:
-                    min_index = np.max([0, domain-closing_distance])
-                    max_index = np.min([domain+1+closing_distance, len(orig_vert[y,:])])
-                    horz_lft_segment = new_horz[y, min_index:domain+1]
-                    if (np.sum(horz_lft_segment) != 0) and (np.sum(horz_lft_segment) != 
+                    min_index = np.max([0, domain - closing_distance])
+                    max_index = np.min([domain + 1 + closing_distance, len(orig_vert[y, :])])
+                    horz_lft_segment = new_horz[y, min_index:domain + 1]
+                    if (np.sum(horz_lft_segment) != 0) and (np.sum(horz_lft_segment) !=
                                                             np.shape(horz_lft_segment)[0]):
                         if horz_lft_segment[0] == 1:
-                            new_horz[y,min_index:domain+1]=np.zeros_like(horz_lft_segment)+1
+                            new_horz[y, min_index:domain + 1] = np.zeros_like(horz_lft_segment) + 1
                         else:
-                            new_horz[y,min_index:domain+1]=np.zeros_like(horz_lft_segment)
+                            new_horz[y, min_index:domain + 1] = np.zeros_like(horz_lft_segment)
                     horz_rgt_segment = new_horz[y, domain:max_index]
-                    if (np.sum(horz_rgt_segment) != 0) and (np.sum(horz_rgt_segment) != 
+                    if (np.sum(horz_rgt_segment) != 0) and (np.sum(horz_rgt_segment) !=
                                                             np.shape(horz_rgt_segment)[0]):
                         if horz_rgt_segment[-1] == 1:
-                            new_horz[y, domain:max_index]=np.zeros_like(horz_rgt_segment)+1
+                            new_horz[y, domain:max_index] = np.zeros_like(horz_rgt_segment) + 1
                         else:
-                            new_horz[y, domain:max_index]=np.zeros_like(horz_rgt_segment)
+                            new_horz[y, domain:max_index] = np.zeros_like(horz_rgt_segment)
                 line_found = False
                 for x in range(np.shape(new_horz)[1]):
-                    if (new_horz[y,x] == 1) and (not line_found):
+                    if (new_horz[y, x] == 1) and (not line_found):
                         line_found = True
                         x1 = x
-                    if (new_horz[y,x] == 0) and line_found:
-                        horz_list.append([x1, y, x-1, y])
+                    if (new_horz[y, x] == 0) and line_found:
+                        horz_list.append([x1, y, x - 1, y])
                         line_found = False
-                if line_found == True:
-                    horz_list.append([x1, y, np.shape(new_horz)[1]-1, y])
+                if line_found:
+                    horz_list.append([x1, y, np.shape(new_horz)[1] - 1, y])
 
     new_all = np.maximum(new_vert, new_horz)
-    return (new_all, new_vert, new_horz, np.array(vert_list), np.array(horz_list))
-            
-            
+    return new_all, new_vert, new_horz, np.array(vert_list), np.array(horz_list)
+
+
 #   FUNCTION switchmap
 # Generates a switchmap from binarised phase data. A switchmap is a 2D array, where the number
 # at each coordinate corresponds to the 'time' it takes that coordinate to switch phase. If a
@@ -1428,74 +1426,74 @@ def final_a_domains(orig_vert, orig_horz, closing_distance = 50):
 #   OUTPUTS
 # result: hdf5_dict showing the switchmap, as well as the relevant voltages in attributes
 
-def switchmap(*phase_list, method = 'total', source_path = None, voltage_increment = None):
+def switchmap(*phase_list, method='total', source_path=None, voltage_increment=None):
     if source_path is not None:
         mV = source_path.split('mV')[-2]
         mV = mV.split('_')[-1]
         mV = int(mV)
-    
+
     if voltage_increment is not None:
         voltage = []
         for i in range(len(phase_list)):
-            voltage.append(mV+voltage_increment*i)
+            voltage.append(mV + voltage_increment * i)
     else:
         voltage = mV
-    
+
     switchmap = np.zeros_like(phase_list[0].astype(float))
     start_time = time.time()
-    
+
     for i in range(phase_list[0].shape[0]):
         for j in range(phase_list[0].shape[1]):
             switch_list = []
             for phase in phase_list:
-                switch_list.append(phase[i,j])
-            if (switch_list[0]==switch_list[-1]):
-                switchmap[i,j] = np.nan
+                switch_list.append(phase[i, j])
+            if switch_list[0] == switch_list[-1]:
+                switchmap[i, j] = np.nan
             else:
-                changes=wherechanged(switch_list)
-                if method=='maximum':
-                    switch_scan=np.ceil(np.nanmax(changes))
+                changes = wherechanged(switch_list)
+                if method == 'maximum':
+                    switch_scan = np.ceil(np.nanmax(changes))
                 elif method == 'minimum':
                     if len(changes) == changes[-1]:
                         switch_scan = changes[-1]
                     else:
                         scan = 0
-                        while changes[scan] == scan+1:
-                            scan = scan+1
-                        switch_scan = changes[scan-1]
-                elif method=='median':
-                    switch_scan=np.ceil(np.nanmedian(changes))
-                elif method=='total':
-                    switch_scan=np.sum(switch_list)+1
+                        while changes[scan] == scan + 1:
+                            scan = scan + 1
+                        switch_scan = changes[scan - 1]
+                elif method == 'median':
+                    switch_scan = np.ceil(np.nanmedian(changes))
+                elif method == 'total':
+                    switch_scan = np.sum(switch_list) + 1
                 else:
                     print('Error: Invalid method submitted')
-                switchmap[i,j] = switch_scan
-        pt.progress_report(i+1, phase_list[0].shape[0], start_time, 'switchmap',
-                           'Scanning Row '+str(i+1))
-    
+                switchmap[i, j] = switch_scan
+        pt.progress_report(i + 1, phase_list[0].shape[0], start_time, 'switchmap',
+                           'Scanning Row ' + str(i + 1))
+
     if source_path is None:
         result = switchmap
     else:
         if voltage_increment is None:
-            result = pt.hdf5_dict(switchmap, voltage_mV = voltage)
+            result = pt.hdf5_dict(switchmap, voltage_mV=voltage)
         else:
-            result = pt.hdf5_dict(switchmap, voltage_list_mV = voltage)
+            result = pt.hdf5_dict(switchmap, voltage_list_mV=voltage)
     return result
-         
-    
+
+
 #   FUNCTION wherechanged
 # Returns the indices where a list changes values
 #   INPUTS:
 # arr: the array or list that may contain changes
 #   OUTPUTS
 # where: a list of indices that changes occur
-            
+
 def wherechanged(arr):
-    where=[]
-    for i in range(len(arr)-1):
-        diff=arr[i+1]^arr[i]
-        if diff!=0:
-            where.append(i+1)
+    where = []
+    for i in range(len(arr) - 1):
+        diff = arr[i + 1] ^ arr[i]
+        if diff != 0:
+            where.append(i + 1)
     return where
 
 
@@ -1528,118 +1526,118 @@ def switch_type_(filename, all_input_criteria):
     out_folder_locations = pt.find_output_folder_location(filename, 'switch_type', '')
     with h5py.File(filename, "a") as f:
         switchmap = np.copy(f[in_path_list[0]])
-        
+
         if 'voltage_list_mV' in f[in_path_list[0]].attrs:
             voltage_array = f[in_path_list[0]].attrs['voltage_list_mV']
         else:
             voltage_array = None
         total_scans = len(f[in_path_list[0]].attrs['source'])
-        
-        totalmap=np.zeros_like(switchmap.astype(float))
-        totalmap[:]=np.nan
-        
-        alljumps_tot=[]
-        alljumps_nucl=[]
-        alljumps_mot=[]
-        alljumps_merg=[]
-        alljumps_error=[]
-        alljumps_closure=[]
-        
-        nucl_centres=np.zeros_like(switchmap.astype(bool))
-        closure_centres=np.zeros_like(switchmap.astype(bool))
-        
+
+        totalmap = np.zeros_like(switchmap.astype(float))
+        totalmap[:] = np.nan
+
+        alljumps_tot = []
+        alljumps_nucl = []
+        alljumps_mot = []
+        alljumps_merg = []
+        alljumps_error = []
+        alljumps_closure = []
+
+        nucl_centres = np.zeros_like(switchmap.astype(bool))
+        closure_centres = np.zeros_like(switchmap.astype(bool))
+
         switchmap = switchmap.astype(int)
         start_time = time.time()
-        
+
         for i in range(total_scans):
-            alljumps_tot_1img=[]
-            alljumps_nucl_1img=[]
-            alljumps_mot_1img=[]
-            alljumps_merg_1img=[]
-            alljumps_error_1img=[]
-            alljumps_closure_1img=[]
-            
+            alljumps_tot_1img = []
+            alljumps_nucl_1img = []
+            alljumps_mot_1img = []
+            alljumps_merg_1img = []
+            alljumps_error_1img = []
+            alljumps_closure_1img = []
+
             # Extract when switching occured
-            prev_scan=(switchmap<=i).astype(int)
-            curr_scan=(switchmap<=i+1).astype(int)
-            switched_regions = curr_scan-prev_scan
+            prev_scan = (switchmap <= i).astype(int)
+            curr_scan = (switchmap <= i + 1).astype(int)
+            switched_regions = curr_scan - prev_scan
 
             # Label areas where switching occured
-            structuring_element=[[1,1,1],[1,1,1],[1,1,1]]
-            labeled_switched_regions, total_features=label(switched_regions, structuring_element)
+            structuring_element = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+            labeled_switched_regions, total_features = label(switched_regions, structuring_element)
 
             for m in range(total_features):
-                feature_region = (labeled_switched_regions == m+1)
-                
-                #Get positions of all points of each label
-                feature_positions=np.nonzero(feature_region)
-                label_surface=np.sum(feature_region)
+                feature_region = (labeled_switched_regions == m + 1)
 
-                #define box around each labelled pixel        
-                box=np.zeros_like(switchmap)
-                box = binary_dilation(feature_region, iterations = 1)
-                box_border = box^(feature_region)
+                # Get positions of all points of each label
+                feature_positions = np.nonzero(feature_region)
+                label_surface = np.sum(feature_region)
 
-                if np.array_equal(np.logical_and(box_border, prev_scan),box_border):
+                # define box around each labelled pixel
+                box = np.zeros_like(switchmap)
+                box = binary_dilation(feature_region, iterations=1)
+                box_border = box ^ feature_region
+
+                if np.array_equal(np.logical_and(box_border, prev_scan), box_border):
                     closure = True
                 else:
                     closure = False
 
-                #Get switched areas up to the previous scan, that are in the box
-                boxed_pha_bin=np.zeros_like(switchmap)
-                boxed_pha_bin=(prev_scan+np.isnan(switchmap))*box_border   #Possibly remove negative
+                # Get switched areas up to the previous scan, that are in the box
+                boxed_pha_bin = np.zeros_like(switchmap)
+                boxed_pha_bin = (prev_scan + np.isnan(switchmap)) * box_border  # Possibly remove negative
 
-                #Label the switched areas in the box
-                labeled_boxed_pha_bin, num_connectors=label(boxed_pha_bin, structuring_element)
+                # Label the switched areas in the box
+                labeled_boxed_pha_bin, num_connectors = label(boxed_pha_bin, structuring_element)
 
-                #Convert the labeled array into a 1d-array of (unique) label values whose
-                #length gives the number of domains connecting the newly switched area
-                num_pix=np.shape(switchmap)[0]*np.shape(switchmap)[1]
-                boxed_labels=np.reshape(labeled_boxed_pha_bin, (1,num_pix))
-                boxed_labels=np.unique(boxed_labels[boxed_labels!=0])
-                number_of_connecting_doms=len(boxed_labels)
+                # Convert the labeled array into a 1d-array of (unique) label values whose
+                # length gives the number of domains connecting the newly switched area
+                num_pix = np.shape(switchmap)[0] * np.shape(switchmap)[1]
+                boxed_labels = np.reshape(labeled_boxed_pha_bin, (1, num_pix))
+                boxed_labels = np.unique(boxed_labels[boxed_labels != 0])
+                number_of_connecting_doms = len(boxed_labels)
 
-                #Define event type and append all points of that event to the totalmap
-                #nucleation
-                alljumps_tot_1img.append(label_surface)            
-                if number_of_connecting_doms==0:
-                    eventtype=2
+                # Define event type and append all points of that event to the totalmap
+                # nucleation
+                alljumps_tot_1img.append(label_surface)
+                if number_of_connecting_doms == 0:
+                    eventtype = 2
                     alljumps_nucl_1img.append(label_surface)
                     event_centre = skeletonize(feature_region, method='lee').astype(bool)
-                    nucl_centres = nucl_centres+event_centre
+                    nucl_centres = nucl_centres + event_centre
                     for j in range(len(feature_positions[0])):
-                        x=feature_positions[0][j]
-                        y=feature_positions[1][j]
-                        totalmap[x,y]=2.
+                        x = feature_positions[0][j]
+                        y = feature_positions[1][j]
+                        totalmap[x, y] = 2.
 
-                #motion
-                elif number_of_connecting_doms==1:
-                    eventtype=1
+                # motion
+                elif number_of_connecting_doms == 1:
+                    eventtype = 1
                     alljumps_mot_1img.append(label_surface)
                     for j in range(len(feature_positions[0])):
-                        x=feature_positions[0][j]
-                        y=feature_positions[1][j]
-                        totalmap[x,y]=1.
-                #merging
-                elif number_of_connecting_doms>1:
-                    eventtype=3
+                        x = feature_positions[0][j]
+                        y = feature_positions[1][j]
+                        totalmap[x, y] = 1.
+                # merging
+                elif number_of_connecting_doms > 1:
+                    eventtype = 3
                     alljumps_merg_1img.append(label_surface)
                     for j in range(len(feature_positions[0])):
-                        x=feature_positions[0][j]
-                        y=feature_positions[1][j]
-                        totalmap[x,y]=3.
+                        x = feature_positions[0][j]
+                        y = feature_positions[1][j]
+                        totalmap[x, y] = 3.
                 else:
-                    eventtype=4
+                    eventtype = 4
                     alljumps_error_1img.append(label_surface)
                     for j in range(len(feature_positions[0])):
-                        x=feature_positions[0][j]
-                        y=feature_positions[1][j]
-                        totalmap[x,y]=4.
-                #closure
-                if closure==True:
+                        x = feature_positions[0][j]
+                        y = feature_positions[1][j]
+                        totalmap[x, y] = 4.
+                # closure
+                if closure:
                     alljumps_closure_1img.append(label_surface)
                     event_centre = skeletonize(feature_region, method='lee').astype(bool)
-                    closure_centres = closure_centres+event_centre
+                    closure_centres = closure_centres + event_centre
 
             alljumps_tot.append(alljumps_tot_1img)
             alljumps_nucl.append(alljumps_nucl_1img)
@@ -1647,21 +1645,21 @@ def switch_type_(filename, all_input_criteria):
             alljumps_merg.append(alljumps_merg_1img)
             alljumps_error.append(alljumps_error_1img)
             alljumps_closure.append(alljumps_closure_1img)
-                   
+
             if voltage_array is not None:
-                name = str(voltage_array[i]).zfill(4)+'_mV'
+                name = str(voltage_array[i]).zfill(4) + '_mV'
             else:
-                name = 'Scan_'+str(i).zfill(3)
-            current_folder_location = out_folder_locations[0]+name
+                name = 'Scan_' + str(i).zfill(3)
+            current_folder_location = out_folder_locations[0] + name
             data = pt.write_output_f(f, totalmap, current_folder_location, in_path_list,
                                      'Switchmap')
             propagate_scale_attrs(data, f[in_path_list[0]])
-            pt.progress_report(i+1, total_scans, start_time, 'switch_type_', '['+name+']')
-        
+            pt.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
+
         gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
         data = pt.write_output_f(f, nucl_centres, gen_loc, in_path_list, 'NucleationCentres')
         data = pt.write_output_f(f, closure_centres, gen_loc, in_path_list, 'ClosureCentres')
-        
+
         gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
                                                  True)[0]
         data = pt.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, 'TotalJumps')
@@ -1670,8 +1668,8 @@ def switch_type_(filename, all_input_criteria):
         data = pt.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, 'Merging')
         data = pt.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, 'Errors')
         data = pt.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, 'Closure')
-        
-        
+
+
 #   FUNCTION fill_blanks
 # Takes a list of lists, and extends each individual list such that each list is the same size. This
 # is done by introducing NaNs. An list that is, for example, [[1,2,3],[],[1]], would then become
@@ -1680,8 +1678,8 @@ def switch_type_(filename, all_input_criteria):
 # list_of_lists: list of lists to be altered so each component list is the same length
 #   OUTPUTS
 # list_of_lists: the new list of lists, where each list is extended to the same length
-        
-def fill_blanks (list_of_lists):
+
+def fill_blanks(list_of_lists):
     longest_list_length = 0
     for one_list in list_of_lists:
         longest_list_length = max(longest_list_length, len(one_list))
@@ -1710,17 +1708,17 @@ def interpolated_features(switchmap, nucl_centres, clos_centres):
     isoline_z = []
     for i in range(np.shape(isolines)[0]):
         for j in range(np.shape(isolines)[1]):
-            if isolines[i,j]!=0:
+            if isolines[i, j] != 0:
                 isoline_x.append(j)
                 isoline_y.append(i)
-                isoline_z.append(isolines[i,j])
+                isoline_z.append(isolines[i, j])
 
     grid_x, grid_y = np.mgrid[0:np.shape(isolines)[0]:1, 0:np.shape(isolines)[1]:1]
     interpolation = interpolate.griddata(np.array([isoline_y, isoline_x]).T, isoline_z,
-                                         (grid_x, grid_y), method='linear', fill_value = np.nan)
+                                         (grid_x, grid_y), method='linear', fill_value=np.nan)
     return interpolation
 
-            
+
 #   FUNCTION find_isolines
 # Finds key features on a switchmap (or similar structures) and corresponding nucleation and closure
 # centres. Three features are considered: the edges of each switch on the switchmap ('cliffs') are 
@@ -1733,48 +1731,48 @@ def interpolated_features(switchmap, nucl_centres, clos_centres):
 #   OUTPUTS
 # isolines: the key features on the switchmap, including the isolines themselves, and the nucleation
 #     and closure centres.
-            
+
 def find_isolines(switchmap, nucl_centres, clos_centres):
     isolines = np.zeros_like(switchmap)
     for i in range(np.shape(switchmap)[0]):
         for j in range(np.shape(switchmap)[1]):
             peak = False
-            if np.isnan(switchmap[i,j]):
-                isolines[i,j] = np.nan
+            if np.isnan(switchmap[i, j]):
+                isolines[i, j] = np.nan
             if i != 0:
-                if np.isnan(switchmap[i-1,j]) or (switchmap[i,j]>switchmap[i-1,j]):
-                    isolines[i,j]=switchmap[i,j]
+                if np.isnan(switchmap[i - 1, j]) or (switchmap[i, j] > switchmap[i - 1, j]):
+                    isolines[i, j] = switchmap[i, j]
                     peak = True
-                elif switchmap[i,j]<switchmap[i-1,j]-1 and peak == False:
-                    isolines[i,j]=switchmap[i,j]+0.5
-            if i != np.shape(switchmap)[0]-1:
-                if np.isnan(switchmap[i+1,j]) or (switchmap[i,j]>switchmap[i+1,j]):
-                    isolines[i,j]=switchmap[i,j]
+                elif switchmap[i, j] < switchmap[i - 1, j] - 1 and peak == False:
+                    isolines[i, j] = switchmap[i, j] + 0.5
+            if i != np.shape(switchmap)[0] - 1:
+                if np.isnan(switchmap[i + 1, j]) or (switchmap[i, j] > switchmap[i + 1, j]):
+                    isolines[i, j] = switchmap[i, j]
                     peak = True
-                elif switchmap[i,j]<switchmap[i+1,j]-1 and peak == False:
-                    isolines[i,j]=switchmap[i,j]+0.5
+                elif switchmap[i, j] < switchmap[i + 1, j] - 1 and peak == False:
+                    isolines[i, j] = switchmap[i, j] + 0.5
             if j != 0:
-                if np.isnan(switchmap[i,j-1]) or (switchmap[i,j]>switchmap[i,j-1]):
-                    isolines[i,j]=switchmap[i,j]
+                if np.isnan(switchmap[i, j - 1]) or (switchmap[i, j] > switchmap[i, j - 1]):
+                    isolines[i, j] = switchmap[i, j]
                     peak = True
-                elif switchmap[i,j]<switchmap[i,j-1]-1 and peak == False:
-                    isolines[i,j]=switchmap[i,j]+0.5
-            if j != np.shape(switchmap)[1]-1:
-                if np.isnan(switchmap[i,j+1]) or (switchmap[i,j]>switchmap[i,j+1]):
-                    isolines[i,j]=switchmap[i,j]
+                elif switchmap[i, j] < switchmap[i, j - 1] - 1 and peak == False:
+                    isolines[i, j] = switchmap[i, j] + 0.5
+            if j != np.shape(switchmap)[1] - 1:
+                if np.isnan(switchmap[i, j + 1]) or (switchmap[i, j] > switchmap[i, j + 1]):
+                    isolines[i, j] = switchmap[i, j]
                     peak = True
-                elif switchmap[i,j]<switchmap[i,j+1]-1 and peak == False:
-                    isolines[i,j]=switchmap[i,j]+0.5
+                elif switchmap[i, j] < switchmap[i, j + 1] - 1 and peak == False:
+                    isolines[i, j] = switchmap[i, j] + 0.5
     clos_location = np.where(clos_centres)
     for centre_number in range(np.shape(clos_location)[1]):
         i = clos_location[0][centre_number]
         j = clos_location[1][centre_number]
-        isolines[i,j] = switchmap[i,j]+0.5
+        isolines[i, j] = switchmap[i, j] + 0.5
     nucl_location = np.where(nucl_centres)
     for centre_number in range(np.shape(nucl_location)[1]):
         i = nucl_location[0][centre_number]
         j = nucl_location[1][centre_number]
-        isolines[i,j] = switchmap[i,j]-0.5
+        isolines[i, j] = switchmap[i, j] - 0.5
     return isolines
 
 
@@ -1788,11 +1786,11 @@ def find_isolines(switchmap, nucl_centres, clos_centres):
 # mag_deriv (if return_directions == False): array showing magnitude of the derivative at all points
 # result (if return_directions == True): A tuple. The first entry is mag_deriv as above. Subsequent
 #    entries are different derivatives of from different directions
-                    
-def differentiate(image, return_directions = True):
+
+def differentiate(image, return_directions=True):
     deriv = np.gradient(image)
     abs_deriv = np.abs(deriv)
-    mag_deriv = np.sqrt(abs_deriv[0]**2+abs_deriv[1]**2)
+    mag_deriv = np.sqrt(abs_deriv[0] ** 2 + abs_deriv[1] ** 2)
     mag_deriv = pt.hdf5_dict(mag_deriv, dimension='Abs')
     if not return_directions:
         return mag_deriv
