@@ -5,6 +5,8 @@ try:
 except:
     xrdml_bool=False
 from . import ardf_files
+from . import sxm_files
+
 import h5py
 import os
 
@@ -21,6 +23,8 @@ def tohdf5(filename):
                 print('xrdml_files was not imported, probably due to the missing xrd_tools package. Please install it.')
         elif filename.split('.')[-1] == 'ardf' or filename.split('.')[-1] == 'ARDF':
             ardf_files.ardf2hdf5(filename)
+        elif filename.split('.')[-1] == 'sxm':
+            sxm_files.sxm2hdf5(filename)
         else:
             print('file type not yet supported')
 
