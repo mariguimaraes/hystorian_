@@ -157,7 +157,7 @@ def load_sxm(filename):
 
 def sxm2hdf5(filename):
     header, channel_info, channel_data = load_sxm(filename)
-    print(channel_info)
+
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
         typegrp = f.create_group("type")
         typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])

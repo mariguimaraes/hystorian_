@@ -1,13 +1,14 @@
-from . import ibw_files
-
 try:
+    xrdml_bool = True
     from . import xrdml_files
 
-    xrdml_bool = True
 except:
     xrdml_bool = False
+
+from . import ibw_files
 from . import ardf_files
 from . import sxm_files
+from . import gsf_files
 
 import h5py
 import os
@@ -28,6 +29,8 @@ def tohdf5(filename):
             ardf_files.ardf2hdf5(filename)
         elif filename.split('.')[-1] == 'sxm':
             sxm_files.sxm2hdf5(filename)
+        elif filename.split('.')[-1] == 'gsf':
+            gsf_files.gsf2hdf5(filename)
         else:
             print('file type not yet supported')
 
