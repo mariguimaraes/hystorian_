@@ -706,10 +706,6 @@ def contour_closure(source, size_threshold = 50, type_bool = True):
 def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_width = 15,
                    thresh_factor = 2, dilation = 2, erosion = 4, line_threshold = 50,
                    min_line_length=50, max_line_gap=10, plots = None):
-    if plots is not None:
-        print('-----')
-        print(path)       
-
     if binarised_phase is not None:
         domain_wall_filter = create_domain_wall_filter(binarised_phase,
                                                        filter_width = filter_width,
@@ -1037,11 +1033,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width = 15, thresh
         start_time = time.time()
         for index in range(len(in_path_list)):
             path = in_path_list[index]
-            
-            if plots is not None:
-                print('-----')
-                print(path)       
-        
+       
             if pb_path_list is not None:
                 domain_wall_filter = create_domain_wall_filter(f[pb_path_list[index]],
                                                                filter_width = filter_width,
