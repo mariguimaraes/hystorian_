@@ -2,8 +2,9 @@ from igor import binarywave
 import h5py
 from numpy import flipud
 
-#==========================================
-#IBW conversion
+
+# ==========================================
+# IBW conversion
 
 def correct_label(label):
     label = [x for x in label if x]  # Remove the empty lists
@@ -18,14 +19,15 @@ def correct_label(label):
         else:  # Correct the duplicate letters
             if 'Trace' in i:
                 i = i.split('Trace')[0]
-                corrected_label.append(i+'Trace')
+                corrected_label.append(i + 'Trace')
             elif 'Retrace' in i:
                 i = i.split('Retrace')[0]
-                corrected_label.append(i+'Retrace')
+                corrected_label.append(i + 'Retrace')
             else:
                 corrected_label.append(i)
     corrected_label = [x.encode() for x in corrected_label]
-    return corrected_label 
+    return corrected_label
+
 
 def ibw2hdf5(filename):
     tmpdata = binarywave.load(filename)['wave']
@@ -42,15 +44,15 @@ def ibw2hdf5(filename):
         typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
         metadatagrp = f.create_group("metadata")
         metadatagrp.create_dataset(filename.split('.')[0], data=tmpdata['note'])
-        datagrp = f.create_group("datasets/"+filename.split('.')[0])
+        datagrp = f.create_group("datasets/" + filename.split('.')[0])
         f.create_group("process")
         for i, k in enumerate(label_list):
-            datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:,:,i].T))
+            datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:, :, i].T))
 
             datagrp[label_list[i]].attrs['name'] = k.decode('utf8')
-            datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:,:,i].T.shape
-            datagrp[label_list[i]].attrs['size'] = (fastsize,slowsize)
-            datagrp[label_list[i]].attrs['offset'] = (xoffset,yoffset)
+            datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:, :, i].T.shape
+            datagrp[label_list[i]].attrs['size'] = (fastsize, slowsize)
+            datagrp[label_list[i]].attrs['offset'] = (xoffset, yoffset)
 
             if "Phase" in str(k):
                 datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
@@ -60,6 +62,6 @@ def ibw2hdf5(filename):
                 datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'm')
             else:
                 datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'unknown')
-        #f.create_dataset("channelsdata/pxs", data=sizes)
+        # f.create_dataset("channelsdata/pxs", data=sizes)
 
     print('file successfully converted')
