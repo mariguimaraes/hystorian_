@@ -9,6 +9,7 @@ from . import ibw_files
 from . import ardf_files
 from . import sxm_files
 from . import gsf_files
+from . import csv_files
 
 import h5py
 import os
@@ -31,6 +32,8 @@ def tohdf5(filename):
             sxm_files.sxm2hdf5(filename)
         elif filename.split('.')[-1] == 'gsf':
             gsf_files.gsf2hdf5(filename)
+        elif filename.split('.')[-1] == 'csv':
+            csv_files.csv2hdf5(filename)
         else:
             print('file type not yet supported')
 
