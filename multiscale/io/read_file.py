@@ -10,9 +10,12 @@ from . import ardf_files
 from . import sxm_files
 from . import gsf_files
 from . import csv_files
+from . import nanoscope_files
 
 import h5py
 import os
+import re
+
 
 
 def tohdf5(filename):
@@ -34,6 +37,12 @@ def tohdf5(filename):
             gsf_files.gsf2hdf5(filename)
         elif filename.split('.')[-1] == 'csv':
             csv_files.csv2hdf5(filename)
+        elif re.match('\d{3}', filename.split('.')[-1]) is not None:
+            try:
+                nanoscope_files.nanoscope2hdf5(filename)
+            except:
+                print('Your file is ending with three digits, but is not a Nanoscope file, please change the '
+                      'extension to the correct one')
         else:
             print('file type not yet supported')
 
