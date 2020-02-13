@@ -15,6 +15,7 @@ try:
     if major < 2:
         if minor < 8:
             print(
-                'Carefull, h5py version is lower than 2.9.x, please consider updating it, since it changes the way the attributes are handeled')
+                "Carefull, h5py version is lower than 2.9.x, please consider updating it, since it changes the way the "
+                "attributes are handeled, to do so use pip or run 'conda install -c conda-forge h5py'")
 except:
     print('please install h5py version 2.9.x or higher')
