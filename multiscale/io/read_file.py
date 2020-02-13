@@ -11,7 +11,7 @@ from . import sxm_files
 from . import gsf_files
 from . import csv_files
 from . import nanoscope_files
-
+from . import img_files
 import h5py
 import os
 import re
@@ -37,6 +37,9 @@ def tohdf5(filename):
             gsf_files.gsf2hdf5(filename)
         elif filename.split('.')[-1] == 'csv':
             csv_files.csv2hdf5(filename)
+        elif filename.split('.')[-1] == 'jpg' or filename.split('.')[-1] == 'png' or filename.split('.')[-1] == 'jpeg' \
+                or filename.split('.')[-1] == 'bmp':
+            img_files.image2hdf5(filename)
         elif re.match('\d{3}', filename.split('.')[-1]) is not None:
             try:
                 nanoscope_files.nanoscope2hdf5(filename)
