@@ -6,6 +6,7 @@ be called using m_, l_, or e_apply.
 
     save_image                 : saves image
     phase_linearisation        : linearises phase data to a value between 0 and 1
+    normalise                  : scales an array to a new range between two numbers
     m_sum                      : adds arrays together
     phase_binarisation         : binarises linearised phases to represent Up and Down polarisation
     threshold_noise            : a threshold function that attempts to minimise the number of noise

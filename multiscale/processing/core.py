@@ -87,6 +87,10 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             data_list.append(np.array(f[path]))
             if prop_attrs is not None:
                 for prop_attr in prop_attrs:
+                    if (prop_attr == 'scale_m_per_px'):
+                        if 'scale (m/px)' in f[path].attrs:
+                            prop_attr_keys.append(prop_attr)
+                            prop_attr_vals.append(f[path].attrs['scale (m/px)'])
                     if (prop_attr not in prop_attr_keys) and (prop_attr in f[path].attrs):
                         prop_attr_keys.append(prop_attr)
                         prop_attr_vals.append(f[path].attrs[prop_attr])
@@ -95,8 +99,9 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                     if (use_attr not in use_attr_keys) and (use_attr in f[path].attrs):
                         use_attr_keys.append(use_attr)
                         use_attr_vals.append(f[path].attrs[use_attr])
+                use_attr_dict = {}
                 for key_num in range(len(use_attr_keys)):
-                    use_attr_dict = {'source_' + use_attr_keys[key_num]: use_attr_vals[key_num]}
+                    use_attr_dict['source_' + use_attr_keys[key_num]] = use_attr_vals[key_num]
                 kwargs.update(use_attr_dict)
         result = function(*data_list, **kwargs)
 
@@ -306,7 +311,7 @@ def e_apply(filename, function, all_input_criteria, output_names=None, folder_na
     all_in_path_list = list(map(list, zip(*all_in_path_list)))[0]
     m_apply(filename, function, all_in_path_list, output_names=output_names,
             folder_names=folder_names, increment_proc=increment_proc,
-            use_attrs=None, prop_attrs=prop_attrs, **kwargs)
+            use_attrs=use_attrs, prop_attrs=prop_attrs, **kwargs)
 
 
 #   FUNCTION create_dataset_from_dict

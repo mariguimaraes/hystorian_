@@ -53,6 +53,8 @@ def ibw2hdf5(filename):
             datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:, :, i].T.shape
             datagrp[label_list[i]].attrs['size'] = (fastsize, slowsize)
             datagrp[label_list[i]].attrs['offset'] = (xoffset, yoffset)
+            datagrp[label_list[i]].attrs['path'] = ("datasets/" + filename.split('.')[0]+"/"+str(k).split('\'')[1])
+            datagrp[label_list[i]].attrs['scale_m_per_px'] = fastsize/tmpdata['wData'][:, :, i].T.shape[0]
 
             if "Phase" in str(k):
                 datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
