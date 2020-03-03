@@ -1,4 +1,4 @@
-# 2f34567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+#234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
 
 import h5py
 import matplotlib.pyplot as plt
@@ -21,100 +21,122 @@ from random import randrange
 # Saves one .png image to the current directory, or a chosen folder
 #   INPUTS:
 # data: A 2-D array which will be converted into a png image.
-# image_name (default: None): name of the image that is saved. By default, tries to pull name from
-#     source_path. If this cannot be done, sets name to 'image'
+# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel 
+#     per data point at 100 dpi
+# ticks (default: True): Generate tick labels
+# labelsize (default: 16): Size of the text in pxs
+# full_range (default: False): Show whether to show the image as is, or to remove offset and use
+#     std to figure out range
+# std_range (default: 3): Range (in std) around the mean that is plotted
 # colorm (default: 'inferno'): colormap to be used for image
+# colorbar (default: True): option to generate a colour bar
 # scalebar (default: False): if True, add a scalebar to the image, requires three attributes : 
 #     shape, which define the pixel size of the image
 #     size, which gives the phyiscal dimension of the image
 #     unit, which give the physical unit of size
 # physical_size (default: (0, 'unit')): physical size of the image used when generating the scalebar
-# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel 
-#     per data point at 100 dpi
-# labelsize (default: 16): Size of the text in pxs
-# std_range (default: 3): Range around the mean for the colorscale, alternatively the value can be 
-#    "full", to take the full range.
+# source_scale_m_per_px (default: None): attempts to directly grab scale if attrs are provided
+# show (default: False): if True, the image is displayed in the kernel
+# save (default: True): determines if the image should be saved
+# image_name (default: None): name of the image that is saved. By default, tries to pull name from
+#     source_path. If this cannot be done, sets name to 'image'
 # saving_path (default: ''): The path to the folder where to save the image
-# verbose (default: False): if True, print a line each time a image is saved.
-# show (default: False): if True, the image is displayed in the kernel.
 # source_path (default: None): if set, and image_name not set, this variable will be used to
 #     generate the file name
-# source_scale_m_per_px (default: None): attempts to directly grab scale if attrs are provided
+# verbose (default: False): if True, print a line each time a image is saved.
 #   OUTPUTS:
 # null
 
 def save_image(data,
-               image_name=None,
+               size=None,
+               ticks=True,
+               labelsize=16,
+               full_range=False,
+               std_range=3,
                colorm='inferno',
+               colorbar=True,
                scalebar=False,
                physical_size=(0, 'unit'),
-               colorbar=True,
-               size=None,
-               labelsize=16,
-               std_range=3,
-               saving_path='',
-               verbose=False,
+               source_scale_m_per_px=None,
                show=False,
+               save=True,
+               image_name=None,
+               saving_path='',
                source_path=None,
-               source_scale_m_per_px=None):
+               verbose=False):
+        
+    # Generate size of image frame
+    if size is None:
+        figsize = (np.array(np.shape(data)) / 100)[::-1]
+        if figsize[0] < 3:
+            scale_factor = np.ceil(3 / figsize[0])
+            figsize = scale_factor * figsize
+        fig = plt.figure(frameon=False, figsize=figsize, dpi=100)
+    else:
+        fig = plt.figure(figsize=size)
+        
+    # Generate ticks
+    if ticks:
+        plt.tick_params(labelsize=labelsize)
+    else:
+        plt.xticks([])
+        plt.yticks([])
+        
+    # Set min and max:
     if data.dtype == 'bool':
         data = data.astype(int)
-    if image_name is None:
-        if source_path is not None:
-            image_name = source_path.replace('/', '_')
-        else:
-            image_name = 'image'
-    if saving_path != '':
-        if saving_path[-1] != '/':
-            saving_path = saving_path + '/'
-    if std_range != 'full':
-        std_range = float(std_range)
-
-        if size is None:
-            figsize = (np.array(np.shape(data)) / 100)[::-1]
-            if figsize[0] < 5:
-                scale_factor = np.ceil(5 / figsize[0])
-                figsize = scale_factor * figsize
-            fig = plt.figure(frameon=False, figsize=figsize, dpi=100)
-        else:
-            fig = plt.figure(figsize=size)
-
-        plt.tick_params(labelsize=labelsize)
-        offsetdata = data - np.nanmin(data)
-        mean_val = np.nanmean(offsetdata)
-        std_val = np.nanstd(offsetdata)
-        v_min = 0
+    if full_range:
+        v_min = np.nanmin(data)
+        v_max = np.nanmax(data)
+    else:
+        data = data - np.nanmin(data)  
+        mean_val = np.nanmean(data)
+        std_val = np.nanstd(data)
+        v_min = mean_val - std_range * std_val
         v_max = mean_val + std_range * std_val
-        if std_range == 'full':
-            pos = plt.imshow(offsetdata, cmap=colorm)
-        else:
-            pos = plt.imshow(offsetdata, vmin=v_min, vmax=v_max, cmap=colorm)
-        if colorbar:
-            cbar = plt.colorbar(pos, fraction=0.046, pad=0.04)
-            cbar.ax.tick_params(labelsize=labelsize)
-        plt.tight_layout()
-        if scalebar:
-            try:
-                if source_scale_m_per_px is None:
-                    phys_size = physical_size[0]
-                    px = np.shape(data)[0]
-                    scalebar = ScaleBar(phys_size / px, physical_size[1], location='lower right',
+
+    # Plot image
+    pos = plt.imshow(data, vmin=v_min, vmax=v_max, cmap=colorm)
+
+    # Generate colourbar
+    if colorbar:
+        cbar = plt.colorbar(pos, fraction=0.046, pad=0.04)
+        cbar.ax.tick_params(labelsize=labelsize)
+    plt.tight_layout()
+    
+    # Generate scalebar
+    if scalebar:
+        try:
+            if source_scale_m_per_px is None:
+                phys_size = physical_size[0]
+                px = np.shape(data)[0]
+                scalebar = ScaleBar(phys_size / px, physical_size[1], location='lower right',
                                         font_properties={'size': labelsize})
-                else:
-                    scalebar = ScaleBar(source_scale_m_per_px, 'm', location='lower right',
+            else:
+                scalebar = ScaleBar(source_scale_m_per_px, 'm', location='lower right',
                                         font_properties={'size': labelsize})
-                # scalebar = ScaleBar(f[path].attrs['scale (m/px)'], 'm', location='lower right',
-                # font_properties={'size':25})
-                plt.gca().add_artist(scalebar)
-            except:
-                print("Error in the creation of the scalebar, please check that the attribute's\
+            plt.gca().add_artist(scalebar)
+        except:
+            print("Error in the creation of the scalebar, please check that the attribute's\
                         size and shape are correctly define for each data channel.")
+    
+    # Generate ouputs:
+    if save:
+        if image_name is None:
+            if source_path is not None:
+                image_name = source_path.replace('/', '_')
+            else:
+                image_name = 'image'
+        if saving_path != '':
+            if saving_path[-1] != '/':
+                saving_path = saving_path + '/'
         fig.savefig(saving_path + str(image_name) + '.png')
-        if show:
-            plt.show()
-        if verbose:
-            print(str(image_name) + '.png saved.')
-        plt.close()
+    if show:
+        plt.show()
+    if verbose:
+        print(str(image_name) + '.png saved.')
+        
+    plt.close()
     return
 
 
@@ -533,6 +555,24 @@ def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
     return entry
 
 
+#   FUNCTION normalise
+# Normalises an array of numbers so each number is within a range fo two numbers
+#   INPUTS:
+# array: the array to be normalised
+# new_min (default: 0): minimum value of new range
+# new_max (default: 1): maximum value of new range
+#   OUTPUTS
+# array: the entry that has been converted
+
+def normalise(array, new_min = 0, new_max = 1):
+    old_range = np.max(array)-np.min(array)
+    new_range = new_max-new_min
+    array = array-np.min(array)
+    array = array*new_range/old_range
+    array = array+new_min
+    return array
+
+
 #   FUNCTION m_sum
 # Adds multiple channels together. The files are added in order, first by channel and then by
 # sample. The amount of source files in each destination file defined by entry_count. Replaces sum_
@@ -658,7 +698,8 @@ def wrap(x, low=0, high=360):
 def contour_closure(source, size_threshold=50, type_bool=True):
     source = np.array(source).astype('uint8')
     image = np.zeros_like(source)
-    cv2_image, contours, hierarchy = cv2.findContours(source, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    cv2_image, contours, hierarchy = cv2.findContours(source, cv2.RETR_TREE,
+                                                      cv2.CHAIN_APPROX_SIMPLE)
     new_contours = []
     for contour in contours:
         if cv2.contourArea(contour) > size_threshold:
@@ -1578,7 +1619,7 @@ def switch_type_(filename, all_input_criteria):
 
                 # Get switched areas up to the previous scan, that are in the box
                 boxed_pha_bin = np.zeros_like(switchmap)
-                boxed_pha_bin = (prev_scan + np.isnan(switchmap)) * box_border  # Possibly remove negative
+                boxed_pha_bin = (prev_scan + np.isnan(switchmap)) * box_border
 
                 # Label the switched areas in the box
                 labeled_boxed_pha_bin, num_connectors = label(boxed_pha_bin, structuring_element)
@@ -1682,20 +1723,16 @@ def fill_blanks(list_of_lists):
     return list_of_lists
 
 
-#   FUNCTION interpolated_features_
-# Interpolates features on a switchmap. This is done by first isolating key points: these are either
-# the edges of the switchmap themselves, or the the centre of closure or nucleation. Using these key
-# points, the image is interpolated linearly. Regions that cannot be interpolated, such as regions
-# that did not switch, or corners, are set to NaN.
+#   FUNCTION interpolated_features
+# Creates isolines from a switchmap, then interpolates it
 #   INPUTS:
 # switchmap: the switchmap used as the base for key features
-# nucl_centres: points where nucleation occurs
-# clos_centres: points where closure occurs
 #   OUTPUTS
 # interpolation: interpolated features
 
-def interpolated_features(switchmap, nucl_centres, clos_centres):
-    isolines = find_isolines(switchmap, nucl_centres, clos_centres)
+def interpolated_features(switchmap):    
+    isolines = find_isolines(switchmap)
+    
     isoline_y = []
     isoline_x = []
     isoline_z = []
@@ -1705,67 +1742,55 @@ def interpolated_features(switchmap, nucl_centres, clos_centres):
                 isoline_x.append(j)
                 isoline_y.append(i)
                 isoline_z.append(isolines[i, j])
-
     grid_x, grid_y = np.mgrid[0:np.shape(isolines)[0]:1, 0:np.shape(isolines)[1]:1]
-    interpolation = interpolate.griddata(np.array([isoline_y, isoline_x]).T, isoline_z,
+    interpolation = interpolate.griddata(np.array([isoline_y, isoline_x]).T, np.array(isoline_z),
                                          (grid_x, grid_y), method='linear', fill_value=np.nan)
     return interpolation
 
 
 #   FUNCTION find_isolines
-# Finds key features on a switchmap (or similar structures) and corresponding nucleation and closure
-# centres. Three features are considered: the edges of each switch on the switchmap ('cliffs') are 
-# set to the value of the switchmap; the nucleation centres are set to 0.5 less than the value at
-# the same point on the switchmap; and the closure centres are set to 0.5 more.
+# Finds key features on a switchmap (or similar structures), by finding edges and subtracting 1. If
+# the point is at the bottom of an edge with height greater than two, and not otherwise defined, the
+# point is set to the switchmap value. Borders are also set to nan.
 #   INPUTS:
 # switchmap: the switchmap used as the base for key features
-# nucl_centres: points where nucleation occurs
-# clos_centres: points where closure occurs
+# set_midpoints (default: True): sets the middle of each contour as 0.5 less than switchmap value
 #   OUTPUTS
-# isolines: the key features on the switchmap, including the isolines themselves, and the nucleation
-#     and closure centres.
+# isolines: the key features on the switchmap
 
-def find_isolines(switchmap, nucl_centres, clos_centres):
+def find_isolines (switchmap, set_midpoints = True):
     isolines = np.zeros_like(switchmap)
     for i in range(np.shape(switchmap)[0]):
         for j in range(np.shape(switchmap)[1]):
-            peak = False
             if np.isnan(switchmap[i, j]):
                 isolines[i, j] = np.nan
-            if i != 0:
-                if np.isnan(switchmap[i - 1, j]) or (switchmap[i, j] > switchmap[i - 1, j]):
-                    isolines[i, j] = switchmap[i, j]
-                    peak = True
-                elif switchmap[i, j] < switchmap[i - 1, j] - 1 and peak == False:
-                    isolines[i, j] = switchmap[i, j] + 0.5
-            if i != np.shape(switchmap)[0] - 1:
-                if np.isnan(switchmap[i + 1, j]) or (switchmap[i, j] > switchmap[i + 1, j]):
-                    isolines[i, j] = switchmap[i, j]
-                    peak = True
-                elif switchmap[i, j] < switchmap[i + 1, j] - 1 and peak == False:
-                    isolines[i, j] = switchmap[i, j] + 0.5
-            if j != 0:
-                if np.isnan(switchmap[i, j - 1]) or (switchmap[i, j] > switchmap[i, j - 1]):
-                    isolines[i, j] = switchmap[i, j]
-                    peak = True
-                elif switchmap[i, j] < switchmap[i, j - 1] - 1 and peak == False:
-                    isolines[i, j] = switchmap[i, j] + 0.5
-            if j != np.shape(switchmap)[1] - 1:
-                if np.isnan(switchmap[i, j + 1]) or (switchmap[i, j] > switchmap[i, j + 1]):
-                    isolines[i, j] = switchmap[i, j]
-                    peak = True
-                elif switchmap[i, j] < switchmap[i, j + 1] - 1 and peak == False:
-                    isolines[i, j] = switchmap[i, j] + 0.5
-    clos_location = np.where(clos_centres)
-    for centre_number in range(np.shape(clos_location)[1]):
-        i = clos_location[0][centre_number]
-        j = clos_location[1][centre_number]
-        isolines[i, j] = switchmap[i, j] + 0.5
-    nucl_location = np.where(nucl_centres)
-    for centre_number in range(np.shape(nucl_location)[1]):
-        i = nucl_location[0][centre_number]
-        j = nucl_location[1][centre_number]
-        isolines[i, j] = switchmap[i, j] - 0.5
+            if (i==0) or (i==np.shape(switchmap)[0]-1) or (j==0) or (j==np.shape(switchmap)[1]-1):
+                isolines [i, j] = np.nan
+            else:
+                for i_del in [-1, +1]:
+                    if switchmap[i,j] < switchmap[i+i_del, j]-1:
+                        isolines[i,j] = switchmap[i,j]
+                for j_del in [-1, +1]:
+                    if switchmap[i,j] < switchmap[i, j+j_del]-1:
+                        isolines[i,j] = switchmap[i,j]
+                for i_del in [-1, +1]:
+                    if switchmap[i,j] > switchmap[i+i_del, j]:
+                        isolines[i,j] = switchmap[i,j] - 1
+                for j_del in [-1, +1]:
+                    if switchmap[i,j] > switchmap[i, j+j_del]:
+                        isolines[i,j] = switchmap[i,j] - 1
+    
+    if set_midpoints:
+        midpoints = np.zeros_like(switchmap)
+        for i in range(int(np.nanmax(switchmap))+1):
+            midpoints = (skeletonize(binary_erosion(switchmap==i, iterations=3),
+                                     method='lee'))+midpoints
+        midpoints = midpoints.astype(bool)
+
+        for i in range(np.shape(switchmap)[0]):
+            for j in range(np.shape(switchmap)[1]):
+                if midpoints[i,j]:
+                    isolines[i,j] = switchmap[i,j]-0.5
     return isolines
 
 
@@ -1786,10 +1811,10 @@ def differentiate(image, return_directions=True):
     mag_deriv = np.sqrt(abs_deriv[0] ** 2 + abs_deriv[1] ** 2)
     mag_deriv = pt.hdf5_dict(mag_deriv, dimension='Abs')
     if not return_directions:
-        return mag_deriv
+        result = mag_deriv
     else:
         result = [mag_deriv]
         for i in range(len(deriv)):
             result.append(pt.hdf5_dict(deriv[i], dimension=[i]))
         result = tuple(result)
-        return result
+    return result
