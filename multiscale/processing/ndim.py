@@ -1,9 +1,8 @@
-from . import core as pt
+from . import core
 import numpy as np
 import h5py
 
-
-def extract_hyst(filename, data_folder='datasets', selection=None):
+def extract_hist_(filename, bias_chan, channels, channels_name):
     with h5py.File(filename, 'a') as f:
 
         notedict = {}
@@ -15,79 +14,61 @@ def extract_hyst(filename, data_folder='datasets', selection=None):
                 except:
                     pass
 
-        if selection is None:
-            keylist = f[data_folder].keys()
-        elif selection == list:
-            keylist = selection
-        elif selection == str:
-            keylist = [selection]
-        else:
-            print('selection input is incorrect, looking at the keys automatically')
-            keylist = f[data_folder].keys()
+    waveform_pulsetime = float(notedict["ARDoIVArg3"])
+    if 'ARDoIVArg4' in notedict.keys():
+        waveform_dutycycle = float(notedict["ARDoIVArg4"])
+    else:
+        waveform_dutycycle = 0.5
 
-        print(keylist)
-        for file in keylist:
+    waveform_delta = 1 / float(notedict["NumPtsPerSec"])
+    waveform_numbiaspoints = int(np.floor(waveform_delta * len(bias_chan[1, 1, :]) / waveform_pulsetime))
+    waveform_pulsepoints = int(waveform_pulsetime / waveform_delta)
+    waveform_offpoints = int(waveform_pulsepoints * (1.0 - waveform_dutycycle))
 
-            inout_list = []
-            inout_list = pt.initialise_process(filename,
-                                               process_name='Extracted_PFM',
-                                               data_folder=data_folder,
-                                               selection=file,
-                                               selection_depth=1,
-                                               create_groups=True)
-            try:
-                bias = f[data_folder][file]['Bias']
-            except:
-                print('Impossible to find the bias in this file, skipping it.')
-                continue
+    list_output_name=[]
+    for i in channels_name:
+        list_output_name.append(i.split('/')[-1] + '_on')
+        list_output_name.append(i.split('/')[-1] + '_off')
+    len_bias = len(bias_chan[1, 1, :])
+    print(list_output_name)
+    core.m_apply(filename,
+                 f_extract_hist,
+                 in_paths=channels_name,
+                 output_names=list_output_name,
+                 len_bias=len_bias,
+                 waveform_pulsetime=waveform_pulsetime,
+                 waveform_dutycycle=waveform_dutycycle,
+                 waveform_delta=waveform_delta)
 
-            waveform_amp = notedict["ARDoIVAmp"]
-            waveform_freq = float(notedict["ARDoIVFrequency"])
-            waveform_phase = float(notedict["ARDoIVArg2"])
-            waveform_pulsetime = float(notedict["ARDoIVArg3"])
-            if 'ARDoIVArg4' in notedict.keys():
-                waveform_dutycycle = float(notedict["ARDoIVArg4"])
-            else:
-                waveform_dutycycle = 0.5
 
-            waveform_delta = 1 / float(notedict["NumPtsPerSec"])
-            waveform_numbiaspoints = int(np.floor(waveform_delta * len(bias[1, 1, :]) / waveform_pulsetime))
-            waveform_pulsepoints = int(waveform_pulsetime / waveform_delta)
-            waveform_offpoints = int(waveform_pulsepoints * (1.0 - waveform_dutycycle))
+def f_extract_hist(*chans, len_bias, waveform_pulsetime, waveform_dutycycle, waveform_delta):
+    output = []
+    waveform_numbiaspoints = int(np.floor(waveform_delta *len_bias / waveform_pulsetime))
+    waveform_pulsepoints = int(waveform_pulsetime / waveform_delta)
+    waveform_offpoints = int(waveform_pulsepoints * (1.0 - waveform_dutycycle))
+    for chan in chans:
+        result_on = np.ndarray(shape=(np.shape(chan)[0],np.shape(chan)[1], waveform_numbiaspoints))
+        result_off= np.ndarray(shape=(np.shape(chan)[0],np.shape(chan)[1], waveform_numbiaspoints))
+        for b in range(waveform_numbiaspoints):
+            start = b * waveform_pulsepoints + waveform_offpoints
+            stop = (b + 1) * waveform_pulsepoints
 
-            for chan in inout_list:
-                print(chan[2] + ' started...')
-                x, y, z = np.shape(f[data_folder][file][chan[2]])
-                b = waveform_numbiaspoints
-                # dgroup = f.require_group('process/' + file + '/' + 'SSPFM_parameters/')
+            var2 = stop - start + 1
+            realstart = int(start + var2 * .25)
+            realstop = int(stop - var2 * .25)
+            result_on[:,:, b] = np.nanmean(chan[:, :, realstart:realstop], axis=2)
+            start = stop
+            stop = stop + waveform_pulsepoints * waveform_dutycycle
 
-                dset_on = f.require_dataset(chan[1] + chan[2] + '_on', (x, y, b), dtype=float)
-                PATH = [chan[0], chan[1], chan[2] + '_on']
-                pt.generic_write(f, path=PATH)
+            var2 = stop - start + 1
+            realstart = int(start + var2 * .25)
+            realstop = int(stop - var2 * .25)
+            result_off[:, :, b] = np.nanmean(chan[:, :, realstart:realstop], axis=2)
+        output.append(result_on)
+        output.append(result_off)
 
-                dset_off = f.require_dataset(chan[1] + chan[2] + '_off', (x, y, b), dtype=float)
-                PATH = [chan[0], chan[1], chan[2] + '_off']
-                pt.generic_write(f, path=PATH)
-
-                for b in range(waveform_numbiaspoints):
-                    start = b * waveform_pulsepoints + waveform_offpoints
-                    stop = (b + 1) * waveform_pulsepoints
-
-                    var2 = stop - start + 1
-                    realstart = int(start + var2 * .25)
-                    realstop = int(stop - var2 * .25)
-                    f[chan[1] + chan[2] + '_on'][:, :, b] = \
-                        np.nanmean(f[chan[0]][:, :, realstart:realstop], axis=2)
-
-                    start = stop
-                    stop = stop + waveform_pulsepoints * waveform_dutycycle
-
-                    var2 = stop - start + 1
-                    realstart = int(start + var2 * .25)
-                    realstop = int(stop - var2 * .25)
-                    f[chan[1] + chan[2] + '_off'][:, :, b] = \
-                        np.nanmean(f[chan[0]][:, :, realstart:realstop], axis=2)
-                print(chan[2] + ' done.')
+    output = tuple(output)
+    return output
 
 
 def calc_hyst_params(bias, phase):
@@ -169,12 +150,12 @@ def PFM_params_map(bias, phase):
 def negative_(filename, data_folder='datasets', selection=None, criteria=0):
     # Trivial sample function to show how to use proc_tools
     # Processes an array determine negatives of all values
-    in_path_list = pt.path_inputs(filename, data_folder, selection, criteria)
-    out_folder_locations = pt.find_output_folder_location(filename, 'negative', in_path_list)
+    in_path_list = core.path_inputs(filename, data_folder, selection, criteria)
+    out_folder_locations = core.find_output_folder_location(filename, 'negative', in_path_list)
     with h5py.File(filename, "a") as f:
         for i in range(len(in_path_list)):
             neg = -np.array(f[in_path_list[i]])
-            pt.write_output_f(f, neg, out_folder_locations[i], in_path_list[i])
+            core.write_output_f(f, neg, out_folder_locations[i], in_path_list[i])
 
 # def negative_(filename, data_folder='datasets', selection = None, selection_depth = 0):
 #    # Trivial sample function to show how to use proc_tools
