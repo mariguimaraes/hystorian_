@@ -2,9 +2,8 @@ from . import core
 import numpy as np
 import h5py
 
-def extract_hist_(filename, bias_chan, channels, channels_name, phase=1):
+def extract_hist_(filename, bias_chan, channels_name, phase=1):
     with h5py.File(filename, 'a') as f:
-
         notedict = {}
         for file in f['metadata'].keys():
             for k in f['metadata'][file]:
@@ -14,6 +13,9 @@ def extract_hist_(filename, bias_chan, channels, channels_name, phase=1):
                 except:
                     pass
 
+        #Extracting bias_length
+        len_bias = len(f[bias_chan][1, 1, :])
+
     waveform_pulsetime = float(notedict["ARDoIVArg3"])
     if 'ARDoIVArg4' in notedict.keys():
         waveform_dutycycle = float(notedict["ARDoIVArg4"])
@@ -21,15 +23,14 @@ def extract_hist_(filename, bias_chan, channels, channels_name, phase=1):
         waveform_dutycycle = 0.5
 
     waveform_delta = 1 / float(notedict["NumPtsPerSec"])
-    waveform_numbiaspoints = int(np.floor(waveform_delta * len(bias_chan[1, 1, :]) / waveform_pulsetime))
+    waveform_numbiaspoints = int(np.floor(waveform_delta * len_bias / waveform_pulsetime))
     waveform_pulsepoints = int(waveform_pulsetime / waveform_delta)
     waveform_offpoints = int(waveform_pulsepoints * (1.0 - waveform_dutycycle))
 
-    list_output_name=[]
+    list_output_name = []
     for i in channels_name:
         list_output_name.append(i.split('/')[-1] + '_on')
         list_output_name.append(i.split('/')[-1] + '_off')
-    len_bias = len(bias_chan[1, 1, :])
 
     core.m_apply(filename,
                  f_extract_hist,
