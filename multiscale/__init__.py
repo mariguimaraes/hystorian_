@@ -7,6 +7,7 @@ from .io.sxm_files import *
 from .processing import core
 from .processing import ndim
 from .processing import twodim
+from .processing import plot
 
 try:
     import h5py

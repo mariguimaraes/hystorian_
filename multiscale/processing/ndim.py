@@ -2,7 +2,7 @@ from . import core
 import numpy as np
 import h5py
 
-def extract_hist_(filename, bias_chan, channels, channels_name):
+def extract_hist_(filename, bias_chan, channels, channels_name, phase=1):
     with h5py.File(filename, 'a') as f:
 
         notedict = {}
@@ -30,7 +30,7 @@ def extract_hist_(filename, bias_chan, channels, channels_name):
         list_output_name.append(i.split('/')[-1] + '_on')
         list_output_name.append(i.split('/')[-1] + '_off')
     len_bias = len(bias_chan[1, 1, :])
-    print(list_output_name)
+
     core.m_apply(filename,
                  f_extract_hist,
                  in_paths=channels_name,
@@ -40,6 +40,36 @@ def extract_hist_(filename, bias_chan, channels, channels_name):
                  waveform_dutycycle=waveform_dutycycle,
                  waveform_delta=waveform_delta)
 
+    extract_list = []
+    names_list = []
+    with h5py.File(filename, 'a') as f:
+        keys = f['process'].keys()
+        for k in keys:
+            if 'f_extract_hist' in k:
+                extract_list.append(k)
+                name_list = list(f['process/' + k].keys())
+
+    for i in extract_list:
+        for name in name_list:
+
+            input_path = ['process/' + i + '/' + name + '/Bias_on']
+            if phase == 1:
+                input_path.append('process/' + i + '/' + name + '/Phase_off')
+            elif phase == 2:
+                input_path.append('process/' + i + '/' + name + '/Phas2_off')
+            else:
+                print('Wrong input for the phase choice, taking the first phase')
+                input_path.append('process/' + i + '/' + name + '/Phase_off')
+
+            core.m_apply(filename,
+                         PFM_params_map,
+                         in_paths=input_path,
+                         output_names=['coerc_pos',
+                                 'coerc_neg',
+                                 'step_left',
+                                 'step_right',
+                                 'imprint',
+                                 'phase_shift'])
 
 def f_extract_hist(*chans, len_bias, waveform_pulsetime, waveform_dutycycle, waveform_delta):
     output = []
