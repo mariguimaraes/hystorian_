@@ -517,6 +517,24 @@ def find_paths_of_all_subgroups(f, current_path):
     return path_list
 
 
+#   FUNCTION write_output_f
+# Return the root mean square of an array
+#   INPUTS:
+# array: an array of any dimension
+#   OUTPUTS
+# RMS: The root mean square of the array
+# Skewness: measure of the asymmetry of the probability distribution of a real-valued random variable about its mean (Wiki)
+# excess kurtosis : higher kurtosis corresponds to greater extremity of deviations (or outliers) (Wiki)
+
+def rms(array):
+    print(array.size)
+    mu2 = 1/array.size * np.sum((array-np.mean(array))**2)
+    mu3 = 1/array.size * np.sum((array-np.mean(array))**3)
+    mu4 = 1/array.size * np.sum((array-np.mean(array))**4)
+
+    return np.sqrt(mu2), mu3/(mu2**(3.0/2.0)), mu4/mu2**2 - 3
+
+
 #####################################################################################################
 #                                                                                                   #
 #                    THESE FUNCTIONS ARE USEFUL FOR HARDCODING COMPLEX FUNCTIONS                    #
@@ -604,20 +622,3 @@ def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
     dataset = f[out_folder_location][output_name]
     write_generic_attributes(dataset, out_folder_location, in_paths, output_name)
     return dataset
-
-#   FUNCTION write_output_f
-# Return the root mean square of an array
-#   INPUTS:
-# array: an array of any dimension
-#   OUTPUTS
-# RMS: The root mean square of the array
-# Skewness: measure of the asymmetry of the probability distribution of a real-valued random variable about its mean (Wiki)
-# excess kurtosis : higher kurtosis corresponds to greater extremity of deviations (or outliers) (Wiki)
-
-def rms(array):
-    print(array.size)
-    mu2 = 1/array.size * np.sum((array-np.mean(array))**2)
-    mu3 = 1/array.size * np.sum((array-np.mean(array))**3)
-    mu4 = 1/array.size * np.sum((array-np.mean(array))**4)
-
-    return np.sqrt(mu2), mu3/(mu2**(3.0/2.0)), mu4/mu2**2 - 3
