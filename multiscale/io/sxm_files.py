@@ -175,18 +175,3 @@ def sxm2hdf5(filename):
                     for k2 in info.keys():
                         datagrp[key].attrs[k2] = info[k2]
                 continue
-
-                # for key2 in channel_info[indx]:
-            #    datagrp[key].attrs[key2] = channel_info[indx][key2]
-
-
-'''filename = 'B19020D_10um_002.sxm'
-header, info, data = load_sxm(filename)
-print(header)
-print(data.keys())
-
-import matplotlib.pyplot as plt
-
-
-plt.imshow(data['Phase - Trace'])
-plt.show()'''
