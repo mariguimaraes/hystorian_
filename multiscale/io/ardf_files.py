@@ -3,7 +3,7 @@ import struct
 import zlib
 import os
 import h5py
-
+import gc
 
 # ==========================================
 # ARDF conversion
@@ -399,6 +399,7 @@ def ARDF_parse_THMB(fd, thmb_entry):
 
 
 def ardf2hdf5(filename):
+    gc.enable()
     ftoc, ttoc, fd = ARDF_load_file(filename)
 
     # print("======================================")
@@ -480,3 +481,5 @@ def ardf2hdf5(filename):
 
         with h5py.File(filename.split('.')[0] + ".hdf5", "a") as f:
             f["metadata"].create_dataset(filename.split('.')[0], data=metalist)
+        
+    gc.disable()
