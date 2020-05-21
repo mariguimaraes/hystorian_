@@ -144,13 +144,13 @@ def load_sxm(filename):
     print(channel_info)
     print(header.keys())
     if ":Scan>pixels/line:" in header.keys():
-        channel_data = get_channels(channel_info, fd, data_start_pos, int(header[":Scan>pixels/line:"]),
-                                    int(header[":Scan>lines:"]))
+        channel_data = get_channels(channel_info, fd, data_start_pos, int(header[":Scan>lines:"]),
+                                    int(header[":Scan>pixels/line:"]))
     else:
         px = header[':SCAN_PIXELS:'].split()[0]
         ln = header[':SCAN_PIXELS:'].split()[1]
-        channel_data = get_channels(channel_info, fd, data_start_pos, int(px),
-                                    int(ln))
+        channel_data = get_channels(channel_info, fd, data_start_pos, int(ln),
+                                    int(px))
 
     return [header, channel_info, channel_data]
 
