@@ -21,6 +21,15 @@ be called using m_, l_, or e_apply.
     interpolated_features      : interpolates features on switchmap or switchmap-like object
     find_isolines              : find isolines on switchmap or switchmap-like object
     differentiate              : finds derivatives of image
+    crop                       : crops outer rows and columns that contain a constant value
+    uncrop_to_multiple         : adds outer rows and columns to a multiple of a given size
+    compress_to_shape          : compresses areas of an array into pixels in a smaller array
+    decompress_to_shape        : attempts to decompress a compressed array to original size
+    sample_fraction            : samples a fraction of an array
+    all_sample_fractions       : generates many samples of an array, of many fractions
+    multi_power_law            : fits a power to steps in an array, from many sample fractions
+    power_law_stats            : determines the major statistics from the power law fits
+    power_law_ratios           : compares power law fits with different area fractions
 
 
 FUNCTIONS THAT ARE HARDCODED

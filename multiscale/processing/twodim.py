@@ -1670,7 +1670,7 @@ def find_isolines (switchmap, set_midpoints = True):
     return isolines
 
 
-#   FUNCTION differentiate_
+#   FUNCTION differentiate
 # Differentiates an image. Creates files corresponding to the magnitude, of the derivative and
 # optionally, derivatives along both axis separately.
 #   INPUTS:
@@ -1694,3 +1694,517 @@ def differentiate(image, return_directions=True):
             result.append(pt.hdf5_dict(deriv[i], dimension=[i]))
         result = tuple(result)
     return result
+
+
+#   FUNCTION crop
+# Crops first and last rows and columns to remove regions without any meaningful data. The columns
+# that are removed are defined by that in background
+#   INPUTS:
+# array: array to be cropped
+# background (default: 0): value of background data that can be cropped out
+#   OUTPUTS
+# cropped_array: the array after being cropped
+
+def crop(array, background=0):
+    empty_rows = []
+    for i in range(np.shape(array)[0]):
+        if len(set(array[i])) == 1:
+            if np.isnan(background):
+                if np.isnan(array[i,0]):
+                    empty_rows.append(i)
+            else:
+                if array[i,0] == background:
+                    empty_rows.append(i)
+    empty_cols = []
+    for j in range(np.shape(array)[1]):
+        if len(set(array[:,j])) == 1:
+            if np.isnan(background):
+                if np.isnan(array[0,j]):
+                    empty_cols.append(j)
+            else:
+                if array[0,j] == background:
+                    empty_cols.append(j)
+
+    starting_row = 0
+    ending_row = np.shape(array)[0]
+    starting_col = 0
+    ending_col = np.shape(array)[1]
+    if empty_rows:
+        if empty_rows[0]==0:
+            starting_row = starting_row+1
+            for i in empty_rows:
+                if i==starting_row:
+                    starting_row = starting_row+1
+        if empty_rows[-1]==np.shape(array)[0]-1:
+            ending_row = ending_row-1
+            for i in reversed(empty_rows):
+                if i==ending_row:
+                    ending_row = ending_row-1
+    if empty_cols:
+        if empty_cols[0]==0:
+            starting_col = starting_col+1
+            for j in empty_cols:
+                if j==starting_col:
+                    starting_col = starting_col+1
+        if empty_cols[-1]==np.shape(array)[1]-1:
+            ending_col = ending_col-1
+            for j in reversed(empty_cols):
+                if j==ending_col:
+                    ending_col = ending_col-1
+    cropped_array = array[starting_row:ending_row, starting_col:ending_col]
+    return cropped_array
+
+
+#   FUNCTION uncrop_to_multiple
+# Adds additional columns and rows around an array. The values added are defined by background,
+# while the amount of rows and columns are defined by an array. The cols and rows are added equally
+# in all directions, preferentially to the right/bottom if an odd amount are added
+#   INPUTS:
+# array: array to be uncropped
+# multiple (default: [50,50]): list of dimensions that the data will be uncropped by. Data will be
+#     uncropped to the the next multiple of the values provided here. ie, given the default value,
+#     rows and cols will be extended such that there are 60, 120, 180, ... or etc. rows or cols
+# background (default: 0): the values granted to the uncropped regions
+#   OUTPUTS
+# extended_array: array after it is uncropped
+
+def uncrop_to_multiple(array, multiple=[50,50], background=0):
+    extended_rows = int(np.ceil(np.shape(array)[0]/multiple[0])*multiple[0])
+    extra_rows = extended_rows-np.shape(array)[0]
+    offset_rows = int(np.floor(extra_rows/2))
+    extended_cols = int(np.ceil(np.shape(array)[1]/multiple[1])*multiple[1])
+    extra_cols = extended_cols-np.shape(array)[1]
+    offset_cols = int(np.floor(extra_cols/2))
+    extended_array = np.zeros([extended_rows,extended_cols])+background
+    extended_array[offset_rows:np.shape(array)[0]+offset_rows,
+                   offset_cols:np.shape(array)[1]+offset_cols] = array
+    return extended_array
+
+
+#   FUNCTION compress_to_shape
+# Compresses an array to a smaller size. This takes rectangular sections of the original array,
+# takes the average of it, and averages it into a single pixel. The size of the compressed shape is
+# defined by the shape argument. If the initial array is not a direct multiple of the desired shape,
+# the function will call uncrop_to_multiple to extend it and ensure clean rectangles.
+#   INPUTS:
+# array: array to be compressed
+# shape (default: [50,50]): dimensions of the output array.
+#   OUTPUTS
+# compressed_array: array after it is compressed
+
+def compress_to_shape(array, shape=[50,50]):
+    compressed_array = np.zeros(shape)
+    extended_array = uncrop_to_multiple(array, shape)
+    row_compression = int(np.shape(extended_array)[0]/shape[0])
+    col_compression = int(np.shape(extended_array)[1]/shape[1])
+    for i in range(np.shape(compressed_array)[0]):
+        for j in range(np.shape(compressed_array)[1]):
+            compressed_array[i,j] = np.average(extended_array[i*row_compression:
+                                                              (i+1)*row_compression,
+                                                              j*col_compression:
+                                                              (j+1)*col_compression])
+    return compressed_array
+
+
+#   FUNCTION decompress_to_shape
+# Decompresses a smaller array into a larger array. Each pixel of the initial, smaller array is
+# expanded into a larger rectangle of pixels, with the same value, on the larger array.
+#   INPUTS:
+# array: array to be decompressed
+# shape: shape of the final, larger array
+#   OUTPUTS
+# decompressed_array: array after it is decompressed
+
+def decompress_to_shape(array, shape):
+    decompressed_array = np.zeros(shape)
+    row_compression = np.ceil(shape[0]/np.shape(array)[0])
+    col_compression = np.ceil(shape[1]/np.shape(array)[1])
+    for i in range(np.shape(decompressed_array)[0]):
+        for j in range(np.shape(decompressed_array)[1]):
+            decompressed_array[i,j] = array[int(np.floor(i/row_compression)),
+                                            int(np.floor(j/col_compression))]
+    return decompressed_array
+    
+
+#   FUNCTION sample_fraction
+# Randomly samples a contiguous block and small fraction of a larger array. Works by taking a small
+# point (or smaller shape) and randomly expanding in all directions. To ensure uniformity, a
+# 'supershape' is constructed, which takes the initial array and adds 5 pixels on each direction
+# to reduce edge effects during sampling.
+#   INPUTS:
+# array: array to be sampled
+# shape_fraction (default: 0.1): the fraction of the array that is actually sampled. eg., by
+#     default, an area of 0.1 will return a block of area 10% of the overall array
+# start_shape (default: None): A shape used to start the sample. Allows sample_fraction to feed into
+#     itself and generate larger samples from smaller ones.
+#   OUTPUTS
+# curr_shape: the sample generated from the main array
+
+def sample_fraction(array, shape_fraction=0.1, start_shape=None):
+    basic_array = np.zeros_like(array)
+    total_shapes = 300000 
+    target_shape_size = shape_fraction*np.sum(array)
+
+    #Create Coordinate List:
+    coord_list = []
+    coord_list_index_array = np.zeros_like(basic_array)
+    index=0
+    for i in range(np.shape(basic_array)[0]):
+        for j in range(np.shape(basic_array)[1]):
+            coord_list.append([i,j])
+            coord_list_index_array[i,j] = index
+            index = index+1
+    neighbour_array = np.zeros_like(basic_array)
+    neighbour_scaling = np.zeros_like(basic_array)+4
+    
+    if start_shape is None:
+        #Pick First Point
+        np.random.seed()
+        init_i, init_j = coord_list[int(np.random.choice(coord_list_index_array.flatten()))]
+        new_i = init_i
+        new_j = init_j
+        curr_shape = np.zeros_like(basic_array)
+        curr_shape[init_i, init_j]=1
+    else:
+        start_shape = np.copy(start_shape)
+        new_i = None
+        new_j = None
+        curr_shape = start_shape
+        expanded_point = np.zeros_like(basic_array)
+        for i in range(np.shape(basic_array)[0]):
+            for j in range(np.shape(basic_array)[1]):
+                if curr_shape[i,j]!= 0:
+                    if i != 0:
+                        if i == 1:
+                            expanded_point[i-1,j] = expanded_point[i-1,j]+2
+                        else:
+                            expanded_point[i-1,j] = expanded_point[i-1,j]+2
+                    if j != 0:
+                        if j == 1:
+                            expanded_point[i,j-1] = expanded_point[i,j-1]+2
+                        else:
+                            expanded_point[i,j-1] = expanded_point[i,j-1]+2
+                    if i != np.shape(curr_shape)[0]-1:
+                        if i == np.shape(curr_shape)[0]-2:
+                            expanded_point[i+1,j] = expanded_point[i+1,j]+2
+                        else:
+                            expanded_point[i+1,j] = expanded_point[i+1,j]+2
+                    if j != np.shape(curr_shape)[1]-1:
+                        if j == np.shape(curr_shape)[1]-2:
+                            expanded_point[i,j+1] = expanded_point[i,j+1]+2
+                        else:
+                            expanded_point[i,j+1] = expanded_point[i,j+1]+2
+                            
+    curr_shape_size = np.sum(curr_shape*array)
+    while curr_shape_size < target_shape_size:
+        #Find possible growths from that point
+        last_point = np.zeros_like(basic_array)
+        last_point[new_i, new_j]=1
+        #Use mirror boundary conditions
+        if new_i != None:
+            expanded_point = np.copy(last_point)
+            if new_i > 1:
+                expanded_point[new_i-1, new_j]=1
+            elif new_i == 1:
+                expanded_point[new_i-1, new_j]=2
+            if new_j > 1:
+                expanded_point[new_i, new_j-1]=1
+            elif new_j == 1:
+                expanded_point[new_i, new_j-1]=2
+            if new_i < np.shape(basic_array)[0]-2:
+                expanded_point[new_i+1, new_j]=1
+            elif new_i == np.shape(basic_array)[0]-2:
+                expanded_point[new_i+1, new_j]=2
+            if new_j < np.shape(basic_array)[1]-2:
+                expanded_point[new_i, new_j+1]=1
+            elif new_j == np.shape(basic_array)[1]-2:
+                expanded_point[new_i, new_j+1]=2
+        neighbour_array = neighbour_array+(expanded_point/neighbour_scaling)
+        neighbour_array = neighbour_array*(1-curr_shape)
+
+        #Grow from one of the growth coords
+        thresh=0.75
+        if np.any(neighbour_array>=thresh):
+            #Grow if too surrounded
+            total_to_change = np.sum(neighbour_array>=thresh)
+            #print(total_to_change)
+            if total_to_change>1:
+                growth_locations = np.where(neighbour_array>=thresh)
+                rand_num=np.random.randint(0, len(growth_locations[0]))
+                new_i = growth_locations[0][rand_num]
+                new_j = growth_locations[1][rand_num]
+            else:
+                new_coords = np.where(neighbour_array>=thresh)
+                new_i = new_coords[0]
+                new_j = new_coords[1]
+        else:
+            #Randomly grow:
+            probability_array = np.copy(neighbour_array)
+            normalise_factor = np.sum(probability_array)
+            new_i,new_j=coord_list[int(np.random.choice(coord_list_index_array.flatten(),
+                                                p=(probability_array/normalise_factor).flatten()))]
+        curr_shape[new_i, new_j]=1
+        curr_shape_size = np.sum(curr_shape*array)
+        #Should make it only consider largest area?
+    return curr_shape
+
+
+#   FUNCTION MLE
+# Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
+# estimation
+#   INPUTS:
+# x_list: list of events/avalanches
+# show (default: False): shows the MLE plot
+#   OUTPUTS
+# x0_list: list of all x0 (cutoffs)
+# a_list: list of all a (scaling parameters)
+
+def MLE(x_list, show=False):
+    x_arr = np.array(x_list)
+    max_x0_check = round(max(x_list)/2)
+    x0_arr=np.linspace(1, max_x0_check, max_x0_check)
+    x0_list = list(x0_arr)
+    a_list = []
+    for x0 in x0_arr:
+        a_est = 1+(len(x_arr[x_arr>x0])/(np.sum(np.log(x_arr[x_arr>x0]/(x0)))))
+        a_list.append(a_est)
+    if show:
+        plt.semilogx(x0_list, a_list)
+        plt.ylabel('a')
+        plt.xlabel('x0')
+        plt.title('MLE')
+        plt.show()
+        plt.close()
+    return x0_list, a_list
+
+
+#   FUNCTION KS_statistic
+# Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
+# estimation
+#   INPUTS:
+# x_list: list of events/avalanches
+# show (default: False): shows the MLE plot
+#   OUTPUTS
+# x0_list: list of all x0 (cutoffs)
+# a_list: list of all a (scaling parameters)
+
+def KS_statistic(x_list, x0_list, a_list, show=False):
+    x_ks_all = np.array(sorted(x_list))
+    D_list = []
+    for i in range(len(x0_list)):
+        x0_est = x0_list[i]
+        a_est = a_list[i]
+        x_ks = x_ks_all[x_ks_all >= x0_est]
+        S_ks = np.linspace(0, 1, len(x_ks))
+        P_ks = []
+        for x in x_ks:
+            P_ks.append(power_law_CDF(x, a_est, x0_est))
+        #P_ks = np.array(P_ks)
+        D = np.max(abs(P_ks-S_ks))
+        D_list.append(D)
+    if show:
+        plt.semilogx(x0_list, D_list)
+        plt.title('KS Statistic with varying x0')
+        plt.ylabel('D')
+        plt.xlabel('x0')
+        plt.show()
+        plt.close()
+    return D_list
+
+
+#   FUNCTION power_law_CDF
+# Returns the CDF of a power law fit, given an event size, scaling parameter, and power law cutoff
+#   INPUTS:
+# x: an event size to find the cumulative probability of
+# a: scaling parameter
+# x0: power law cutoff
+#   OUTPUTS
+# P: cumulative probability
+
+def power_law_CDF(x, a, x0):
+    P = 1-((x/x0)**(1-a))
+    return P
+
+
+#   FUNCTION power_law_params
+# Generates important parameters of a power law fit, given MLE and KS results
+#   INPUTS:
+# x_list: list of events
+# x0_list: list of minimum cutoffs
+# a_list: list of scaling parameters
+# D_list: list of KS statistics
+# max_x0 (default: 20): maximum value of x0 that will be considered
+#   OUTPUTS
+# P: parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic for
+#     optimal cutoff and scaling parameter; number of events above cutoff; total number of events;
+#     average event size considered; largest event size considered
+
+def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
+    x_array = np.array(x_list)
+    min_D_arg = np.argmin(D_list[0:max_x0])
+    optimal_x0 = x0_list[min_D_arg]
+    optimal_a = a_list[min_D_arg]
+    min_D = np.min(D_list)
+    valid_n = sum(np.array(x_list)>optimal_x0)
+    total_n = len(x_list)
+    mean_x_size = np.mean(x_array[x_array>optimal_x0])
+    max_x_size = np.max(x_array)
+    total_x_size_thresh = np.sum(x_array[x_array>optimal_x0])
+    total_x_size = np.sum(x_array)
+    P = [optimal_x0, optimal_a, min_D, valid_n, total_n, mean_x_size, max_x_size,
+         total_x_size_thresh, total_x_size]
+    return P
+
+
+#   FUNCTION power_law_params_force_fit
+# Generates important parameters of a power law fit, given the scaling parameters and minimum cutoff
+#   INPUTS:
+# x_list: list of events
+# optimal_x0: minimum cutoff used
+# optimal_a: scaling parameter used
+#   OUTPUTS
+# P: parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic for
+#     optimal cutoff and scalign parameter; number of events above cutoff; total number of events;
+#     average event size considered; largest event size considered
+
+def power_law_params_force_fit(x_list, optimal_x0, optimal_a):
+    x_array = np.array(x_list)
+    x_ks_all = np.array(sorted(x_list))
+    x_ks = x_ks_all[x_ks_all >= optimal_x0]
+    S_ks = np.linspace(0, 1, len(x_ks))
+    P_ks = []
+    for x in x_ks:
+        P_ks.append(power_law_CDF(x, optimal_a, optimal_x0))
+    P_ks = np.array(P_ks)
+    D = np.max(abs(P_ks-S_ks))
+    valid_n = sum(np.array(x_list)>optimal_x0)
+    total_n = len(x_list)
+    mean_x_size = np.mean(x_array[x_array>optimal_x0])
+    max_x_size = np.max(x_array)
+    total_x_size_thresh = np.sum(x_array[x_array>optimal_x0])
+    total_x_size = np.sum(x_array)
+    P = [optimal_x0, optimal_a, D, valid_n, total_n, mean_x_size, max_x_size,
+         total_x_size_thresh, total_x_size]
+    return P
+
+
+#   FUNCTION all_sample_fractions
+# Generates a 4D array of several samples; the first axis allows choice of the fraction of each
+# sampling; the second axis allows for each iteration of this fraction. The remaining two axes
+# are the 2D array of each individual sample.
+#   INPUTS:
+# array: the array to be sampled
+# iterations (default: 100): number of samples to be taken of for each fraction
+# fractions (default: [0.1, 0.15, 0.2, 0.25]): fractions to be sampled of the array
+# compression (default: [50,50]): the size to which the array is compressed to during sampling
+# background (default: np.nan): values of background areas that may be removed during compression
+#   OUTPUTS
+# sample_fractions_all_fractions: 4D array describing all samples extracted
+
+def all_sample_fractions(array, iterations=100, fractions=[0.1,0.15,0.2,0.25], compression=[50,50],
+                         background=np.nan):
+    #Compress array and generate "supershape" template from which subshapes are drawn
+    if np.isnan(background):
+        bool_array = ~np.isnan(array)
+    else:
+        bool_array = ~(array==background)
+    cropped_array = crop(bool_array)
+    expanded_array = uncrop_to_multiple(cropped_array, compression)
+    compressed_array = compress_to_shape(expanded_array, compression)
+    array_supershape = uncrop_to_multiple(compressed_array, [compression[0]+10, compression[1]+10])
+    
+    #Generate first generation of all shapes
+    if type(fractions)!= list:
+        fractions = [fractions]
+    sample_fractions_all_fractions = []
+    sample_fractions_one_fraction = []
+    for sample_count in range(iterations):
+        shape = sample_fraction(array_supershape, fractions[0]).astype(bool)
+        sample_fractions_one_fraction.append(shape)
+       
+    #If multiple fractions are provides, generate successive generations
+    if len(fractions)>1:
+        for i in range(1,len(fractions)):
+            sample_fractions_all_fractions.append(sample_fractions_one_fraction)
+            sample_fractions_one_fraction = []
+            for sample_count in range(iterations):
+                shape = sample_fraction(array_supershape, fractions[i], 
+                                        sample_fractions_all_fractions[i-1]
+                                        [sample_count]).astype(bool)
+                sample_fractions_one_fraction.append(shape)
+        sample_fractions_all_fractions.append(sample_fractions_one_fraction)
+    else:
+        sample_fractions_all_fractions = sample_fractions_one_fraction
+        
+    sample_fractions_all_fractions = np.array(sample_fractions_all_fractions)
+    #axes = [(fraction_num)][sample_num][y][x]
+    return sample_fractions_all_fractions
+
+
+#   FUNCTION multi_power_law
+# Applies a power law fit to a switchmap (or similar), multiple times according to samples extracted
+# from sample_fractions, and extracts parameters
+#   INPUTS:
+# switchmap: the array to be sampled
+# sample_fractions: 4D array showing all samples, extracted from function all_sample_fractions
+# compression (default: [50,50]): the size to which the array is compressed to during sampling
+# background (default: np.nan): values of background areas that may be removed during compression
+#   OUTPUTS
+# all_params: parameters in an 3D array. First axis represents each fraction value provided by
+#     sample_fractions. Second axis represents data for each particular sample. What remains is a 1D
+#     array, which contains the following parameters in order: optimal cutoff; scaling parameter;
+#     KS statistic for the optimal cutoff and scaling parameter; number of events above cutoff;
+#     total number of events; average event size considered; largest event size considered
+
+def multi_power_law(switchmap, sample_fractions, compression=[50,50], background=np.nan):
+    all_params = np.zeros([np.shape(sample_fractions)[0], np.shape(sample_fractions)[1],9])
+
+    #Recenter initial array in same manner as supershape
+    if np.isnan(background):
+        bool_array = ~np.isnan(switchmap)
+    else:
+        bool_array = ~(array==background)
+    cropped_array = crop(bool_array)
+    expanded_array = uncrop_to_multiple(cropped_array, compression)
+    compressed_array = compress_to_shape(expanded_array, compression)
+    array_supershape = uncrop_to_multiple(compressed_array, [compression[0]+10, compression[1]+10])
+    copied_array = np.copy(switchmap)
+    copied_array[~bool_array]=0
+    scaled_array = uncrop_to_multiple(crop(copied_array*bool_array),compression)
+            
+    for fraction_num in range(np.shape(sample_fractions)[0]):
+        for shape_num in range(np.shape(sample_fractions)[1]):
+            print(shape_num)
+            shape = sample_fractions[fraction_num][shape_num]
+            
+            #Prepare the samples of the switchmap
+            avalanche_size_list = []
+            sample=decompress_to_shape(np.ceil(shape*array_supershape)[5:np.shape(shape)[0]-5,
+                                                                       5:np.shape(shape)[1]-5],
+                                       np.shape(expanded_array))
+            sample=sample*scaled_array
+
+            #Find Avalanche Sizes
+            for i in range(1,int(np.max(sample)+1)):
+                avalanche_size = np.sum(sample==i)
+                if avalanche_size>0:
+                    avalanche_size_list.append(avalanche_size)
+            
+            if fraction_num == 0:
+                #Using MLE, generate list of x0s and as
+                x0_list, a_list = MLE(avalanche_size_list)
+
+                #Find KS_Statistic
+                D_list = KS_statistic(avalanche_size_list, x0_list, a_list)
+
+                #Report Parameters
+                params = power_law_params(avalanche_size_list, x0_list, a_list, D_list, max_x0=20)
+                
+            else:
+                optimal_x0 = all_params[0, shape_num, 0]
+                optimal_a = all_params[0, shape_num, 1]
+                params = power_law_params_force_fit(avalanche_size_list, optimal_x0, optimal_a)
+            #optimal_x0, optimal_a, min_D, valid_n, total_n, mean_x_size, max_x_size,
+            #   total_x_size_thresh, total_x_size
+            all_params[fraction_num, shape_num] = params
+    return all_params
