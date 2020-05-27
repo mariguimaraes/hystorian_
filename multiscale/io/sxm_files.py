@@ -100,7 +100,7 @@ def parse_channel_info(header):
     return channels
 
 
-def get_channels(channel_info, fd, data_start_pos, pixels_x, pixels_y):
+def get_channels(channel_info,orientation, fd, data_start_pos, pixels_x, pixels_y):
     channel_data = {}
     fd.seek(data_start_pos + 1)
     for c in channel_info:
@@ -108,11 +108,16 @@ def get_channels(channel_info, fd, data_start_pos, pixels_x, pixels_y):
             trace_data = np.reshape(
                 np.array(struct.unpack(">" + str(pixels_x * pixels_y) + "f", fd.read(4 * pixels_x * pixels_y))),
                 (pixels_x, pixels_y))
+            if orientation == 'up':
+                trace_data = np.flip(trace_data, axis=0)
             channel_data[c["Full Name"] + " - Trace"] = trace_data
+
             retrace_data = np.reshape(
                 np.array(struct.unpack(">" + str(pixels_x * pixels_y) + "f", fd.read(4 * pixels_x * pixels_y))),
                 (pixels_x, pixels_y))
-            channel_data[c["Full Name"] + " - Retrace"] = retrace_data
+            if orientation == 'up':
+                retrace_data = np.flip(retrace_data, axis=0)
+            channel_data[c["Full Name"] + " - Retrace"] = np.flip(retrace_data, axis=1)
         else:
             debug_print_info("Scan direction is not 'both'. Assuming single trace/retrace acquisition...")
             trace_data = np.reshape(
@@ -141,15 +146,16 @@ def load_sxm(filename):
 
     header = parse_header(header_bytes)
     channel_info = parse_channel_info(header)
-    print(channel_info)
-    print(header.keys())
+    # print(channel_info)
+    # print(header.keys())
+    orientation=header[':SCAN_DIR:']
     if ":Scan>pixels/line:" in header.keys():
-        channel_data = get_channels(channel_info, fd, data_start_pos, int(header[":Scan>lines:"]),
+        channel_data = get_channels(channel_info, orientation, fd, data_start_pos, int(header[":Scan>lines:"]),
                                     int(header[":Scan>pixels/line:"]))
     else:
         px = header[':SCAN_PIXELS:'].split()[0]
         ln = header[':SCAN_PIXELS:'].split()[1]
-        channel_data = get_channels(channel_info, fd, data_start_pos, int(ln),
+        channel_data = get_channels(channel_info, orientation, fd, data_start_pos, int(ln),
                                     int(px))
 
     return [header, channel_info, channel_data]
