@@ -517,14 +517,16 @@ def find_paths_of_all_subgroups(f, current_path):
     return path_list
 
 
-#   FUNCTION write_output_f
+#   FUNCTION rms
 # Return the root mean square of an array
 #   INPUTS:
 # array: an array of any dimension
 #   OUTPUTS
 # RMS: The root mean square of the array
-# Skewness: measure of the asymmetry of the probability distribution of a real-valued random variable about its mean (Wiki)
-# excess kurtosis : higher kurtosis corresponds to greater extremity of deviations (or outliers) (Wiki)
+# Skewness: measure of the asymmetry of the probability distribution of a real-valued random variable
+#    about its mean (Wiki)
+# excess kurtosis : higher kurtosis corresponds to greater extremity of deviations (or outliers)
+#    (Wiki)
 
 def rms(array):
     print(array.size)
@@ -534,6 +536,82 @@ def rms(array):
 
     return np.sqrt(mu2), mu3/(mu2**(3.0/2.0)), mu4/mu2**2 - 3
 
+
+# FUNCTION deallocate_hdf5_memory
+# By default, .hdf5 files do not deallocate memory after component datasets or groups are deleted.
+# This function overcomes this issue by 'repacking' the data in a .hdf5 file into a new .hdf5 file.
+# The original file is then deleted and replaced with the new file.
+#   INPUTS:
+# filename: the hdf5 file to have memory deallocated
+# verify (default: True): If true, asks for the verification request.
+#   OUTPUTS:
+# null
+
+def deallocate_hdf5_memory(filename, verify=True):
+    if verify:
+        print('WARNING: The basic process of this function involves:')
+        print('    1) Copying all components of a .hdf5 file into another .hdf5 file,')
+        print('    2) Deleting the original file, and')
+        print('    3) Renaming the new file to the original file.')
+        print('As a result of this deletion-rename process, there is a possibility')
+        print('that files may be lost. It is -strongly- recommended to back up all')
+        print('files before running this function.\n')
+        print('Once all files are backed up, type \'Yes\' to continue.')
+        response = input()
+        if response != 'Yes':
+            print('Invalid Input; Function aborted.')
+        return
+    if '_CleanCopy.hdf5' in filename:
+        raise ValueError('Filename ending in _CleanCopy.hdf5 found. Please remove from folder.')
+    copy_filename = filename.split('.hdf5')[0]+'_CleanCopy.hdf5'
+    with h5py.File(filename, 'a') as f1:
+        with h5py.File(copy_filename, 'a') as f2:
+            for group in f1:
+                f1.copy(group, f2)
+    os.remove(filename)
+    os.rename(copy_filename, filename)
+
+    
+# FUNCTION deallocate_hdf5_memory_of_folder
+# As above, but operates on an entire folder of .hdf5 files.
+#   INPUTS:
+# folder_path: path to folder to have memory deallocated
+# verify (default: True): If true, asks for the verification request.
+#   OUTPUTS:
+# null
+    
+def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
+    os.chdir(folder_path)
+    filelist=glob('*.hdf5')
+    if verify:
+        print('WARNING: The basic process of this function involves:')
+        print('    1) Copying all components of a .hdf5 file into another .hdf5 file,')
+        print('    2) Deleting the original file, and')
+        print('    3) Renaming the new file to the original file.')
+        print('As a result of this deletion-rename process, there is a possibility')
+        print('that files may be lost. It is -strongly- recommended to back up all')
+        print('files before running this function.\n')
+        print('The following .hdf5 files will be repacked to reduce memory:')
+        for filename in filelist:
+            print('    '+filename)
+        print('')
+        print('Once all files are backed up, type \'Yes\' to continue.')
+        response = input()
+        if response != 'Yes':
+            print('Invalid Input; Function aborted.')
+        return
+    for filename in filelist:
+        if '_CleanCopy.hdf5' in filename:
+            raise ValueError('Filename ending in _CleanCopy.hdf5 found. Please remove from folder.')
+    for filename in filelist:
+        copy_filename = filename.split('.hdf5')[0]+'_CleanCopy.hdf5'
+        with h5py.File(filename, 'a') as f1:
+            with h5py.File(copy_filename, 'a') as f2:
+                for group in f1:
+                    f1.copy(group, f2)
+        os.remove(filename)
+        os.rename(copy_filename, filename)
+    
 
 #####################################################################################################
 #                                                                                                   #
