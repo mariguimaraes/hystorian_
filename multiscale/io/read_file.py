@@ -19,36 +19,46 @@ import re
 
 
 def tohdf5(filename):
+    filetype = 'unknown'
     if type(filename) == list:
         merge_hdf5(filename, 'merged_file', erase_file='partial')
     else:
         if filename.split('.')[-1] == 'ibw':
             ibw_files.ibw2hdf5(filename)
+            filetype = 'ibw'
         elif filename.split('.')[-1] == 'xrdml':
             if xrdml_bool:
                 xrdml_files.xrdml2hdf5(filename)
             else:
                 print('xrdml_files was not imported, probably due to the missing xrd_tools package. Please install it.')
+                
+            filetype = 'xrdml'
         elif filename.split('.')[-1] == 'ardf' or filename.split('.')[-1] == 'ARDF':
             ardf_files.ardf2hdf5(filename)
+            filetype = 'ardf'
         elif filename.split('.')[-1] == 'sxm':
             sxm_files.sxm2hdf5(filename)
+            filetype = 'sxm'
         elif filename.split('.')[-1] == 'gsf':
             gsf_files.gsf2hdf5(filename)
+            filetype = 'gsf'
         elif filename.split('.')[-1] == 'csv':
             csv_files.csv2hdf5(filename)
+            filetype = 'csv'
         elif filename.split('.')[-1] == 'jpg' or filename.split('.')[-1] == 'png' or filename.split('.')[-1] == 'jpeg' \
                 or filename.split('.')[-1] == 'bmp':
             img_files.image2hdf5(filename)
+            filetype = 'jpg'
         elif re.match('\d{3}', filename.split('.')[-1]) is not None:
             try:
                 nanoscope_files.nanoscope2hdf5(filename)
             except:
                 print('Your file is ending with three digits, but is not a Nanoscope file, please change the '
-                      'extension to the correct one')
+                      'extension to the correct one') 
+            filetype = 'nanoscope'
         else:
             print('file type not yet supported')
-
+    return filetype
 
 def merge_hdf5(filelist, combined_name, erase_file='partial'):
     i = 0
@@ -69,8 +79,11 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
             if filename.split('.')[-1] != 'hdf5':
                 if not (filename.split('.')[0] + '.hdf5' in filelist):
                     try:
-                        tohdf5(filename)
-                        filename = filename.split('.')[0] + '.hdf5'
+                        filetype = tohdf5(filename)
+                        if filetype == 'nanoscope':
+                            filename = filename.replace('.', '_') + ".hdf5"
+                        else:
+                            filename = filename.split('.')[0] + '.hdf5'
                         temporary = True
                     except:
                         print('Warning: \'' + filename + '\' as impossible to convert. File has been ignored.')

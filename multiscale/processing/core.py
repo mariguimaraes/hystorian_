@@ -500,16 +500,21 @@ def intermediate_plot(data, condition='', plotlist=[], text='Intermediate Plot',
 
 # FUNCTION find_paths_of_all_subgroups
 # Recursively determines list of paths for all datafiles in current_path, as well as datafiles in
-# all  subfolders (and sub-subfolders and...) of current path
+# all subfolders (and sub-subfolders and...) of current path. If no path given, will find all 
+# subfolders in entire file.
 #   INPUTS:
 # f: open hdf5 file
-# current_path: current group searched
+# current_path (default: ''): current group searched
 #   OUTPUTS:
 # path_list: list of paths to datafiles
 
-def find_paths_of_all_subgroups(f, current_path):
+def find_paths_of_all_subgroups(f, current_path=''):
     path_list = []
-    for sub_group in f[current_path]:
+    if current_path=='':
+        curr_group = f
+    else:
+        curr_group = f[current_path]
+    for sub_group in curr_group:
         if isinstance(f[current_path + '/' + sub_group], h5py.Group):
             path_list.extend(find_paths_of_all_subgroups(f, current_path + '/' + sub_group))
         elif isinstance(f[current_path + '/' + sub_group], h5py.Dataset):

@@ -2172,7 +2172,8 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
     copied_array[~bool_array]=0
     scaled_array = uncrop_to_multiple(crop(copied_array*bool_array),compression)
             
-    for fraction_num in range(np.shape(sample_fractions)[0]):
+    for fraction_num in reversed(range(np.shape(sample_fractions)[0])):
+    #for fraction_num in (range(np.shape(sample_fractions)[0])):
         for shape_num in range(np.shape(sample_fractions)[1]):
             print(shape_num)
             shape = sample_fractions[fraction_num][shape_num]
@@ -2189,8 +2190,9 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
                 avalanche_size = np.sum(sample==i)
                 if avalanche_size>0:
                     avalanche_size_list.append(avalanche_size)
+            if fraction_num == (np.shape(sample_fractions)[0]-1):
+            #if fraction_num == 0:
             
-            if fraction_num == 0:
                 #Using MLE, generate list of x0s and as
                 x0_list, a_list = MLE(avalanche_size_list)
 
@@ -2201,9 +2203,13 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
                 params = power_law_params(avalanche_size_list, x0_list, a_list, D_list, max_x0=20)
                 
             else:
-                optimal_x0 = all_params[0, shape_num, 0]
-                optimal_a = all_params[0, shape_num, 1]
+                #optimal_x0 = all_params[0, shape_num, 0]
+                #optimal_a = all_params[0, shape_num, 1]
+                optimal_x0 = all_params[np.shape(sample_fractions)[0]-1, shape_num, 0]
+                optimal_a = all_params[np.shape(sample_fractions)[0]-1, shape_num, 1]
                 params = power_law_params_force_fit(avalanche_size_list, optimal_x0, optimal_a)
+                
+                
             #optimal_x0, optimal_a, min_D, valid_n, total_n, mean_x_size, max_x_size,
             #   total_x_size_thresh, total_x_size
             all_params[fraction_num, shape_num] = params
