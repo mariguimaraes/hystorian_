@@ -150,7 +150,11 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                 for key, value in kwargs.items():
                     if value is None:
                         value = 'None'
-                    dataset.attrs[key] = value
+                    try:
+                        dataset.attrs[key] = value
+                    except RuntimeError:
+                        print('Attribute was not able to be saved, probably because the attribute is too large')
+                        dataset.attrs[key] = 'None'
         else:
             print('Error: Unequal amount of outputs and output names')
     return result
