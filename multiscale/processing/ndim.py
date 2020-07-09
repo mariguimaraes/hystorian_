@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
+
 # FUNCTION extract_hist
 ## Split the SSPFM curve into on and off signal.
 ## Function was rewritten to work with m_apply, and to take account a bug into Cypher machine, leading to pulse not
@@ -92,7 +93,6 @@ def PFM_params_map(bias, phase):
     step_right = np.zeros((x, y), dtype=float)
     imprint = np.zeros((x, y), dtype=float)
     phase_shift = np.zeros((x, y), dtype=float)
-    list_values = ['coerc_pos', 'coerc_neg', 'step_left', 'step_right', 'imprint', 'phase_shift']
     for xi in range(x):
         for yi in range(y):
             hyst_matrix = calc_hyst_params(bias[xi, yi, :], phase[xi, yi, :])
@@ -106,7 +106,7 @@ def PFM_params_map(bias, phase):
     return coerc_pos, coerc_neg, step_left, step_right, imprint, phase_shift
 
 
-def gauss_area(x,y):
+def gauss_area(x, y):
     """
     Determine the area created by the polygon formed by x,y using the Gauss's area formula (also called shoelace formula)
 
@@ -129,14 +129,15 @@ def gauss_area(x,y):
         y1 = y[i]
 
         if i < len(x) - 1:
-            x2 = x[i+1]
-            y2 = y[i+1]
+            x2 = x[i + 1]
+            y2 = y[i + 1]
         else:
             x2 = x[0]
             y2 = y[0]
 
-        area = area + x1*y2-x2*y1
-    return np.abs(area/2.0)
+        area = area + x1 * y2 - x2 * y1
+    return np.abs(area / 2.0)
+
 
 # FUNCTION clean_loop
 ## Determine if a SSPFM loop is good or not by calculating the area encompassed by the hysteresis curve and
@@ -194,6 +195,7 @@ def clean_loop(bias, phase, amp, threshold=None, debug=False):
 
     return list_bias, list_phase, list_amp, mask
 
+
 # FUNCTION negative_
 ## Processes an array determine negatives of all values
 ## Trivial sample function to show how to use proc_tools
@@ -214,6 +216,7 @@ def negative_(filename, data_folder='datasets', selection=None, criteria=0):
         for i in range(len(in_path_list)):
             neg = -np.array(f[in_path_list[i]])
             core.write_output_f(f, neg, out_folder_locations[i], in_path_list[i])
+
 
 '''
 def extract_hist_(filename, bias_chan, channels_name, phase=1):

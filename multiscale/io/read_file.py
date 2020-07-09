@@ -17,7 +17,6 @@ import os
 import re
 
 
-
 def tohdf5(filename):
     if type(filename) == list:
         merge_hdf5(filename, 'merged_file', erase_file='partial')

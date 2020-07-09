@@ -3,6 +3,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 import numpy as np
 import h5py
 
+
 #   FUNCTION save_image
 # Saves one .png image to the current directory, or a chosen folder
 #   INPUTS:
@@ -124,6 +125,7 @@ def save_image(data,
     plt.close()
     return
 
+
 #   FUNCTION plot_hysteresis_parameters_
 # Saves one .png image containing the map of the 6 hysteresis parameters : coercive voltage (up and down),
 # step (left and right), imprint and phase shift.
@@ -146,18 +148,17 @@ def save_image(data,
 #   OUTPUTS:
 # null
 
-def plot_hysteresis_parameters_(filename,PATH,
-               size=None,
-               ticks=True,
-               labelsize=16,
-               colorbar=True,
-               show=False,
-               save=True,
-               image_name=None,
-               saving_path='',
-               source_path=None,
-               verbose=False):
-
+def plot_hysteresis_parameters_(filename, PATH,
+                                size=None,
+                                ticks=True,
+                                labelsize=16,
+                                colorbar=True,
+                                show=False,
+                                save=True,
+                                image_name=None,
+                                saving_path='',
+                                source_path=None,
+                                verbose=False):
     print(PATH)
     if size is None:
         fig = plt.figure(figsize=(20, 30))
@@ -169,7 +170,6 @@ def plot_hysteresis_parameters_(filename,PATH,
     else:
         plt.xticks([])
         plt.yticks([])
-
 
     with h5py.File(filename) as f:
         plt.subplot(3, 2, 1)

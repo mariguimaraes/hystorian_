@@ -73,8 +73,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                 filename = filename.split('.')[0] + '.hdf5'
                 print('The file does not have an hdf5 extension. It has been converted.')
             except:
-                print('The given filename does not have an hdf5 extension, and it was not possible' \
-                      'to convert it. Please use an hdf5 file with m_apply')
+                print('The given filename does not have an hdf5 extension, and it was not possible''to convert it. Please use an hdf5 file with m_apply')
 
     # Open hdf5 file to extract data, attributes, and run function
     data_list = []
@@ -87,7 +86,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             data_list.append(np.array(f[path]))
             if prop_attrs is not None:
                 for prop_attr in prop_attrs:
-                    if (prop_attr == 'scale_m_per_px'):
+                    if prop_attr == 'scale_m_per_px':
                         if 'scale (m/px)' in f[path].attrs:
                             prop_attr_keys.append(prop_attr)
                             prop_attr_vals.append(f[path].attrs['scale (m/px)'])
@@ -265,15 +264,13 @@ def path_search(filename, all_input_criteria, repeat=None):
         else:
             if len(set(list_lengths)) != 1:
                 if repeat is None:
-                    print('Input lengths not equal, and repeat not set! Extra files will be' \
-                          'omitted.')
+                    print('Input lengths not equal, and repeat not set! Extra files will be''omitted.')
                 else:
                     largest_list_length = np.max(list_lengths)
                     list_multiples = []
                     for length in list_lengths:
                         if largest_list_length % length != 0:
-                            print('At least one path list length is not a factor of the largest' \
-                                  'path list length. Extra files will be omitted.')
+                            print('At least one path list length is not a factor of the largest''path list length. Extra files will be omitted.')
                         list_multiples.append(largest_list_length // length)
                     if (repeat == 'block') or (repeat == 'b'):
                         for list_num in range(len(list_multiples)):
@@ -532,11 +529,11 @@ def find_paths_of_all_subgroups(f, current_path):
 
 def rms(array):
     print(array.size)
-    mu2 = 1/array.size * np.sum((array-np.mean(array))**2)
-    mu3 = 1/array.size * np.sum((array-np.mean(array))**3)
-    mu4 = 1/array.size * np.sum((array-np.mean(array))**4)
+    mu2 = 1 / array.size * np.sum((array - np.mean(array)) ** 2)
+    mu3 = 1 / array.size * np.sum((array - np.mean(array)) ** 3)
+    mu4 = 1 / array.size * np.sum((array - np.mean(array)) ** 4)
 
-    return np.sqrt(mu2), mu3/(mu2**(3.0/2.0)), mu4/mu2**2 - 3
+    return np.sqrt(mu2), mu3 / (mu2 ** (3.0 / 2.0)), mu4 / mu2 ** 2 - 3
 
 
 #####################################################################################################
@@ -586,8 +583,7 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
                 elif folder_root.split('/', 1)[0] == 'process':
                     folder_centre = folder_root.split('/', 2)[2]
                 else:
-                    print('Error: folder_names should not contain a slash unless a path to either ' \
-                          'datasets or process')
+                    print('Error: folder_names should not contain a slash unless a path to either ''datasets or process')
             else:
                 folder_centre = folder
             out_folder_location = ('process/' + str(operation_number).zfill(3) + '-' + process_name
