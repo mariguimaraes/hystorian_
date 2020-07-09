@@ -15,24 +15,32 @@ from scipy import interpolate
 from skimage.morphology import skeletonize
 from random import randrange
 
-
-#   FUNCTION distortion_params_
-# determine cumulative translation matrices for distortion correction.
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using pt.path_search. Should be
-#     height data to extract parameters from
-# speed (default: 2): int between 1 and 4, which determines speed and accuracy of function. A higher
-#     number is faster, but assumes lower distortion and thus may be incorrect.
-# read_offset (default: False): if set to True, attempts to read dataset for offset attributes to
-#     improve initial guess and thus overall accuracy
-# cumulative (default: False): determines if each image is compared to the previous image (default,
-#      False), or to the original image (True). Output format is identical.
-#   OUTPUTS
-# null
-
 def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
                        cumulative=False):
+    """
+    Determine cumulative translation matrices for distortion correction and directly write it into an hdf5 file
+
+    Parameters
+    ----------
+    filename : str
+        name of hdf5 file containing data
+    all_input_criteria : str
+        criteria to identify paths to source files using pt.path_search. Should be
+        height data to extract parameters from
+    speed : int, optional
+        Value between 1 and 4, which determines speed and accuracy of function. A higher
+        number is faster, but assumes lower distortion and thus may be incorrect. Default value is 2.
+    read_offset : bool, optional
+        If set to True, attempts to read dataset for offset attributes to
+        improve initial guess and thus overall accuracy (default is False).
+    cumulative : bool, optional
+        Determines if each image is compared to the previous image (default,
+        False), or to the original image (True). Output format is identical.
+
+    Returns
+    -------
+        None
+    """
     in_path_list = pt.path_search(filename, all_input_criteria)[0]
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
                                                           in_path_list)
@@ -123,29 +131,45 @@ def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
                                in_path_list[i], clear=False)
 
 
-#   FUNCTION m2px
-# Converts length in metres to a length in pixels
-#   INPUTS:
-# m: length in metres to be converted
-# points: number of lines or points per row
-# scan_size: total length of scan
-#   OUTPUTS:
-# px: converted length in pixels
-
 def m2px(m, points, scan_size):
+    """
+    Converts length in metres to a length in pixels
+
+    Parameters
+    ----------
+    m : int or float
+        length in metres to be converted
+    points : int
+        number of lines or points per row
+    scan_size : int or float
+        total length of scan
+
+    Returns
+    -------
+    px : float
+        converted length in pixels
+    """
     px = m * points / scan_size
     return px
 
 
-#   FUNCTION img2cv
-# Converts image (numpy array, or hdf5 dataset) into cv2
-#   INPUTS:
-# img1: currently used image
-# sigma_cutoff (default: 10): variation used to convert to cv-viable format
-#   OUTPUTS
-# img1: converted image into cv2 valid format
-
 def img2cv(img1, sigma_cutoff=10):
+    """
+    Converts image (numpy array, or hdf5 dataset) into cv2
+
+    Parameters
+    ----------
+    img1 : nparray or hdf5 dataset
+        currently used image
+
+    sigma_cutoff : int, optional
+        variation used to convert to cv-viable format (default : 10)
+
+    Returns
+    -------
+    img1 : nparray or hdf5 dataset
+        converted image into cv2 valid format
+    """
     img1 = img1 - np.min(img1)
     img1 = img1 / np.max(img1)
     tmp1 = sigma_cutoff * np.std(img1)
@@ -153,24 +177,35 @@ def img2cv(img1, sigma_cutoff=10):
     return img1
 
 
-#   FUNCTION generate_transform_xy
-# Determines transformation matrices in x and y coordinates
-#   INPUTS:
-# img: currently used image (in cv2 format) to find transformation array of
-# img_orig: image (in cv2 format) transformation array is based off of
-# tfinit (default: None): base array passed into function
-# offset_guess (default: [0,0]): Array showing initial estimate of distortion, in pixels
-# warp_check_range (default: 10): distance (in pixels) that the function will search to find the
-#     optimal transform matrix. Number of iterations = (warp_check_range+1)**2
-# cumulative (default: False): determines if each image is compared to the previous image (default,
-#      False), or to the original image (True). Output format is identical.
-# cumulative_tform21 (default: np.eye(2,3,dtype=np.float32)): the transformation matrix, only used
-#      if cumulative is switched to True.
-#   OUTPUTS
-# warp_matrix: transformation matrix used to convert img_orig into img
-
 def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_check_range=10,
                           cumulative=False, cumulative_tform21=np.eye(2, 3, dtype=np.float32)):
+    """
+    Determines transformation matrices in x and y coordinates
+
+    Parameters
+    ----------
+    img : cv2
+        Currently used image (in cv2 format) to find transformation array of
+    img_orig : cv2
+        Image (in cv2 format) transformation array is based off of
+    tfinit : array_like or None, optional
+        Base array passed into function
+    offset_guess : list, optional
+        Array showing initial estimate of distortion, in pixels (default: [0,0])
+    warp_check_range : int, optional
+        Distance (in pixels) that the function will search to find the optimal transform matrix.
+        Number of iterations = (warp_check_range+1)**2. (default: 10)
+    cumulative : bool, optional
+        Determines if each image is compared to the previous image (default, False), or to the original image (True).
+        Output format is identical.
+    cumulative_tform21 : ndarray, optional
+        The transformation matrix, only used if cumulative is switched to True. (default: np.eye(2,3,dtype=np.float32))
+
+    Returns
+    -------
+    warp_matrix : ndarray
+        Transformation matrix used to convert img_orig into img
+    """
     # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
