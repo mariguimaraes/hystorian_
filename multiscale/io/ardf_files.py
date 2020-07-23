@@ -5,6 +5,7 @@ import os
 import h5py
 import gc
 
+
 # ==========================================
 # ARDF conversion
 def debug_print(dstr):
@@ -481,5 +482,5 @@ def ardf2hdf5(filename):
 
         with h5py.File(filename.split('.')[0] + ".hdf5", "a") as f:
             f["metadata"].create_dataset(filename.split('.')[0], data=metalist)
-        
+
     gc.disable()

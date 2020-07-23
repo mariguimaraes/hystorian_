@@ -17,7 +17,6 @@ import os
 import re
 
 
-
 def tohdf5(filename):
     filetype = 'unknown'
     if type(filename) == list:
@@ -119,3 +118,18 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                 os.remove(filename)
 
     print(str(i) + '/' + str(len(filelist)) + ' files merged into \'' + combined_name + '.hdf5\'')
+
+    
+def create_hdf5(filename, image):
+    with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
+        typegrp = f.create_group("type")
+        typegrp.create_dataset(filename.split('.')[0], data='image')
+        metadatagrp = f.create_group("metadata")
+        datagrp = f.create_group("datasets/" + filename.split('.')[0])
+        f.create_group("process")
+        label = filename.split('.')[0]
+        datagrp.create_dataset(label, data=image)
+        datagrp[label].attrs['name'] = filename
+        datagrp[label].attrs['shape'] = image.shape
+        datagrp[label].attrs['path'] = ("datasets/" + filename.split('.')[0])
+    print('file successfully converted')

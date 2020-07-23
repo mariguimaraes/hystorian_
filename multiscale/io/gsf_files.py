@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 
+
 def gsf_read(filename):
     '''Read a Gwyddion Simple Field 1.0 file format
     http://gwyddion.net/documentation/user-guide-en/gsf.html
@@ -57,6 +58,7 @@ def gsf_read(filename):
     gsfFile.close()
 
     return metadata, data
+
 
 def gsf2hdf5(filename):
     meta, data = gsf_read(filename)

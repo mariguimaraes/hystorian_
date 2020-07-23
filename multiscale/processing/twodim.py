@@ -16,23 +16,33 @@ from skimage.morphology import skeletonize
 from random import randrange
 
 
-#   FUNCTION distortion_params_
-# determine cumulative translation matrices for distortion correction.
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using pt.path_search. Should be
-#     height data to extract parameters from
-# speed (default: 2): int between 1 and 4, which determines speed and accuracy of function. A higher
-#     number is faster, but assumes lower distortion and thus may be incorrect.
-# read_offset (default: False): if set to True, attempts to read dataset for offset attributes to
-#     improve initial guess and thus overall accuracy
-# cumulative (default: False): determines if each image is compared to the previous image (default,
-#      False), or to the original image (True). Output format is identical.
-#   OUTPUTS
-# null
-
 def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
                        cumulative=False):
+    """
+    Determine cumulative translation matrices for distortion correction and directly write it into
+    an hdf5 file
+
+    Parameters
+    ----------
+    filename : str
+        name of hdf5 file containing data
+    all_input_criteria : str
+        criteria to identify paths to source files using pt.path_search. Should be
+        height data to extract parameters from
+    speed : int, optional
+        Value between 1 and 4, which determines speed and accuracy of function. A higher number is
+        faster, but assumes lower distortion and thus may be incorrect. Default value is 2.
+    read_offset : bool, optional
+        If set to True, attempts to read dataset for offset attributes to
+        improve initial guess and thus overall accuracy (default is False).
+    cumulative : bool, optional
+        Determines if each image is compared to the previous image (default,
+        False), or to the original image (True). Output format is identical.
+
+    Returns
+    -------
+        None
+    """
     in_path_list = pt.path_search(filename, all_input_criteria)[0]
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
                                                           in_path_list)
@@ -123,29 +133,45 @@ def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
                                in_path_list[i], clear=False)
 
 
-#   FUNCTION m2px
-# Converts length in metres to a length in pixels
-#   INPUTS:
-# m: length in metres to be converted
-# points: number of lines or points per row
-# scan_size: total length of scan
-#   OUTPUTS:
-# px: converted length in pixels
-
 def m2px(m, points, scan_size):
+    """
+    Converts length in metres to a length in pixels
+
+    Parameters
+    ----------
+    m : int or float
+        length in metres to be converted
+    points : int
+        number of lines or points per row
+    scan_size : int or float
+        total length of scan
+
+    Returns
+    -------
+    px : float
+        converted length in pixels
+    """
     px = m * points / scan_size
     return px
 
 
-#   FUNCTION img2cv
-# Converts image (numpy array, or hdf5 dataset) into cv2
-#   INPUTS:
-# img1: currently used image
-# sigma_cutoff (default: 10): variation used to convert to cv-viable format
-#   OUTPUTS
-# img1: converted image into cv2 valid format
-
 def img2cv(img1, sigma_cutoff=10):
+    """
+    Converts image (numpy array, or hdf5 dataset) into cv2
+
+    Parameters
+    ----------
+    img1 : nparray or hdf5 dataset
+        currently used image
+
+    sigma_cutoff : int, optional
+        variation used to convert to cv-viable format (default : 10)
+
+    Returns
+    -------
+    img1 : nparray or hdf5 dataset
+        converted image into cv2 valid format
+    """
     img1 = img1 - np.min(img1)
     img1 = img1 / np.max(img1)
     tmp1 = sigma_cutoff * np.std(img1)
@@ -153,24 +179,35 @@ def img2cv(img1, sigma_cutoff=10):
     return img1
 
 
-#   FUNCTION generate_transform_xy
-# Determines transformation matrices in x and y coordinates
-#   INPUTS:
-# img: currently used image (in cv2 format) to find transformation array of
-# img_orig: image (in cv2 format) transformation array is based off of
-# tfinit (default: None): base array passed into function
-# offset_guess (default: [0,0]): Array showing initial estimate of distortion, in pixels
-# warp_check_range (default: 10): distance (in pixels) that the function will search to find the
-#     optimal transform matrix. Number of iterations = (warp_check_range+1)**2
-# cumulative (default: False): determines if each image is compared to the previous image (default,
-#      False), or to the original image (True). Output format is identical.
-# cumulative_tform21 (default: np.eye(2,3,dtype=np.float32)): the transformation matrix, only used
-#      if cumulative is switched to True.
-#   OUTPUTS
-# warp_matrix: transformation matrix used to convert img_orig into img
-
 def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_check_range=10,
                           cumulative=False, cumulative_tform21=np.eye(2, 3, dtype=np.float32)):
+    """
+    Determines transformation matrices in x and y coordinates
+
+    Parameters
+    ----------
+    img : cv2
+        Currently used image (in cv2 format) to find transformation array of
+    img_orig : cv2
+        Image (in cv2 format) transformation array is based off of
+    tfinit : array_like or None, optional
+        Base array passed into function
+    offset_guess : list, optional
+        Array showing initial estimate of distortion, in pixels (default: [0,0])
+    warp_check_range : int, optional
+        Distance (in pixels) that the function will search to find the optimal transform matrix.
+        Number of iterations = (warp_check_range+1)**2. (default: 10)
+    cumulative : bool, optional
+        Determines if each image is compared to the previous image (default, False), or to the original image (True).
+        Output format is identical.
+    cumulative_tform21 : ndarray, optional
+        The transformation matrix, only used if cumulative is switched to True. (default: np.eye(2,3,dtype=np.float32))
+
+    Returns
+    -------
+    warp_matrix : ndarray
+        Transformation matrix used to convert img_orig into img
+    """
     # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
@@ -440,12 +477,12 @@ def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
 #   OUTPUTS
 # array: the entry that has been converted
 
-def normalise(array, new_min = 0, new_max = 1):
-    old_range = np.max(array)-np.min(array)
-    new_range = new_max-new_min
-    array = array-np.min(array)
-    array = array*new_range/old_range
-    array = array+new_min
+def normalise(array, new_min=0, new_max=1):
+    old_range = np.max(array) - np.min(array)
+    new_range = new_max - new_min
+    array = array - np.min(array)
+    array = array * new_range / old_range
+    array = array + new_min
     return array
 
 
@@ -619,11 +656,10 @@ def contour_closure(source, size_threshold=50, type_bool=True):
 #     'clean': Lines found, after filtering to the most common angles
 #   OUTPUTS
 # result: hdf5_dict containing the predicted a-domains, and the binarisation threshold in attributes
-   
-def find_a_domains(amplitude, binarised_phase = None, direction = None, filter_width = 15,
-                   thresh_factor = 2, dilation = 2, erosion = 4, line_threshold = 50,
-                   min_line_length=50, max_line_gap=10, plots = None):
 
+def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width=15,
+                   thresh_factor=2, dilation=2, erosion=4, line_threshold=50,
+                   min_line_length=50, max_line_gap=10, plots=None):
     if binarised_phase is not None:
         domain_wall_filter = create_domain_wall_filter(binarised_phase,
                                                        filter_width=filter_width,
@@ -817,7 +853,7 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
 
 def align_rows(array, mask=None, cols=False):
     if mask is None:
-        mask = 1 + zeros_like(array)
+        mask = 1 + np.zeros_like(array)
     if cols:
         array = np.transpose(array)
         mask = np.transpose(mask)
@@ -1606,9 +1642,9 @@ def fill_blanks(list_of_lists):
 #   OUTPUTS
 # interpolation: interpolated features
 
-def interpolated_features(switchmap):    
+def interpolated_features(switchmap):
     isolines = find_isolines(switchmap)
-    
+
     isoline_y = []
     isoline_x = []
     isoline_z = []
@@ -1634,7 +1670,7 @@ def interpolated_features(switchmap):
 #   OUTPUTS
 # isolines: the key features on the switchmap
 
-def find_isolines (switchmap, set_midpoints = True):
+def find_isolines(switchmap, set_midpoints=True):
     isolines = np.zeros_like(switchmap)
     for i in range(np.shape(switchmap)[0]):
         for j in range(np.shape(switchmap)[1]):
@@ -2214,3 +2250,262 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
             #   total_x_size_thresh, total_x_size
             all_params[fraction_num, shape_num] = params
     return all_params
+
+
+# FUNCTION centre_peak
+# Given a dataset containing a gaussian peak, transforms the data by a linear shift such that the
+# peak is at a given coordinate
+#   INPUTS:
+# x: 2D dataset containing position data in one of the spacial dimensions
+# y: 2D dataset containing position data in one of the spacial dimensions
+# z: 2D dataset containing value at the spacial dimensions defined by x and y
+# theo_x: the x-position of where the peak should be
+# theo_y: the y-position of where the peak should be
+# xc_range (default: []): x-range of data searched for peak. By default, searches entire span
+# yc_range (default: []): y-range of data searched for peak. By default, searches entire span
+# plot_fit (default: False): if set to True, plots the fit
+# plot_name (default: 'fit'): name of output plot if generated
+# plot_axes (default: ['','']): axes labels (x and y) for the output plot
+#   OUTPUTS:
+# xc_fitted: x-coordinate of centre of fitted peak
+# yc_fitted: y-coordinate of centre of fitted peak
+
+def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], plot_fit=False,
+                plot_name = 'fit', plot_axes = ['','']):
+    real_x, real_y = find_peak_position(x, y, z, xc_range, yc_range, plot_fit, plot_name, plot_axes)
+    delta_x = real_x-theo_x
+    delta_y = real_y-theo_y
+    adj_x = x-delta_x
+    adj_y = y-delta_y
+    return adj_x, adj_y
+
+
+# FUNCTION find_peak_position
+# Fits, and optionally plots, 2-dimensional rotated gaussian to 3 sets of 2D arrays
+#   INPUTS:
+# x: 2D dataset containing position data in one of the spacial dimensions
+# y: 2D dataset containing position data in one of the spacial dimensions
+# z: 2D dataset containing value at the spacial dimensions defined by x and y
+# xc_range (default: []): x-range of data searched for peak. By default, searches entire span
+# yc_range (default: []): y-range of data searched for peak. By default, searches entire span
+# plot_fit (default: False): if set to True, plots the fit
+# plot_name (default: 'fit'): name of output plot if generated
+# plot_axes (default: ['','']): axes labels (x and y) for the output plot
+#   OUTPUTS:
+# xc_fitted: x-coordinate of centre of fitted peak
+# yc_fitted: y-coordinate of centre of fitted peak
+
+def find_peak_position(x,y,z, xc_range = [], yc_range = [], plot_fit=False, plot_name = 'fit',
+                       plot_axes = ['','']):
+    if xc_range and yc_range:
+        xc_min = xc_range[0]
+        xc_est = np.mean([xc_range])
+        xc_max = xc_range[1]
+        yc_min = yc_range[0]
+        yc_est = np.mean([yc_range])
+        yc_max = yc_range[1]
+        ilow = 0
+        ihigh = np.shape(y)[0]-1
+        for i in range(np.shape(y)[0]):
+            if all(y[i,:]<yc_min):
+                ilow = i
+            if all(y[i,:]>yc_max):
+                ihigh = i
+        jlow = 0
+        jhigh = np.shape(x)[1]-1
+        for j in range(np.shape(x)[1]):
+            if all(x[:,j]<xc_min):
+                jlow = j
+            if all(x[:,j]>xc_max):
+                jhigh = j
+    else:
+        min_z = np.min(z)
+        max_z = np.max(z)
+        ratio = max_z/min_z
+        threshold = ratio**0.75
+        
+        ijmax = np.argmax(z)
+        imax = int(np.floor(ijmax/np.shape(z)[1]))
+        jmax = ijmax%np.shape(z)[1]
+
+        xc_est = x[imax,jmax]
+        ilow = imax
+        while (z[ilow, jmax] >= z[imax,jmax]/threshold) and ilow > 0:
+            ilow -= 1
+        ihigh = imax
+        while (z[ihigh, jmax] >= z[imax,jmax]/threshold) and ihigh < np.shape(z)[0]-1:
+            ihigh += 1
+        xc_min = np.min([x[ilow, jmax],x[ihigh,jmax]])
+        xc_max = np.max([x[ilow, jmax],x[ihigh,jmax]])
+
+        yc_est = y[imax,jmax]
+        jlow = jmax
+        while (z[imax, jlow] >= z[imax,jmax]/threshold) and jlow > 0:
+            jlow -= 1
+        jhigh = jmax
+        while (z[imax, jhigh] >= z[imax,jmax]/threshold) and jhigh < np.shape(z)[1]-1:
+            jhigh += 1
+        yc_min = np.min([y[imax, jlow],y[imax,jhigh]])
+        yc_max = np.max([y[imax, jlow],y[imax,jhigh]])
+    
+    if ilow > ihigh:
+        ilow, ihigh = ihigh, ilow
+    if jlow > jhigh:
+        jlow, jhigh = jhigh, jlow
+    
+    z0_est = np.min(z[ilow:ihigh, jlow:jhigh])
+    z0_min = z0_est/2
+    z0_max = z0_est*2
+    
+    amp_est = np.max(z[ilow:ihigh, jlow:jhigh])-z0_est
+    amp_min = amp_est/2
+    amp_max = amp_est*2
+    
+    theta_est = 0
+    theta_min = -np.pi
+    theta_max = np.pi
+    
+    w1_est = 0.1
+    w1_min = 0
+    w1_max = 10
+    
+    w2_est = 0.1
+    w2_min = 0
+    w2_max = 10
+    
+    p_est = [amp_est, xc_est, w1_est, yc_est, w2_est, theta_est, z0_est]
+    p_min = [amp_min, xc_min, w1_min, yc_min, w2_min, theta_min, z0_min]
+    p_max = [amp_max, xc_max, w1_max, yc_max, w2_max, theta_max, z0_max]
+    
+    xyz = np.vstack((x.ravel(),y.ravel(),z.ravel()))
+    if xc_range and yc_range:
+        for_deletion = []
+        for i in range(np.shape(xyz)[1]):
+            if ((xyz[0,i] < xc_range[0]) or (xyz[0,i] > xc_range[1]) or
+                    (xyz[1,i] < yc_range[0]) or (xyz[1,i] > yc_range[1])):
+                for_deletion.append(i)
+        xyz = np.delete(xyz, for_deletion, axis=1)
+
+    xy_crop = xyz[0:2]
+    z_crop = xyz[2]
+    
+    popt, pcov = curve_fit(gauss_curve_rotation, xy_crop, z_crop, p0 = p_est,
+                           bounds = [p_min, p_max])
+    xc_fitted = popt[1]
+    yc_fitted = popt[3]
+    theta_fitted = popt[5]
+    
+    if plot_fit:
+        m1 = np.tan(theta_fitted)
+        m2 = np.tan(theta_fitted+np.pi/2)
+        b1 = yc_fitted-m1*xc_fitted
+        b2 = yc_fitted-m2*xc_fitted
+        x_plot = np.array([xc_min, xc_max])
+        y1 = m1*x_plot+b1
+        y2 = m2*x_plot+b2
+        plt.figure(figsize=(10,10))
+        spacing=500
+        x_spaced = np.linspace(xc_min, xc_max, spacing)
+        y_spaced = np.linspace(yc_min, yc_max, spacing)
+        x_arr = np.array([list(x_spaced),]*spacing)
+        y_arr = np.array([list(y_spaced),]*spacing).T
+        theo_intensity = np.log10(gauss_curve_rotation([x_arr, y_arr], *popt))
+        plt.contour(x_spaced, y_spaced, np.log10(theo_intensity), levels=5, colors='k')
+        plt.tricontourf(xy_crop[0], xy_crop[1], np.log10(z_crop), levels=100, cmap='jet')
+        plt.tick_params(labelsize=14)
+        cbar = plt.colorbar()
+        cbar.ax.tick_params(labelsize=14)
+        cbar.ax.set_ylabel('log10(Intensity)', fontsize=18)
+        plt.plot(x_plot, y1, 'k', linewidth=2)
+        plt.plot(x_plot, y2, 'k', linewidth=2)
+        plt.xlim(xc_min, xc_max)
+        plt.ylim(yc_min, yc_max)
+        plt.xlabel(plot_axes[0], fontsize=18)
+        plt.ylabel(plot_axes[1], fontsize=18)
+        plt.title('Peak Fit', fontsize=22)
+        plt.savefig(plot_name+'.png')
+        plt.show()
+        plt.close()
+    return [xc_fitted, yc_fitted]
+
+
+# FUNCTION gauss_curve_rotation
+# Calculates the value at the surface of a rotated gaussian, given the spacial coordinates and fit
+# parameters
+#   INPUTS:
+# data: a list, containing the spacial coordinates
+# amp: amplitude of gassuain curve
+# xc: x-coordinate of centre of gaussian 
+# w1: width of gaussian (1)
+# yc: y-coordinate of centre of gaussian 
+# w2: width of gaussian (2)
+# theta: angle of rotation of gaussian
+# z0: baseline of curve fit
+#   OUTPUTS:
+# z: value of the surface
+
+def gauss_curve_rotation(data, amp, xc, w1, yc, w2, theta, z0):
+    x, y = data
+    z=z0+amp*np.exp(-0.5*((x*np.cos(theta)+y*np.sin(theta)
+                           -xc*np.cos(theta)-yc*np.sin(theta))/w1)**2
+                    -0.5*((-x*np.sin(theta)+y*np.cos(theta)
+                           +xc*np.sin(theta)-yc*np.cos(theta))/w2)**2)
+    return z
+
+
+# FUNCTION qvector
+# Converts 2-theta and omega 2-axes measurement into reciprocal space data, in units of 1/angstrom
+#   INPUTS:
+# twtheta: array of 2-theta angle data
+# omega: array of omega angle data
+# wavelength (default: 1.5409580): wavelength of incident beam
+# source_unit (default: 'deg'): unit of angles
+#   OUTPUTS:
+# qx: in-plane reciprocal space vector
+# qz: out-of-plane reciprocal space vector
+
+def qvector(twtheta, omega, wavelength = 1.5405980, source_unit='deg'):
+    if source_unit == 'deg' or source_unit == 'degree':
+        twtheta = twtheta*np.pi/180
+        omega = omega*np.pi/180
+    qx = 2*np.pi/wavelength*(np.cos(omega)-np.cos(twtheta-omega))
+    qz = 2*np.pi/wavelength*(np.sin(omega)+np.sin(twtheta-omega))
+    return qx,qz
+
+
+# FUNCTION add_lattice_param_attributes_
+# Adds lattice-parameter related attributes to a dataset containing q-vectors
+#   INPUTS:
+# filename: name of hdf5 file containing data
+# all_input_criteria: criteria to identify paths to source files using pt.path_search. Should be
+#        q-vector data to write attributes to
+# out_index: out-of-plane lattice index
+# in_index (default: 0): in-plane lattice index
+#   OUTPUTS:
+# NULL
+
+def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_index=0):
+    in_path_list = pt.path_search(filename, all_input_criteria)[0]
+    with h5py.File(filename, "a") as f:
+        for i in range(len(in_path_list)):
+            path = in_path_list[i]
+            q_out = np.array(f[path])[1]
+            q_in = np.array(f[path])[0]
+            f[path].attrs['out_index'] = out_index
+            f[path].attrs['in_index'] = in_index
+            q_magnitude = np.sqrt(np.sum(np.array(f[path])**2))
+            f[path].attrs['q_magnitude'] = q_magnitude
+            d_spacing = 2*np.pi/q_magnitude
+            f[path].attrs['d_spacing'] = d_spacing
+            if in_index==0:
+                out_param = out_index*2*np.pi/q_magnitude
+                f[path].attrs['out_param'] = out_param
+                angle = 180*np.arctan(q_in/q_out)/np.pi
+                f[path].attrs['angle_deg'] = angle
+            else:
+                out_param = out_index*2*np.pi/q_out
+                f[path].attrs['out_param'] = out_param
+                in_param = in_index*2*np.pi/q_in
+                f[path].attrs['in_param'] = in_param
+                
+            

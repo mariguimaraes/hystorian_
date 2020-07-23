@@ -100,7 +100,7 @@ def parse_channel_info(header):
     return channels
 
 
-def get_channels(channel_info,orientation, fd, data_start_pos, pixels_x, pixels_y):
+def get_channels(channel_info, orientation, fd, data_start_pos, pixels_x, pixels_y):
     channel_data = {}
     fd.seek(data_start_pos + 1)
     for c in channel_info:
@@ -148,7 +148,7 @@ def load_sxm(filename):
     channel_info = parse_channel_info(header)
     # print(channel_info)
     # print(header.keys())
-    orientation=header[':SCAN_DIR:']
+    orientation = header[':SCAN_DIR:']
     if ":Scan>pixels/line:" in header.keys():
         channel_data = get_channels(channel_info, orientation, fd, data_start_pos, int(header[":Scan>lines:"]),
                                     int(header[":Scan>pixels/line:"]))

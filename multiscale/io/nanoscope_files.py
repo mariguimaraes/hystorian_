@@ -55,6 +55,7 @@ def extract_image_infos_from_header(header):
         image_infos.append(extract_image_info_from_header(head))
     return image_infos
 
+
 def extract_image_info_from_header(header):
     header_dic = {}
     for line in header:
@@ -79,6 +80,7 @@ def extract_image_info_from_header(header):
         header_dic[key] = value
 
     return header_dic
+
 
 def load_nanoscope(filename):
     """
@@ -128,8 +130,9 @@ def load_nanoscope(filename):
         start = start + tempX * tempY
 
     scan_info = {y.decode('iso-8859-1'): scan_info.get(y).decode('iso-8859-1') for y in scan_info.keys()}
-    for i,k in enumerate(image_infos):
-        image_infos[i] = {y.decode('iso-8859-1'): image_infos[i].get(y).decode('iso-8859-1') for y in image_infos[i].keys()}
+    for i, k in enumerate(image_infos):
+        image_infos[i] = {y.decode('iso-8859-1'): image_infos[i].get(y).decode('iso-8859-1') for y in
+                          image_infos[i].keys()}
     header = header.decode('iso-8859-1')
 
     return data, scan_info, image_infos, header
@@ -150,7 +153,7 @@ def nanoscope2hdf5(filename):
 
         for key in scan_info.keys():
             datagrp.attrs[key] = scan_info[key]
-        #Get the name and trace orientation of each the channels
+        # Get the name and trace orientation of each the channels
         nameChan = []
         for i in range(1, len(header.split('\@2:Image Data: '))):
             chan = header.split('\@2:Image Data: ')[i].split('\r\n')[0].split()[-1][1:-1]
@@ -162,4 +165,3 @@ def nanoscope2hdf5(filename):
             dtst = datagrp.create_dataset(name, data=data[indx])
             for key in image_infos[indx].keys():
                 dtst.attrs[key] = image_infos[indx][key]
-

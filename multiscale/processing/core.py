@@ -9,6 +9,7 @@ import multiscale.io.read_file as read_file
 import fnmatch
 import sys
 import time
+from glob import glob
 
 
 #   FUNCTION m_apply
@@ -31,12 +32,14 @@ import time
 #     be copied from in_paths, into each output file. If the same attribute name is in multiple
 #     in_paths, the first in_path with the attribute name will be copied from.
 # increment_proc (default: True): determines whether to increment the process counter
+# process_folder (default: 'process'): determines name of folder to write output into
 # **kwargs : All the non-data inputs to give to the function
 #    OUTPUTS:
 # result: the datafile produced after running the custom function
 
 def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
-            use_attrs=None, prop_attrs=None, increment_proc=True, **kwargs):
+            use_attrs=None, prop_attrs=None, increment_proc=True, process_folder='process',
+            **kwargs):
     # Convert in_paths to a list if not already
     if type(in_paths) != list:
         in_paths = [in_paths]
@@ -115,16 +118,16 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
 
     # Open hdf5 file to write new data, attributes
     with h5py.File(filename, 'a') as f:
-        num_proc = len(f['process'].keys())
+        num_proc = len(f[process_folder].keys())
         if increment_proc:
             num_proc = num_proc + 1
-            out_folder_location = ('process/' + str(num_proc).zfill(3) + '-' + function.__name__ +
-                                   '/' + folder_names)
+            out_folder_location = (process_folder + '/' + str(num_proc).zfill(3) + '-' +
+                                   function.__name__ + '/' + folder_names)
         else:
-            out_folder_location = ('process/' + str(num_proc).zfill(3) + '-' + function.__name__ +
-                                   '/' + folder_names)
+            out_folder_location = (process_folder + '/' + str(num_proc).zfill(3) + '-' +
+                                   function.__name__ + '/' + folder_names)
             if out_folder_location.split('/')[1] not in f['process'].keys():
-                out_folder_location = ('process/' + str(num_proc + 1).zfill(3) + '-' +
+                out_folder_location = (process_folder + '/' + str(num_proc + 1).zfill(3) + '-' +
                                        function.__name__ + '/' + folder_names)
 
         fproc = f.require_group(out_folder_location)
@@ -150,13 +153,60 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                 for key, value in kwargs.items():
                     if value is None:
                         value = 'None'
-                    dataset.attrs[key] = value
+                    try:
+                        dataset.attrs[key] = value
+                    except RuntimeError:
+                        print('Attribute was not able to be saved, probably because the attribute' \
+                                  'is too large')
+                        dataset.attrs[key] = 'None'
         else:
             print('Error: Unequal amount of outputs and output names')
     return result
 
 
 #   FUNCTION l_apply
+# Runs m_apply multiple times successively, intended to operate on an entire process or dataset
+# folder
+#   INPUTS:
+# filename : name of the hdf5 file where the datas are stored
+# function : Custom function that you want to call
+# all_input_criteria : Regex expression to describe the inputs searched for. Can be composed as a
+#     list of a list of strings, with extra list parenthesis automatically generated. Eg:
+#         'process*Trace1*' would pass to m_apply all files that contain 'process*Trace1*'.
+#         ['process*Trace1*'] as above
+#         [['process*Trace1*']] as above
+#         [['process*Trace1*', 'process*Trace2*']] would pass to m_apply all files that contain 
+#             'process*Trace1*' and 'process*Trace2*' in a single list.
+#         [['process*Trace1*'], ['process*Trace2*']] would pass to m_apply all files that contain 
+#             'process*Trace1*' and 'process*Trace2*' in two different lists; and thus will operate
+#             differently on each of these lists.
+# repeat (default: None): determines what to do if path_lists generated are of different lengths.
+#     None: Default, no special action is taken, and extra entries are removed. ie, given lists
+#         IJKL and AB, IJKL -> IJ.
+#     'alt': The shorter lists of path names are repeated to be equal in length to the longest list.
+#         ie, given IJKL and AB, AB -> ABAB
+#     'block': Each entry of the shorter list of path names is repeated to be equal in length to the
+#         longest list. ie, given IJKL and AB, AB -> AABB.
+# **kwargs : All the non-data inputs to give to the function
+#    OUTPUTS:
+# null
+#    TO DO:
+# Can we force a None to be passed?
+
+def l_apply(filename, function, all_input_criteria, repeat=None, **kwargs):
+    all_in_path_list = path_search(filename, all_input_criteria, repeat)
+    all_in_path_list = list(map(list, zip(*all_in_path_list)))
+    increment_proc = True
+    start_time = time.time()
+    for path_num in range(len(all_in_path_list)):
+        m_apply(filename, function, all_in_path_list[path_num], increment_proc=increment_proc,
+                **kwargs)
+        progress_report(path_num + 1, len(all_in_path_list), start_time, function.__name__,
+                        all_in_path_list[path_num])
+        increment_proc = False
+        
+
+#   FUNCTION l_apply_classic
 # Runs m_apply multiple times successively, intended to operate on an entire process or dataset
 # folder
 #   INPUTS:
@@ -194,7 +244,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
 #    TO DO:
 # Can we force a None to be passed?
 
-def l_apply(filename, function, all_input_criteria, output_names=None, folder_names=None,
+def l_apply_classic(filename, function, all_input_criteria, output_names=None, folder_names=None,
             use_attrs=None, prop_attrs=None, repeat=None, **kwargs):
     all_in_path_list = path_search(filename, all_input_criteria, repeat)
     all_in_path_list = list(map(list, zip(*all_in_path_list)))
@@ -208,9 +258,8 @@ def l_apply(filename, function, all_input_criteria, output_names=None, folder_na
                         all_in_path_list[path_num])
         increment_proc = False
 
-    #   FUNCTION path_search
-
-
+        
+#   FUNCTION path_search
 # Uses regex expressions to search for all paths. Useful when writing complicated custom functions
 # that cannot use m_apply or l_apply
 #   INPUTS:
@@ -452,11 +501,13 @@ def progress_report(processes_complete, processes_total, start_time=None,
         if start_time is not None:
             time_remaining = round(((processes_total - processes_complete) / processes_complete) *
                                    (time.time() - start_time))
-            str_progress = (process_name + ': ' + str(processes_complete) + ' of ' + str(processes_total) +
-                            ' Complete. ' + str(time_remaining) + 's remaining. ' + str(identifier))
+            str_progress = (process_name + ': ' + str(processes_complete) + ' of ' +
+                            str(processes_total) + ' Complete. ' + str(time_remaining) +
+                            's remaining. ' + str(identifier))
         else:
-            str_progress = (process_name + ': ' + str(processes_complete) + ' of ' + str(processes_total) +
-                            ' Complete. Unknown time remaining. ' + str(identifier))
+            str_progress = (process_name + ': ' + str(processes_complete) + ' of ' +
+                            str(processes_total) + ' Complete. Unknown time remaining. ' +
+                            str(identifier))
         if clear:
             print(str_progress + ' ' * len(str_progress), sep=' ', end='\r', file=sys.stdout,
                   flush=False)
@@ -535,11 +586,11 @@ def find_paths_of_all_subgroups(f, current_path=''):
 
 def rms(array):
     print(array.size)
-    mu2 = 1/array.size * np.sum((array-np.mean(array))**2)
-    mu3 = 1/array.size * np.sum((array-np.mean(array))**3)
-    mu4 = 1/array.size * np.sum((array-np.mean(array))**4)
+    mu2 = 1 / array.size * np.sum((array - np.mean(array)) ** 2)
+    mu3 = 1 / array.size * np.sum((array - np.mean(array)) ** 3)
+    mu4 = 1 / array.size * np.sum((array - np.mean(array)) ** 4)
 
-    return np.sqrt(mu2), mu3/(mu2**(3.0/2.0)), mu4/mu2**2 - 3
+    return np.sqrt(mu2), mu3 / (mu2 ** (3.0 / 2.0)), mu4 / mu2 ** 2 - 3
 
 
 # FUNCTION deallocate_hdf5_memory
@@ -565,7 +616,7 @@ def deallocate_hdf5_memory(filename, verify=True):
         response = input()
         if response != 'Yes':
             print('Invalid Input; Function aborted.')
-        return
+            return
     if '_CleanCopy.hdf5' in filename:
         raise ValueError('Filename ending in _CleanCopy.hdf5 found. Please remove from folder.')
     copy_filename = filename.split('.hdf5')[0]+'_CleanCopy.hdf5'
@@ -604,7 +655,7 @@ def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
         response = input()
         if response != 'Yes':
             print('Invalid Input; Function aborted.')
-        return
+            return
     for filename in filelist:
         if '_CleanCopy.hdf5' in filename:
             raise ValueError('Filename ending in _CleanCopy.hdf5 found. Please remove from folder.')

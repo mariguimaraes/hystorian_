@@ -2,6 +2,7 @@ import h5py
 import csv
 import numpy as np
 
+
 def csv2hdf5(filename):
     file_base = filename.split('.')[0]
     with open(filename) as csvfile:
