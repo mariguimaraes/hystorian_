@@ -9,6 +9,7 @@ import os
 import time
 
 from scipy.signal import medfilt, cspline2d
+from scipy.optimize import curve_fit
 from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
 from scipy.ndimage.measurements import label
 from scipy import interpolate
@@ -2263,6 +2264,8 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
 # theo_y: the y-position of where the peak should be
 # xc_range (default: []): x-range of data searched for peak. By default, searches entire span
 # yc_range (default: []): y-range of data searched for peak. By default, searches entire span
+# angle_correction (default: False): if set to True, will attempt to fit x and y as angles to a
+#     a change in displacement
 # plot_fit (default: False): if set to True, plots the fit
 # plot_name (default: 'fit'): name of output plot if generated
 # plot_axes (default: ['','']): axes labels (x and y) for the output plot
@@ -2270,13 +2273,18 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
 # xc_fitted: x-coordinate of centre of fitted peak
 # yc_fitted: y-coordinate of centre of fitted peak
 
-def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], plot_fit=False,
-                plot_name = 'fit', plot_axes = ['','']):
-    real_x, real_y = find_peak_position(x, y, z, xc_range, yc_range, plot_fit, plot_name, plot_axes)
-    delta_x = real_x-theo_x
-    delta_y = real_y-theo_y
-    adj_x = x-delta_x
-    adj_y = y-delta_y
+def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], angle_correction_deg = False,
+                plot_fit=False, plot_name = 'fit', plot_axes = ['','']):
+    measured_x, measured_y = find_peak_position(x, y, z, xc_range, yc_range, plot_fit,
+                                                plot_name, plot_axes)
+    if angle_correction_deg:
+        angle_factor_x = np.cos(np.pi*theo_x/180)/np.cos(np.pi*x/180)
+        angle_factor_y = np.cos(np.pi*theo_y/180)/np.cos(np.pi*y/180)
+    else:
+        angle_factor_x = 1
+        angle_factor_y = 1
+    adj_x = x + (theo_x - measured_x)*angle_factor_x
+    adj_y = y + (theo_y - measured_y)*angle_factor_y
     return adj_x, adj_y
 
 
