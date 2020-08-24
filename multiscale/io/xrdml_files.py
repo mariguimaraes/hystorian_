@@ -1,8 +1,7 @@
 try:
     import xrdtools
-
     xrdtools_bool = True
-except:
+except ImportError:
     xrdtools_bool = False
 import h5py
 import re

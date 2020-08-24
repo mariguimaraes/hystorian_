@@ -1,20 +1,13 @@
-import matplotlib.pyplot as plt
-from matplotlib_scalebar.scalebar import ScaleBar
+try:
+    from matplotlib_scalebar.scalebar import ScaleBar
+    scaleBarBool = True
+except ImportError:
+    print('Matplotlib_scalebar was not found, please install the package.')
+    scaleBarBool = False
+
 import numpy as np
 import h5py
-
-from multiscale.processing import twodim
-from multiscale.processing import core as pt
-from multiscale.processing import plot as msplt
-import multiscale.io
-import os
 import matplotlib.pyplot as plt
-from glob import glob
-import cv2
-from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
-from scipy.optimize import curve_fit
-import matplotlib.tri as tri
-import itertools
     
 
 
@@ -106,20 +99,23 @@ def save_image(data,
 
     # Generate scalebar
     if scalebar:
-        try:
-            if source_scale_m_per_px is None:
-                phys_size = physical_size[0]
-                px = np.shape(data)[0]
-                scalebar = ScaleBar(phys_size / px, physical_size[1], location='lower right',
-                                    font_properties={'size': labelsize})
-            else:
-                scalebar = ScaleBar(source_scale_m_per_px, 'm', location='lower right',
-                                    font_properties={'size': labelsize})
-            plt.gca().add_artist(scalebar)
-        except:
-            print("Error in the creation of the scalebar, please check that the attribute's\
-                        size and shape are correctly define for each data channel.")
-
+        if scaleBarBool:
+            try:
+                if source_scale_m_per_px is None:
+                    phys_size = physical_size[0]
+                    px = np.shape(data)[0]
+                    scalebar = ScaleBar(phys_size / px, physical_size[1], location='lower right',
+                                        font_properties={'size': labelsize})
+                else:
+                    scalebar = ScaleBar(source_scale_m_per_px, 'm', location='lower right',
+                                        font_properties={'size': labelsize})
+                plt.gca().add_artist(scalebar)
+            except:
+                print("Error in the creation of the scalebar, please check that the attribute's\
+                            size and shape are correctly define for each data channel.")
+                raise
+        else:
+            print("Scalebar package is not installed, please install it if you want to add a scalebar to your image")
     # Generate ouputs:
     if save:
         if image_name is None:

@@ -59,7 +59,7 @@ def parse_channel_info(header):
     '''
     try:
         fullnames = header[":Scan>channels:"].split(";")
-    except:
+    except ValueError:
         fullnames = []
 
     fullnameindex = 0

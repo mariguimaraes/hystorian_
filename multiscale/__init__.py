@@ -3,6 +3,7 @@ from .io.ardf_files import *
 from .io.ibw_files import *
 from .io.xrdml_files import *
 from .io.sxm_files import *
+from .io.shg_files import *
 
 from .processing import core
 from .processing import ndim

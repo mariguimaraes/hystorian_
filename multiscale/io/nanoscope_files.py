@@ -1,7 +1,6 @@
 import numpy as np
 import h5py
 
-
 def convert_length_to_SI_unit(value, unit):
     unit_dic = {'am': 1e-18,
                 'fm': 1e-15,
@@ -33,7 +32,7 @@ def extract_scan_info_from_header(header):
             continue
         try:
             key, value = line.split(b': ')
-        except:
+        except ValueError:
             continue
         if key in ['Samps/line', 'Lines']:
             value = int(value)
@@ -65,7 +64,7 @@ def extract_image_info_from_header(header):
             continue
         try:
             key, value = line.split(b': ')
-        except:
+        except ValueError:
             continue
 
         if key in ['Data offset', 'Data length', 'Bytes/pixel', 'Samps/line',
