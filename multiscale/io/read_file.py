@@ -12,12 +12,13 @@ from . import gsf_files
 from . import csv_files
 from . import nanoscope_files
 from . import img_files
+from . import shg_files
 import h5py
 import os
 import re
 
 
-def tohdf5(filename):
+def tohdf5(filename, params=None):
     filetype = 'unknown'
     if type(filename) == list:
         merge_hdf5(filename, 'merged_file', erase_file='partial')
@@ -55,6 +56,12 @@ def tohdf5(filename):
                 print('Your file is ending with three digits, but is not a Nanoscope file, please change the '
                       'extension to the correct one') 
             filetype = 'nanoscope'
+        if filename.split('.')[-1] == 'dat':
+            try:
+                shg_files.dat2hdf5(filename, params)
+            except:
+                print('This dat file has a shape which is not supported, for the moment dat file are used for SHG datas')
+            filetype= 'dat'
         else:
             print('file type not yet supported')
     return filetype
