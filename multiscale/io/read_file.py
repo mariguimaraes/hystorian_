@@ -18,6 +18,21 @@ import re
 
 
 def tohdf5(filename, params=None):
+    '''
+    Used to convert a datafile to an hdf5 file.
+
+    Parameters
+    ----------
+    filename: str
+        Name of the file to be converted. MUST contain the extension.
+    params: str, optional
+        Name of the file containing metadatas
+
+    Returns
+    -------
+        filetype: str
+            string containing the converted file extension
+    '''
     filetype = 'unknown'
     if type(filename) == list:
         merge_hdf5(filename, 'merged_file', erase_file='partial')
@@ -66,6 +81,23 @@ def tohdf5(filename, params=None):
     return filetype
 
 def merge_hdf5(filelist, combined_name, erase_file='partial'):
+    '''
+    Take a list of file to convert into a single hdf5 file
+
+    Parameters
+    ----------
+    filelist: list of strings
+        list of the file to be converted. MUST contain the extensions. There can be multiple type of file in the list
+    combined_name: str
+        Name of the hdf5 file
+    erase_file : str, optional
+        merge_hdf5 create temporary hdf5 file for each element in filelist and then merge them.
+        If set to 'partial', it erases the temp files.
+
+    Returns
+    -------
+        None
+    '''
     i = 0
     temporary = False
 
@@ -127,6 +159,19 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
 
     
 def create_hdf5(filename, image):
+    '''
+    Create an hdf5 file from an array-like.
+
+    Parameters
+    ----------
+    filename: str
+        Name of the resulting file
+    image: array-like
+        data to be converted into hdf5
+    Returns
+    -------
+        None
+    '''
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
         typegrp = f.create_group("type")
         typegrp.create_dataset(filename.split('.')[0], data='image')

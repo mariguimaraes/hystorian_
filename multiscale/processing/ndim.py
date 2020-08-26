@@ -139,18 +139,36 @@ def gauss_area(x, y):
     return np.abs(area / 2.0)
 
 
-# FUNCTION clean_loop
-## Determine if a SSPFM loop is good or not by calculating the area encompassed by the hysteresis curve and
-## comparing it to a threshold
-# INPUTS:
-## bias/phase/amp: grid corresponding to the bias_on, phase_off and amp_off from the SSPFM.
-## to obtain the on/off values, run extract_hist first.
-## threshold: either calculated using std and mean, or manually input by the user
-## debug: if true, plot the area of the loops and the threshold, to have an idea of how many curves are left out
-# OUTPUTS:
-## list_bias/phase/amp : return a list of list, containing the good loops
-## mask : return a mask of the grid, True being good loop, False being bad loops
 def clean_loop(bias, phase, amp, threshold=None, debug=False):
+    '''
+    Used to determine if a SSPFM loop is good or not by calculating the area encompassed by the hysteresis curve and
+    comparing it to a threshold
+
+    Parameters
+    ----------
+    bias: nd-array
+        3d-array containing the bias applied to each point of the grid
+    phase: nd-array
+        3d-array containing the phase applied to each point of the grid
+    amp: nd-array
+        3d-array containing the amplitude applied to each point of the grid
+    threshold: int or float, optional
+        minimal value of the loop area to be considered a good loop (default: None)
+        if set to None will use threshold = np.mean(area_grid_full) - 2 * np.std(area_grid_full)
+    debug: bool, optional
+        if set to True will use plt.imshow() to plot the loops in red for bad and blue for good. (default: False)
+
+    Returns
+    -------
+        list_bias: array-like
+            list of the bias corresponding to good loops
+        list_phase: array-like
+            list of the phase corresponding to good loops
+        list_amp: array-like
+            list of the amplitudes corresponding to good loops
+        mask: nd-array
+            a 2D mask where a 1 correspond to a good loop and 0 to a bad loop, can be used to mask the input data.
+    '''
     list_bias = []
     list_phase = []
     list_amp = []

@@ -12,34 +12,45 @@ import time
 from glob import glob
 
 
-#   FUNCTION m_apply
-# Take any function and handles the inputs of the function by looking into the hdf5 file
-# The input must be in the form datasets/name/channel or process/proc_name/name/channel
-# Also write the output of the function into the hdf5. The name of the path can be given into 
-# outputs_names
-#   INPUTS:
-# filename : name of the hdf5 file where the datas are stored
-# function : Custom function that you want to call
-# in_paths : Paths to the datasets in the hdf5 file that contain the inputs. Multiple inputs can
-#     be given by using a list
-# outputs_names (default: None): list of the names of the channels the results are written in.
-#     By default, copies names from the first of the in_paths
-# folder_names (default: None): list of the names of the folder containing results data channels.
-#     By default, copies names from the first of the in_paths
-# use_attrs (default: None): string, or list of strings, that are the names of attributes that will
-#     be copied from in_paths, and passed into the function as a kwarg for use. 
-# prop_attrs (default: None): string, or list of strings, that are the names of attributes that will
-#     be copied from in_paths, into each output file. If the same attribute name is in multiple
-#     in_paths, the first in_path with the attribute name will be copied from.
-# increment_proc (default: True): determines whether to increment the process counter
-# process_folder (default: 'process'): determines name of folder to write output into
-# **kwargs : All the non-data inputs to give to the function
-#    OUTPUTS:
-# result: the datafile produced after running the custom function
-
 def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             use_attrs=None, prop_attrs=None, increment_proc=True, process_folder='process',
             **kwargs):
+
+    '''
+    Take any function and handles the inputs of the function by looking into the hdf5 file
+    Also write the output of the function into the hdf5.
+
+    Parameters
+    ----------
+    filename: str
+        name of the hdf5 file where the datas are stored
+    function: function
+        any function with input and outputs being array-like
+    in_paths: list of str, or str
+        list of the args for the function, usually the datasets
+    output_names: list of str, or str, optional
+        list of names for the outputs of the fonction
+    folder_names: str, optional
+        name of the folder for the output to be saved into the hdf5
+        (default: second element of the first in_paths element)
+    use_attrs: list of str, or str, optional
+        list of attributes to be passed to the function as kwargs. (default: None)
+    prop_attrs: list of str, or str, optional
+        Propagate a list of attributes to the processed data. (default: None)
+    increment_proc: bool, optional
+        increment the process number in the hdf5 file. This should be kept to true, except during experimentation
+        since setting it to false will overwrite processed datas and therefore lose history of the processing
+        (default: True)
+    process_folder, str, optional
+        name of the folder in the hdf5 to save the output into. (default: 'process')
+        This should stay 'process' almost all the times.
+    **kwargs :
+        any kwargs that the function passed to m_apply requires.
+
+    Returns
+    -------
+        output of the passed function
+    '''
     # Convert in_paths to a list if not already
     if type(in_paths) != list:
         in_paths = [in_paths]
@@ -76,8 +87,8 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                 filename = filename.split('.')[0] + '.hdf5'
                 print('The file does not have an hdf5 extension. It has been converted.')
             except:
-                print('The given filename does not have an hdf5 extension, and it was not possible' \
-                      'to convert it. Please use an hdf5 file with m_apply')
+                print('The given filename does not have an hdf5 extension, and it was not possible''to convert it. '
+                      'Please use an hdf5 file with m_apply')
 
     # Open hdf5 file to extract data, attributes, and run function
     data_list = []
@@ -106,6 +117,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                 for key_num in range(len(use_attr_keys)):
                     use_attr_dict['source_' + use_attr_keys[key_num]] = use_attr_vals[key_num]
                 kwargs.update(use_attr_dict)
+
         result = function(*data_list, **kwargs)
 
     # End function if no result is calculated
@@ -156,8 +168,8 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                     try:
                         dataset.attrs[key] = value
                     except RuntimeError:
-                        print('Attribute was not able to be saved, probably because the attribute' \
-                                  'is too large')
+                        print('Attribute was not able to be saved, probably because the attribute'
+                              'is too large')
                         dataset.attrs[key] = 'None'
         else:
             print('Error: Unequal amount of outputs and output names')
@@ -204,7 +216,6 @@ def l_apply(filename, function, all_input_criteria, repeat=None, **kwargs):
         progress_report(path_num + 1, len(all_in_path_list), start_time, function.__name__,
                         all_in_path_list[path_num])
         increment_proc = False
-        
 
 #   FUNCTION l_apply_classic
 # Runs m_apply multiple times successively, intended to operate on an entire process or dataset
@@ -244,8 +255,9 @@ def l_apply(filename, function, all_input_criteria, repeat=None, **kwargs):
 #    TO DO:
 # Can we force a None to be passed?
 
+
 def l_apply_classic(filename, function, all_input_criteria, output_names=None, folder_names=None,
-            use_attrs=None, prop_attrs=None, repeat=None, **kwargs):
+                    use_attrs=None, prop_attrs=None, repeat=None, **kwargs):
     all_in_path_list = path_search(filename, all_input_criteria, repeat)
     all_in_path_list = list(map(list, zip(*all_in_path_list)))
     increment_proc = True
@@ -258,7 +270,7 @@ def l_apply_classic(filename, function, all_input_criteria, output_names=None, f
                         all_in_path_list[path_num])
         increment_proc = False
 
-        
+
 #   FUNCTION path_search
 # Uses regex expressions to search for all paths. Useful when writing complicated custom functions
 # that cannot use m_apply or l_apply
@@ -283,6 +295,7 @@ def l_apply_classic(filename, function, all_input_criteria, output_names=None, f
 #         longest list. ie, given IJKL and AB, AB -> AABB.
 #    OUTPUTS:
 # all_in_path_list: list of paths (paths are strings)
+
 
 def path_search(filename, all_input_criteria, repeat=None):
     if type(all_input_criteria) != list:
@@ -561,7 +574,7 @@ def intermediate_plot(data, condition='', plotlist=[], text='Intermediate Plot',
 
 def find_paths_of_all_subgroups(f, current_path=''):
     path_list = []
-    if current_path=='':
+    if current_path == '':
         curr_group = f
     else:
         curr_group = f[current_path]
@@ -619,7 +632,7 @@ def deallocate_hdf5_memory(filename, verify=True):
             return
     if '_CleanCopy.hdf5' in filename:
         raise ValueError('Filename ending in _CleanCopy.hdf5 found. Please remove from folder.')
-    copy_filename = filename.split('.hdf5')[0]+'_CleanCopy.hdf5'
+    copy_filename = filename.split('.hdf5')[0] + '_CleanCopy.hdf5'
     with h5py.File(filename, 'a') as f1:
         with h5py.File(copy_filename, 'a') as f2:
             for group in f1:
@@ -627,7 +640,7 @@ def deallocate_hdf5_memory(filename, verify=True):
     os.remove(filename)
     os.rename(copy_filename, filename)
 
-    
+
 # FUNCTION deallocate_hdf5_memory_of_folder
 # As above, but operates on an entire folder of .hdf5 files.
 #   INPUTS:
@@ -635,10 +648,10 @@ def deallocate_hdf5_memory(filename, verify=True):
 # verify (default: True): If true, asks for the verification request.
 #   OUTPUTS:
 # null
-    
+
 def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
     os.chdir(folder_path)
-    filelist=glob('*.hdf5')
+    filelist = glob('*.hdf5')
     if verify:
         print('WARNING: The basic process of this function involves:')
         print('    1) Copying all components of a .hdf5 file into another .hdf5 file,')
@@ -649,7 +662,7 @@ def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
         print('files before running this function.\n')
         print('The following .hdf5 files will be repacked to reduce memory:')
         for filename in filelist:
-            print('    '+filename)
+            print('    ' + filename)
         print('')
         print('Once all files are backed up, type \'Yes\' to continue.')
         response = input()
@@ -660,14 +673,14 @@ def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
         if '_CleanCopy.hdf5' in filename:
             raise ValueError('Filename ending in _CleanCopy.hdf5 found. Please remove from folder.')
     for filename in filelist:
-        copy_filename = filename.split('.hdf5')[0]+'_CleanCopy.hdf5'
+        copy_filename = filename.split('.hdf5')[0] + '_CleanCopy.hdf5'
         with h5py.File(filename, 'a') as f1:
             with h5py.File(copy_filename, 'a') as f2:
                 for group in f1:
                     f1.copy(group, f2)
         os.remove(filename)
         os.rename(copy_filename, filename)
-    
+
 
 #####################################################################################################
 #                                                                                                   #

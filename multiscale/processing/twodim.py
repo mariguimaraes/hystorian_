@@ -5,16 +5,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from . import core as pt
 import cv2
-import os
 import time
 
 from scipy.signal import medfilt, cspline2d
 from scipy.optimize import curve_fit
-from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
+from scipy.ndimage.morphology import binary_erosion, binary_dilation
 from scipy.ndimage.measurements import label
 from scipy import interpolate
 from skimage.morphology import skeletonize
-from random import randrange
 
 
 def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
@@ -209,7 +207,8 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_
     warp_matrix : ndarray
         Transformation matrix used to convert img_orig into img
     """
-    # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
+
+    # Here we generate a MOTION_EUCLIDEAN matrix by doing a
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
     warp_mode = cv2.MOTION_TRANSLATION
@@ -252,19 +251,26 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_
     return warp_matrix
 
 
-#   FUNCTION distortion_correction_
-# Applies distortion correction parameters to an image. The distortion corrected data is then
-# cropped to show only the common data, or expanded to show the maximum extent of all possible data.
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using pt.path_search. First should
-#     be data to be corrected, second should be the distortion parameters.
-# cropping (default: True): If set to True, each dataset is cropped to show only the common area. If
-#     set to false, expands data shape to show all data points of all images.
-#   OUTPUTS
-# null
-
 def distortion_correction_(filename, all_input_criteria, cropping=True):
+    """
+    Applies distortion correction parameters to an image. The distortion corrected data is then
+    cropped to show only the common data, or expanded to show the maximum extent of all possible data.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of hdf5 file containing data
+    all_input_criteria : list
+        Criteria to identify paths to source files using pt.path_search. First should
+        be data to be corrected, second should be the distortion parameters.
+    cropping : bool, optional
+        If set to True, each dataset is cropped to show only the common area. If
+        set to false, expands data shape to show all data points of all images. (default: True)
+
+    Returns
+    -------
+    None
+    """
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     dm_path_list = all_in_path_list[1]
@@ -298,17 +304,23 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
                                in_path_list[i])
 
 
-#   FUNCTION propagate_scale_attrs
-# Attempts to write the scale attributes to a new dataset. This is done by directly copying from
-# an old dataset. If this is not possible, then it attempts to generate this from the old dataset
-# by calculating from the 'size' and 'shape' attributes.
-#   INPUTS:
-# new_data: new dataset to write to
-# old_data: old dataset to read from
-#   OUTPUTS
-# null
-
 def propagate_scale_attrs(new_data, old_data):
+    """
+    Attempts to write the scale attributes to a new dataset. This is done by directly copying from
+    an old dataset. If this is not possible, then it attempts to generate this from the old dataset
+    by calculating from the 'size' and 'shape' attributes.
+
+    Parameters
+    ----------
+    new_data : hdf5 file
+        New dataset to write to
+    old_data : hdf5 file
+        Old dataset to read from
+
+    Returns
+    -------
+    None
+    """
     if 'scale_m_per_px' in old_data.attrs:
         new_data.attrs['scale_m_per_px'] = old_data.attrs['scale_m_per_px']
     else:
@@ -317,20 +329,27 @@ def propagate_scale_attrs(new_data, old_data):
             shape = old_data.attrs['shape']
             new_data.attrs['scale_m_per_px'] = scan_size[0] / shape[0]
 
-
-#   FUNCTION array_cropped
-# crops a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set,
-# to include only valid data shared by all arrays
-#   INPUTS:
-# array: the array to be cropped
-# xoffset: the xoffset of the array
-# yoffset: the yoffset of the array
-# offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset
-# minimum, yoffset maximum, and yoffset minimum fo all arrays
-#   OUTPUTS:
-# cropped_array: the cropped array
-
 def array_cropped(array, xoffset, yoffset, offset_caps):
+    """
+    Crops a numpy_array given the offsets of the array, and the minimum and maximum offsets of a set,
+    to include only valid data shared by all arrays
+
+    Parameters
+    ----------
+    array : array_like
+        The array to be cropped
+    xoffset : int
+        The x-offset ot the array
+    yoffset : int
+        The y-offset of the array
+    offset_caps : list
+        A list of four entries. In order, these entries are the xoffset maximum, xoffset
+        minimum, yoffset maximum, and yoffset minimum for all arrays
+
+    Returns
+    -------
+    cropped_array : array_like
+    """
     if offset_caps != [0, 0, 0, 0]:
         left = int(np.ceil(offset_caps[0]) - np.floor(xoffset))
         right = int(np.floor(offset_caps[1]) - np.floor(xoffset))
@@ -346,19 +365,28 @@ def array_cropped(array, xoffset, yoffset, offset_caps):
     return cropped_array
 
 
-#   FUNCTION array_expanded
-# expands a numpy_array given the offsets of the array, and the minimum and maximum offsets of a
-# set, to include all points of each array. Empty data is set to be NaN
-#   INPUTS:
-# array: the array to be expanded
-# xoffset: the xoffset of the array
-# yoffset: the yoffset of the array
-# offset_caps: a list of four entries. In order, these entries are the xoffset maximum, xoffset
-# minimum, yoffset maximum, and yoffset minimum fo all arrays
-#   OUTPUTS:
-# expanded_array: the expanded array
-
 def array_expanded(array, xoffset, yoffset, offset_caps):
+    """
+    Expands a numpy_array given the offsets of the array, and the minimum and maximum offsets of a
+    set, to include all points of each array. Empty data is set to be NaN
+
+    Parameters
+    ----------
+    array : array_like
+        The array to be expanded
+    xoffset : int
+        The x-offset ot the array
+    yoffset : int
+        The y-offset of the array
+    offset_caps : list
+        A list of four entries. In order, these entries are the xoffset maximum, xoffset
+        minimum, yoffset maximum, and yoffset minimum for all arrays
+
+    Returns
+    -------
+    expanded_array : array_like
+        The expanded array
+    """
     height = int(np.shape(array)[0] + np.ceil(offset_caps[2]) - np.floor(offset_caps[3]))
     length = int(np.shape(array)[1] + np.ceil(offset_caps[0]) - np.floor(offset_caps[1]))
     expanded_array = np.empty([height, length])
@@ -371,26 +399,35 @@ def array_expanded(array, xoffset, yoffset, offset_caps):
     return expanded_array
 
 
-#   FUNCTION phase_linearisation
-# As phase_linearisation, but designed for use with pt.l_apply.
-# Converts each entry of a 2D phase channel (rotating 360 degrees with an arbitrary 0 point) into a
-# float between 0 and 1.  The most common values become 0 or 1, and other values are a linear
-# interpolation between these two values. 0 and 1 are chosen such that the mean of the entire 
-# channel does not become greater than a value defined by flip_proportion, and such that the 
-# edgemost pixels are more 0 than the centre.
-#   INPUTS:
-# image: array that contains data
-# min_separation (default: 90): minimum distance between the two peaks assigned as 0 and 1.
-# background (default: None): number to identify where background is to correctly attribute values.
-#     If positive, tries to make everything to the left of this value background; if negative, makes
-#     everything to the right background
-# flip_proportion (default: 0.8): threshold, above which the data is flipped to (1-data)
-# show (default: False): If True, show the data prior to saving
-#   OUTPUTS
-# result: hdf5_dict containing linearised data and peak values as attributes
-
 def phase_linearisation(image, min_separation=90, background=None,
                         flip_proportion=0.8, show=False):
+    """
+    Converts each entry of a 2D phase channel (rotating 360 degrees with an arbitrary 0 point) into a
+    float between 0 and 1.  The most common values become 0 or 1, and other values are a linear
+    interpolation between these two values. 0 and 1 are chosen such that the mean of the entire
+    channel does not become greater than a value defined by flip_proportion, and such that the
+    edgemost pixels are more 0 than the centre.
+
+    Parameters
+    ----------
+    image : array_like
+        Array that contains the data
+    min_separation : int, optional
+        Minimum distance between the two peaks assigned as 0 and 1 (default: 90)
+    background : int or flaot, optional
+        Number to identify where background is to correctly attribute values.
+        If positive, tries to make everything to the left of this value background; if negative, makes
+        everything to the right background
+    flip_proportion : int or float, optional
+        Threshold, above which the data is flipped to (1-data)
+    show : bool, optional
+        If True, show the data prior to saving
+
+    Returns
+    -------
+    hdf5_dict
+        Contain linearised data and peak values as attributes
+    """
     phase_flat = np.array(image).ravel()
     min_phase = int(np.floor(np.min(phase_flat)))
     max_phase = min_phase + 360
@@ -447,19 +484,29 @@ def phase_linearisation(image, min_separation=90, background=None,
     return result
 
 
-#   FUNCTION linearise
-# Converts a phase entry (rotating 360 degrees with an arbitrary 0 point) into a float between 0 
-# and 1, given the values of the two extremes, and the ranges between them
-#   INPUTS:
-# entry: the phase entry to be converted
-# peak1_value: the phase value that would be linearised to 0
-# peak2_value: the phase value that would be linearised to 1
-# range_1to2: the distance in phase from peak1 to peak2
-# range_1to2: the distance in phase from peak2 to peak1
-#   OUTPUTS
-# entry: the phase entry that has been converted
-
 def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
+    """
+    Converts a phase entry (rotating 360 degrees with an arbitrary 0 point) into a float between 0
+    and 1, given the values of the two extremes, and the ranges between them
+
+    Parameters
+    ----------
+    entry : int or float
+        The phase entry to be converted
+    peak1_value : int or float
+        The phase value that would be linearised to 0
+    peak2_value : int or float
+        The phase value that would be linearised to 1
+    range_1to2 : int or float
+        The distance in phase from peak1 to peak2
+    range_2to1 : int or float
+        The distance in phase from peak2 to peak1
+
+    Returns
+    -------
+    entry : int or float
+        The phase entry that has been converted
+    """
     if (entry >= peak1_value) and (entry < peak2_value):
         entry = (entry - peak1_value) / range_1to2
     elif entry < peak1_value:
@@ -469,16 +516,24 @@ def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
     return entry
 
 
-#   FUNCTION normalise
-# Normalises an array of numbers so each number is within a range fo two numbers
-#   INPUTS:
-# array: the array to be normalised
-# new_min (default: 0): minimum value of new range
-# new_max (default: 1): maximum value of new range
-#   OUTPUTS
-# array: the entry that has been converted
-
 def normalise(array, new_min=0, new_max=1):
+    """
+    Normalises an array of numbers so each number is within a range fo two numbers
+
+    Parameters
+    ----------
+    array : array_like
+        The array to be normalised
+    new_min : int or float, optional
+        Minimum value of new range (default: 0)
+    new_max : int or float, optional
+        Maximum value of new range (default: 1)
+    Returns
+    -------
+    array : array_like
+        the entry that has been converted
+
+    """
     old_range = np.max(array) - np.min(array)
     new_range = new_max - new_min
     array = array - np.min(array)
@@ -486,16 +541,21 @@ def normalise(array, new_min=0, new_max=1):
     array = array + new_min
     return array
 
-
-#   FUNCTION m_sum
-# Adds multiple channels together. The files are added in order, first by channel and then by
-# sample. The amount of source files in each destination file defined by entry_count. Replaces sum_
-#   INPUTS:
-# *args: arrays to be summed
-#   OUTPUTS
-# result: hdf5_dict containing summed data and amount of inputs as attributes
-
 def m_sum(*args):
+    """
+    Adds multiple channels together. The files are added in order, first by channel and then by
+    sample. The amount of source files in each destination file defined by entry_count. Replaces sum_
+
+    Parameters
+    ----------
+    *args : array_like
+        Arrays to be summed
+
+    Returns
+    -------
+    result : hdf5 dict
+        Contains summed data and amount of inputs as attributes
+    """
     if (args[0].dtype == 'uint8') or (args[0].dtype == 'bool'):
         convert = True
     else:

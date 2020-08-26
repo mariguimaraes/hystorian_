@@ -8,38 +8,7 @@ except ImportError:
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
-    
 
-
-#   FUNCTION save_image
-# Saves one .png image to the current directory, or a chosen folder
-#   INPUTS:
-# data: A 2-D array which will be converted into a png image.
-# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel
-#     per data point at 100 dpi
-# ticks (default: True): Generate tick labels
-# labelsize (default: 16): Size of the text in pxs
-# full_range (default: False): Show whether to show the image as is, or to remove offset and use
-#     std to figure out range
-# std_range (default: 3): Range (in std) around the mean that is plotted
-# colorm (default: 'inferno'): colormap to be used for image
-# colorbar (default: True): option to generate a colour bar
-# scalebar (default: False): if True, add a scalebar to the image, requires three attributes :
-#     shape, which define the pixel size of the image
-#     size, which gives the phyiscal dimension of the image
-#     unit, which give the physical unit of size
-# physical_size (default: (0, 'unit')): physical size of the image used when generating the scalebar
-# source_scale_m_per_px (default: None): attempts to directly grab scale if attrs are provided
-# show (default: False): if True, the image is displayed in the kernel
-# save (default: True): determines if the image should be saved
-# image_name (default: None): name of the image that is saved. By default, tries to pull name from
-#     source_path. If this cannot be done, sets name to 'image'
-# saving_path (default: ''): The path to the folder where to save the image
-# source_path (default: None): if set, and image_name not set, this variable will be used to
-#     generate the file name
-# verbose (default: False): if True, print a line each time a image is saved.
-#   OUTPUTS:
-# null
 
 def save_image(data,
                size=None,
@@ -58,6 +27,52 @@ def save_image(data,
                saving_path='',
                source_path=None,
                verbose=False):
+
+    '''
+    Wrapper around plt.imshow() and plt.savefig() to uniformize image saving
+
+    Parameters
+    ----------
+    data: array-like
+        array-like containing the image (1-channel)
+    size: tuple (int,int), optional
+        size in pxs of the image
+    ticks: bool, optional
+        shows ticks if set to True. (default is False)
+    labelsize: int, optional
+        setup the px size of the labels. (default: 16)
+    full_range: bool, optional
+        use the whole data scale if set to True, or use [mean-std_range*std, mean+std_range*std]. (default: True)
+    std_range: int or float, optional
+        the number of standard deviation to use in case full_range is set to false. (default: 3)
+    colorm: str, optional
+        choose the colormap, see matplotlib for the list of available colormap (default: 'inferno')
+    colorbar: bool, optional
+        allows to remove the colorbar if set to false. (default: True)
+    scalebar: bool, optional
+        allows to show a scalebar, need a value in physical size. (Default: False)
+    physical_size: tuple (float, str)
+        physical size of the image to define the scalebar.
+    source_scale_m_per_px:
+        attempts to directly grab scale if attrs are provided (default: None)
+    show: bool, optional
+        If set to true, use plt.show() to show the image (default: False)
+    save: bool, optional
+        If set to true, use plt.imsave() to save the image (default: True)
+    image_name: str, optional
+        filename to use while saving the image. If set to None will try to use source_path to generate a filename,
+        if no source_path is given, will use 'image' (default: None)
+    saving_path: str, optional
+        path where to save the file. (default: '')
+    source_path: str, optional
+        If set, and image_name not set, this variable will be used to generate the file name (default: None)
+    verbose: bool, optional
+        if True, print a line when the image is saved. (default: false)
+    Returns
+    -------
+    None
+    '''
+
     # Generate size of image frame
     if size is None:
         figsize = (np.array(np.shape(data)) / 100)[::-1]
@@ -136,28 +151,6 @@ def save_image(data,
     return
 
 
-#   FUNCTION plot_hysteresis_parameters_
-# Saves one .png image containing the map of the 6 hysteresis parameters : coercive voltage (up and down),
-# step (left and right), imprint and phase shift.
-#   INPUTS:
-# filename: hdf5 file containing a SSPFM map
-# PATH: path to the folder containing the map of the hysteresis parameters
-# size (default: None): Dimension of the saved image. If none, the image is set to have one pixel
-#     per data point at 100 dpi
-# ticks (default: True): Generate tick labels
-# labelsize (default: 16): Size of the text in pxs
-# colorbar (default: True): option to generate a colour bar
-# show (default: False): if True, the image is displayed in the kernel
-# save (default: True): determines if the image should be saved
-# image_name (default: None): name of the image that is saved. By default, tries to pull name from
-#     source_path. If this cannot be done, sets name to 'image'
-# saving_path (default: ''): The path to the folder where to save the image
-# source_path (default: None): if set, and image_name not set, this variable will be used to
-#     generate the file name
-# verbose (default: False): if True, print a line each time a image is saved.
-#   OUTPUTS:
-# null
-
 def plot_hysteresis_parameters_(filename, PATH,
                                 size=None,
                                 ticks=True,
@@ -169,7 +162,46 @@ def plot_hysteresis_parameters_(filename, PATH,
                                 saving_path='',
                                 source_path=None,
                                 verbose=False):
-    print(PATH)
+
+    '''
+    NOTE - This function is not made to be used by m_apply, this is indicated by the trailing underscore.
+    Used on data processed using twodim.calc_hyst_params() to plot and save an image containing maps of the
+    6 hysteresis parameters : coercive voltage (up and down), step (left and right), imprint and phase shift.
+    Parameters
+    ----------
+    filename: str
+        hdf5 file containing the SSPFM parameters extracted using twodim.calc_hyst_params()
+    PATH: str
+        path inside the hdf5 file to the datas
+    size: tuple (int,int), optional
+        size in pxs of the image
+    ticks: bool, optional
+        shows ticks if set to True. (default is False)
+    labelsize: int, optional
+        setup the px size of the labels. (default: 16)
+    colorbar: bool, optional
+        allows to remove the colorbar if set to false. (default: True)
+    scalebar: bool, optional
+        allows to show a scalebar, need a value in physical size. (Default: False)
+    show: bool, optional
+        If set to true, use plt.show() to show the image (default: False)
+    save: bool, optional
+        If set to true, use plt.imsave() to save the image (default: True)
+    image_name: str, optional
+        filename to use while saving the image. If set to None will try to use source_path to generate a filename,
+        if no source_path is given, will use 'image' (default: None)
+    saving_path: str, optional
+        path where to save the file. (default: '')
+    source_path: str, optional
+        If set, and image_name not set, this variable will be used to generate the file name (default: None)
+    verbose: bool, optional
+        if True, print a line when the image is saved. (default: false)
+    Returns
+    -------
+        None
+    '''
+
+
     if size is None:
         fig = plt.figure(figsize=(20, 30))
     else:
@@ -184,7 +216,6 @@ def plot_hysteresis_parameters_(filename, PATH,
     with h5py.File(filename) as f:
         plt.subplot(3, 2, 1)
         plt.title('Negative Coercive field')
-        print(PATH + '/coerc_neg')
         plt.imshow(f[PATH + '/coerc_neg'], cmap='Blues')
         if colorbar:
             plt.colorbar(fraction=0.046, pad=0.04)
