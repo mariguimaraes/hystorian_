@@ -60,7 +60,7 @@ def gsf_read(filename):
     return metadata, data
 
 
-def gsf2hdf5(filename):
+def gsf2hdf5(filename, filepath=None):
     meta, data = gsf_read(filename)
     filename = '_'.join(filename.split())
     filename = ''.join(filename.split('.')[:-1])
@@ -68,15 +68,23 @@ def gsf2hdf5(filename):
     print(filename)
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
         typegrp = f.create_group("type")
-        typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
-
         metadatagrp = f.create_group("metadata")
-        metadatagrp.create_dataset(filename.split('.')[0], data=str(meta))
-        datagrp = f.create_group("datasets/" + filename.split('.')[0])
         f.create_group("process")
 
         name = filename.split('.')[0:-1]
         name = '_'.join(name)
+
+
+
+        if filepath is not None:
+            metadatagrp.create_dataset(filepath.split('.')[0], data=str(meta))
+            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
+            datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+        else:
+            metadatagrp.create_dataset(filename.split('.')[0], data=str(meta))
+            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+            datagrp = f.create_group("datasets/" + filename.split('.')[0])
+
         datagrp.create_dataset(name, data=data)
 
         datagrp[name].attrs['name'] = name

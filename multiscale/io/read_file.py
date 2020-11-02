@@ -15,9 +15,9 @@ from . import shg_files
 import h5py
 import os
 import re
+import numpy as np
 
-
-def tohdf5(filename, params=None):
+def tohdf5(filename,filepath=None, params=None):
     '''
     Used to convert a datafile to an hdf5 file.
 
@@ -38,41 +38,41 @@ def tohdf5(filename, params=None):
         merge_hdf5(filename, 'merged_file', erase_file='partial')
     else:
         if filename.split('.')[-1] == 'ibw':
-            ibw_files.ibw2hdf5(filename)
+            ibw_files.ibw2hdf5(filename, filepath)
             filetype = 'ibw'
         elif filename.split('.')[-1] == 'xrdml':
             if xrdml_bool:
-                xrdml_files.xrdml2hdf5(filename)
+                xrdml_files.xrdml2hdf5(filename, filepath)
             else:
                 print('xrdml_files was not imported, probably due to the missing xrd_tools package. Please install it.')
                 
             filetype = 'xrdml'
         elif filename.split('.')[-1] == 'ardf' or filename.split('.')[-1] == 'ARDF':
-            ardf_files.ardf2hdf5(filename)
+            ardf_files.ardf2hdf5(filename, filepath)
             filetype = 'ardf'
         elif filename.split('.')[-1] == 'sxm':
-            sxm_files.sxm2hdf5(filename)
+            sxm_files.sxm2hdf5(filename, filepath)
             filetype = 'sxm'
         elif filename.split('.')[-1] == 'gsf':
-            gsf_files.gsf2hdf5(filename)
+            gsf_files.gsf2hdf5(filename, filepath)
             filetype = 'gsf'
         elif filename.split('.')[-1] == 'csv':
-            csv_files.csv2hdf5(filename)
+            csv_files.csv2hdf5(filename, filepath)
             filetype = 'csv'
         elif filename.split('.')[-1] == 'jpg' or filename.split('.')[-1] == 'png' or filename.split('.')[-1] == 'jpeg' \
                 or filename.split('.')[-1] == 'bmp':
-            img_files.image2hdf5(filename)
+            img_files.image2hdf5(filename, filepath)
             filetype = 'jpg'
         elif re.match('\d{3}', filename.split('.')[-1]) is not None:
             try:
-                nanoscope_files.nanoscope2hdf5(filename)
+                nanoscope_files.nanoscope2hdf5(filename, filepath)
             except:
                 print('Your file is ending with three digits, but is not a Nanoscope file, please change the '
                       'extension to the correct one') 
             filetype = 'nanoscope'
-        if filename.split('.')[-1] == 'dat':
+        elif filename.split('.')[-1] == 'dat':
             try:
-                shg_files.dat2hdf5(filename, params)
+                shg_files.dat2hdf5(filename, filepath, params)
             except:
                 print('This dat file has a shape which is not supported, for the moment dat file are used for SHG datas')
             filetype= 'dat'
@@ -80,7 +80,7 @@ def tohdf5(filename, params=None):
             print('file type not yet supported')
     return filetype
 
-def merge_hdf5(filelist, combined_name, erase_file='partial'):
+def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial'):
     '''
     Take a list of file to convert into a single hdf5 file
 
@@ -100,6 +100,10 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
     '''
     i = 0
     temporary = False
+    if shortend:
+        file_path = shorten_path(filelist)
+    else:
+        file_path = None
 
     with h5py.File(combined_name + '.hdf5', 'w') as f:
         typegrp = f.create_group('type')
@@ -108,7 +112,8 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
         procgrp = f.create_group('process')
         # print(f.keys())
 
-    for filename in filelist:
+    for i, filename in enumerate(filelist):
+
         if filename.split('.')[0] == combined_name:
             print('Warning: \'' + filename + '\' already exists. File has been ignored and will be overwritten.')
             continue
@@ -116,7 +121,10 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
             if filename.split('.')[-1] != 'hdf5':
                 if not (filename.split('.')[0] + '.hdf5' in filelist):
                     try:
-                        filetype = tohdf5(filename)
+                        if shortend:
+                            filetype = tohdf5(filename, filepath=file_path[i])
+                        else:
+                            filetype = tohdf5(filename)
                         if filetype == 'nanoscope':
                             filename = filename.replace('.', '_') + ".hdf5"
                         else:
@@ -130,21 +138,27 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
                         'Warning: \'' + filename + '\' is a non-hdf5 file, but the list containt a hdf5 file with the same name. File has been ignored.')
                     continue
         with h5py.File(combined_name + '.hdf5', 'a') as f:
-            # print(f.keys())
             typegrp = f['type']
             metadatagrp = f['metadata']
             datagrp = f['datasets']
             procgrp = f['process']
             with h5py.File(filename, 'r') as source_f:
-                for source_type in source_f['type']:
-                    source_f.copy('type/' + source_type, typegrp)
-                for source_metadata in source_f['metadata']:
-                    source_f.copy('metadata/' + source_metadata, metadatagrp)
-                for source_data in source_f['datasets']:
-                    source_f.copy('datasets/' + source_data, datagrp)
+                if file_path is not None:
+                    p = file_path[i].split('.')[0]
+                else:
+                    p = filename.split('.hdf5')[0]
+                f.require_group('type/' + '/'.join(p.split('/')[:-1]))
+                source_f.copy('type/' + p, f['type/' + '/'.join(p.split('/')[:-1])])
+                f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
+                source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
+                #try:
+                f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
+                #except:
+                #    pass
+                source_f.copy('datasets/' + p, f['datasets/' + '/'.join(p.split('/')[:-1])])
                 try:
-                    for source_proc in source_f['process']:
-                        source_f.copy('process/' + source_proc, procgrp)
+                    f.require_group('process/' + '/'.join(p.split('/')[:-1]))
+                    source_f.copy('process/' + p, f['process/' + '/'.join(p.split('/')[:-1])])
                 except:
                     pass
                 i = i + 1
@@ -152,7 +166,7 @@ def merge_hdf5(filelist, combined_name, erase_file='partial'):
         print('\'' + filename + '\' successfully merged')
         if erase_file == 'partial' and temporary:
             temporary = False
-            if filename.split('.')[-1] == '.hdf5':
+            if filename.split('.')[-1] == 'hdf5':
                 os.remove(filename)
 
     print(str(i) + '/' + str(len(filelist)) + ' files merged into \'' + combined_name + '.hdf5\'')
@@ -184,3 +198,22 @@ def create_hdf5(filename, image):
         datagrp[label].attrs['shape'] = image.shape
         datagrp[label].attrs['path'] = ("datasets/" + filename.split('.')[0])
     print('file successfully converted')
+
+
+def shorten_path(filelist):
+    if type(filelist) == str:
+        filelist = [filelist]
+    pad = max([len(i.split('/')) for i in filelist])
+    splitted = np.array([i.split('/') + ['NAN'] * (pad - len(i.split('/'))) for i in filelist])
+    for i in range(np.shape(splitted)[1]):
+        if len(set(splitted[:, i])) != 1:
+            breakpoint = i
+            break
+        else:
+            breakpoint = -1
+    result = []
+    for i in range(np.shape(splitted)[0]):
+        unpadded = np.delete(splitted[i, breakpoint:], np.where(splitted[i, breakpoint:] == 'NAN'))
+        result.append('/'.join(unpadded))
+
+    return result

@@ -399,7 +399,7 @@ def ARDF_parse_THMB(fd, thmb_entry):
     return [x_size, y_size, bin_data]
 
 
-def ardf2hdf5(filename):
+def ardf2hdf5(filename, filepath=None):
     gc.enable()
     ftoc, ttoc, fd = ARDF_load_file(filename)
 
@@ -433,10 +433,18 @@ def ardf2hdf5(filename):
 
             with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
                 typegrp = f.create_group("type")
-                typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
                 metadatagrp = f.create_group("metadata")
-                datagrp = f.create_group("datasets/" + filename.split('.')[0])
                 f.create_group("process")
+
+                if filepath is not None:
+                    typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
+                    datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+                else:
+                    typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+                    datagrp = f.create_group("datasets/" + filename.split('.')[0])
+
+
+
                 label_list = list(map(lambda x: x.decode('utf-8').replace('\x00', ''), data_channels_names))
                 y_size = volm_vdef[2]
                 x_size = volm_vdef[3]
@@ -481,6 +489,9 @@ def ardf2hdf5(filename):
             print("Found '" + str(t[0]) + "' header. What is it?")
 
         with h5py.File(filename.split('.')[0] + ".hdf5", "a") as f:
-            f["metadata"].create_dataset(filename.split('.')[0], data=metalist)
+            if filepath is not None:
+                f["metadata"].create_dataset(filepath.split('.')[0], data=metalist)
+            else:
+                f["metadata"].create_dataset(filename.split('.')[0], data=metalist)
 
     gc.disable()

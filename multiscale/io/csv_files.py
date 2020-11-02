@@ -3,8 +3,11 @@ import csv
 import numpy as np
 
 
-def csv2hdf5(filename):
-    file_base = filename.split('.')[0]
+def csv2hdf5(filename, filepath=None):
+    if filepath is not None:
+        file_base = filepath.split('.')[0]
+    else:
+        file_base = filename.split('.')[0]
     with open(filename) as csvfile:
         data = csv.reader(csvfile, delimiter=',')
         data = list(data)
@@ -19,6 +22,8 @@ def csv2hdf5(filename):
         metadatagrp.create_dataset(file_base, data=str(header))
         datagrp = f.create_group("datasets/" + file_base)
         f.create_group("process")
+
+
         dataset = datagrp.create_dataset(file_base, data=np_data)
         dataset.attrs['name'] = file_base
         dataset.attrs['shape'] = np_data.shape

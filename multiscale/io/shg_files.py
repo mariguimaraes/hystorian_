@@ -1,7 +1,7 @@
 import numpy as np
 import h5py
 
-def dat2hdf5(filename, params=None):
+def dat2hdf5(filename, filepath=None, params=None):
     data = np.fromfile(filename,sep=" ")
     try:
         data = np.reshape(data, (int(np.sqrt(len(data))), int(np.sqrt(len(data)))))
@@ -20,13 +20,18 @@ def dat2hdf5(filename, params=None):
 
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
         typegrp = f.create_group("type")
-        typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
-
         metadatagrp = f.create_group("metadata")
-        if params is not None:
-            metadatagrp.create_dataset(filename.split('.')[0], data=contents)
-
         f.create_group("process")
 
-        datagrp = f.create_group("datasets/" + filename.split('.')[0])
+        if filepath is not None:
+            if params is not None:
+                metadatagrp.create_dataset(filepath.split('.')[0], data=contents)
+            datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
+        else:
+            if params is not None:
+                metadatagrp.create_dataset(filename.split('.')[0], data=contents)
+            datagrp = f.create_group("datasets/" + filename.split('.')[0])
+            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+
         datagrp.create_dataset("SHG", data=data)

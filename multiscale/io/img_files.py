@@ -3,20 +3,24 @@ import h5py
 from PIL import Image
 
 
-def image2hdf5(filename):
+def image2hdf5(filename, filepath=None):
     img = Image.open(filename)
     arr = np.array(img)
 
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
         typegrp = f.create_group("type")
-        typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
-
         metadatagrp = f.create_group("metadata")
-        metadatagrp.create_dataset(filename.split('.')[0], data='no metadata')
-
         f.create_group("process")
 
-        datagrp = f.create_group("datasets/" + filename.split('.')[0])
+        if filepath is not None:
+            datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
+            metadatagrp.create_dataset(filepath.split('.')[0], data='no metadata')
+        else:
+            datagrp = f.create_group("datasets/" + filename.split('.')[0])
+            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+            metadatagrp.create_dataset(filename.split('.')[0], data='no metadata')
+
         keys = ['red', 'green', 'blue']
         for indx, key in enumerate(keys):
             datagrp.create_dataset(key, data=arr[:, :, indx])

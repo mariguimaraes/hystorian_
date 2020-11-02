@@ -11,7 +11,7 @@ import numpy as np
 # ==========================================
 # XRDML conversion
 
-def xrdml2hdf5(filename):
+def xrdml2hdf5(filename, filepath=None):
     if not xrdtools_bool:
         print('Please download the xrdtools package if you want to use this function')
         return
@@ -30,16 +30,19 @@ def xrdml2hdf5(filename):
                          '<positions axis="Z" unit="mm">']
 
         scans = contents.split('<dataPoints>')[1:]
-        
+
         typegrp = f.create_group("type")
-        typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
-
         metadatagrp = f.create_group("metadata")
-        metadatagrp.create_dataset(filename.split('.')[0], data=contents)
-
         f.create_group("process")
 
-        datagrp = f.create_group("datasets/" + filename.split('.')[0])
+        if filepath is not None:
+            metadatagrp.create_dataset(filepath.split('.')[0], data=contents)
+            datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
+        else:
+            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+            metadatagrp.create_dataset(filename.split('.')[0], data=contents)
+            datagrp = f.create_group("datasets/" + filename.split('.')[0])
         
         for i in range(len(param_names)):
             name = param_names[i]
