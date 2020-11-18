@@ -4,19 +4,126 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from . import core as pt
+import os
 import cv2
 import time
 
 from scipy.signal import medfilt, cspline2d
 from scipy.optimize import curve_fit
-from scipy.ndimage.morphology import binary_erosion, binary_dilation
+from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
 from scipy.ndimage.measurements import label
 from scipy import interpolate
 from skimage.morphology import skeletonize
 
 
-def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
-                       cumulative=False):
+def normalise(array, new_min=0, new_max=1):
+    """
+    Normalises an array of numbers so each number is within a range fo two numbers
+
+    Parameters
+    ----------
+    array : array_like
+        The array to be normalised
+    new_min : int or float, optional
+        Minimum value of new range (default: 0)
+    new_max : int or float, optional
+        Maximum value of new range (default: 1)
+    Returns
+    -------
+    array : array_like
+        the entry that has been converted
+    """
+    old_range = np.max(array) - np.min(array)
+    new_range = new_max - new_min
+    array = array - np.min(array)
+    array = array * new_range / old_range
+    array = array + new_min
+    return array
+
+def distortion_params_(filename, all_input_criteria,
+                       cumulative=False, filterfunc=normalise):
+    """
+    Determine cumulative translation matrices for distortion correction and directly write it into
+    an hdf5 file
+
+    Parameters
+    ----------
+    filename : str
+        name of hdf5 file containing data
+    all_input_criteria : str
+        criteria to identify paths to source files using pt.path_search. Should be
+        height data to extract parameters from
+    cumulative : bool, optional
+        Determines if each image is compared to the previous image (default,
+        False), or to the original image (True). Output format is identical.
+    fitlerfunc : func, optional
+        Function applied to image before identifying distortion params
+
+    Returns
+    -------
+        None
+    """
+    in_path_list = pt.path_search(filename, all_input_criteria)[0]
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
+                                                          in_path_list)
+    tform21 = np.eye(2, 3, dtype=np.float32)
+    cumulative_tform21 = np.eye(2, 3, dtype=np.float32)
+    with h5py.File(filename, "a") as f:
+        recent_offsets = []
+        for i in range(len(in_path_list)):
+            if i == 0:
+                start_time = time.time()
+            else:
+                print('---')
+                print('Currently reading path ' + in_path_list[i])
+                i1 = f[in_path_list[0]]
+                if (i > 1) and (not cumulative):
+                    i1 = f[in_path_list[i-1]]
+                i2 = f[in_path_list[i]]
+                if filterfunc is not None:
+                    i1 = filterfunc(i1)
+                    i2 = filterfunc(i2)                    
+                img1 = img_as_ubyte(i1)
+                img2 = img_as_ubyte(i2)
+
+                # legacy; may be useful to optimise correction by reading offset
+                #if read_offset:
+                #    offset2 = (f[in_path_list[i]]).attrs['offset']
+                #    offset1 = (f[in_path_list[i - 1]]).attrs['offset']
+                #    scan_size = (f[in_path_list[i]]).attrs['size']
+                #    shape = (f[in_path_list[i]]).attrs['shape']
+                #    offset_px = m2px(offset2 - offset1, shape, scan_size)
+                #else:
+                #    offset_px = np.array([0, 0])
+                #if (offset_px[0] != 0) or (offset_px[1] != 0):
+                #    print('Offset found from file attributes: ' + str(offset_px))
+                #    warp_check_range = warp_check_range + 8
+                #    recent_offsets = []
+                
+                tform21 =  generate_transform_xy(img1, img2)
+                timg = cv2.warpAffine(img1, tform21, (512, 512), flags=cv2.INTER_LINEAR +
+                                                                          cv2.WARP_INVERSE_MAP)
+                if cumulative:
+                    tform21[0, 2] = tform21[0, 2] - cumulative_tform21[0, 2]
+                    tform21[1, 2] = tform21[1, 2] - cumulative_tform21[1, 2]
+                cumulative_tform21[0, 2] = cumulative_tform21[0, 2] + tform21[0, 2]
+                cumulative_tform21[1, 2] = cumulative_tform21[1, 2] + tform21[1, 2]
+                print('Scan ' + str(i) + ' Complete. Cumulative Transform Matrix:')
+                print(cumulative_tform21)
+                if cumulative:
+                    print('Scan ' + str(i) + ' Complete. Cumulative Transform Matrix:')
+                else:
+                    print('Scan ' + str(i) + ' Complete. Transform Matrix:')
+                print(tform21)
+            data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
+                                     in_path_list[i])
+            data.attrs['cumulative'] = cumulative
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_params',
+                               in_path_list[i], clear=False)
+
+
+def distortion_params_classic(filename, all_input_criteria, speed=2, read_offset=False,
+                       cumulative=False, filterfunc=normalise):
     """
     Determine cumulative translation matrices for distortion correction and directly write it into
     an hdf5 file
@@ -37,6 +144,8 @@ def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
     cumulative : bool, optional
         Determines if each image is compared to the previous image (default,
         False), or to the original image (True). Output format is identical.
+    fitlerfunc : func, optional
+        Function applied to image before identifying distortion params
 
     Returns
     -------
@@ -55,12 +164,15 @@ def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
             else:
                 print('---')
                 print('Currently reading path ' + in_path_list[i])
-                if cumulative:
-                    img1 = img2cv((f[in_path_list[0]]))
-                    img2 = img2cv((f[in_path_list[i]]))
-                else:
-                    img1 = img2cv((f[in_path_list[i - 1]]))
-                    img2 = img2cv((f[in_path_list[i]]))
+                i1 = f[in_path_list[0]]
+                if (i > 1) and (not cumulative):
+                    i1 = f[in_path_list[i-1]]
+                i2 = f[in_path_list[i]]
+                if filterfunc is not None:
+                    i1 = filterfunc(i1)
+                    i2 = filterfunc(i2)                    
+                img1 = img_as_ubyte(i1)
+                img2 = img_as_ubyte(i2)
 
                 # try estimate offset change from attribs of img1 and img2
                 if read_offset:
@@ -71,7 +183,7 @@ def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
                     offset_px = m2px(offset2 - offset1, shape, scan_size)
                 else:
                     offset_px = np.array([0, 0])
-                if speed != 1 and speed != 2 and speed != 3 and speed != 4:
+                if speed != 0 and speed != 1 and speed != 2 and speed != 3 and speed != 4:
                     print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest).\
                             Speed now set to level 2.')
                     speed = 2
@@ -113,7 +225,7 @@ def distortion_params_(filename, all_input_criteria, speed=2, read_offset=False,
                     print('Offset found from file attributes: ' + str(offset_px))
                     warp_check_range = warp_check_range + 8
                     recent_offsets = []
-                tform21 = generate_transform_xy(img1, img2, tform21, offset_guess,
+                tform21 = generate_transform_xy_classic(img1, img2, tform21, offset_guess,
                                                 warp_check_range, cumulative, cumulative_tform21)
                 if cumulative:
                     tform21[0, 2] = tform21[0, 2] - cumulative_tform21[0, 2]
@@ -178,8 +290,41 @@ def img2cv(img1, sigma_cutoff=10):
     return img1
 
 
-def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_check_range=10,
-                          cumulative=False, cumulative_tform21=np.eye(2, 3, dtype=np.float32)):
+def generate_transform_xy(img, img_orig, warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
+                          number_of_iterations=10000):
+    """
+    Determines transformation matrices in x and y coordinates
+
+    Parameters
+    ----------
+    img : cv2
+        Currently used image (in cv2 format) to find transformation array of
+    img_orig : cv2
+        Image (in cv2 format) transformation array is based off of
+    warp_mode : see cv2 documentation
+        warp_mode used in cv2's findTransformationECC function
+    termination_eps : float
+        eps used to terminate fit
+    number_of_iterations : int
+        number of iterations in fit before termination
+    
+    Returns
+    -------
+    warp_matrix : ndarray
+        Transformation matrix used to convert img_orig into img
+    """
+    # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
+    # findTransformECC (OpenCV 3.0+ only).
+    # Returns the transform matrix of the img with respect to img_orig
+    warp_matrix = np.eye(2, 3, dtype=np.float32)
+    criteria = (term_flags, number_of_iterations, termination_eps)
+    (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
+                                         criteria)
+    return tform21
+
+
+def generate_transform_xy_classic(img, img_orig, tfinit=None, offset_guess = [0,0], warp_check_range=10, 
+                          cumulative=False, cumulative_tform21=np.eye(2,3,dtype=np.float32)):
     """
     Determines transformation matrices in x and y coordinates
 
@@ -207,8 +352,7 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_
     warp_matrix : ndarray
         Transformation matrix used to convert img_orig into img
     """
-
-    # Here we generate a MOTION_EUCLIDEAN matrix by doing a
+    # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
     warp_mode = cv2.MOTION_TRANSLATION
@@ -216,8 +360,8 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_
         warp_matrix = tfinit
     else:
         warp_matrix = np.eye(2, 3, dtype=np.float32)
-    number_of_iterations = 100000
-    termination_eps = 1e-1  # e-5
+    number_of_iterations = 10000
+    termination_eps = 1e-3
     term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
 
     if cumulative:
@@ -235,7 +379,7 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_
             warp_matrix[1, 2] = 2 * j + offset_guess[1]
             try:
                 (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                                     criteria, inputMask=None, gaussFiltSize=5)
+                                                     criteria)
                 img_test = cv2.warpAffine(img, tform21, (512, 512), flags=cv2.INTER_LINEAR +
                                                                           cv2.WARP_INVERSE_MAP)
                 currDiff = np.sum(np.square(img_test[150:-150, 150:-150]
@@ -249,9 +393,56 @@ def generate_transform_xy(img, img_orig, tfinit=None, offset_guess=[0, 0], warp_
             warp_matrix[0, 2] = offset1
             warp_matrix[1, 2] = offset2
     return warp_matrix
-
-
+            
+            
 def distortion_correction_(filename, all_input_criteria, cropping=True):
+    """
+    Applies distortion correction parameters to an image. The distortion corrected data is then
+    cropped to show only the common data, or expanded to show the maximum extent of all possible data.
+
+    Parameters
+    ----------
+    filename : str
+        Filename of hdf5 file containing data
+    all_input_criteria : list
+        Criteria to identify paths to source files using pt.path_search. First should
+        be data to be corrected, second should be the distortion parameters.
+    cropping : bool, optional
+        If set to True, each dataset is cropped to show only the common area. If
+        set to false, expands data shape to show all data points of all images. (default: True)
+
+    Returns
+    -------
+    None
+    """
+    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
+    in_path_list = all_in_path_list[0]
+    dm_path_list = all_in_path_list[1]
+    channel_number = int(len(in_path_list)/len(dm_path_list))
+
+    distortion_matrices = []
+    with h5py.File(filename, "a") as f:
+        for path in dm_path_list[:]:
+            distortion_matrices.append(np.copy(f[path]))
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
+                                                          in_path_list)
+    
+    with h5py.File(filename, "a") as f:
+        start_time = time.time()
+        for i in range(len(dm_path_list)):
+            #for j in range(channel_number)
+            #curr_image = np.array(f[in_path_list[(i*channel_number)+j]])
+            curr_image = np.array(f[in_path_list[i]])
+            for k in range(i):
+                prev_image=np.copy(curr_image)
+                curr_image = cv2.warpAffine(prev_image, distortion_matrices[k], tuple(reversed(list(np.shape(prev_image)))), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
+            data = pt.write_output_f(f, curr_image, out_folder_locations[i], [in_path_list[i],
+                                                                               dm_path_list[i]])
+            propagate_scale_attrs(data, f[in_path_list[i]])
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
+                               in_path_list[i])
+
+def distortion_correction_classic(filename, all_input_criteria, cropping=True):
     """
     Applies distortion correction parameters to an image. The distortion corrected data is then
     cropped to show only the common data, or expanded to show the maximum extent of all possible data.
@@ -302,7 +493,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
             propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
                                in_path_list[i])
-
+            
 
 def propagate_scale_attrs(new_data, old_data):
     """
@@ -400,7 +591,7 @@ def array_expanded(array, xoffset, yoffset, offset_caps):
 
 
 def phase_linearisation(image, min_separation=90, background=None,
-                        flip_proportion=0.8, show=False):
+                        flip_proportion=0.8, phase_range=None, show=False):
     """
     Converts each entry of a 2D phase channel (rotating 360 degrees with an arbitrary 0 point) into a
     float between 0 and 1.  The most common values become 0 or 1, and other values are a linear
@@ -420,6 +611,8 @@ def phase_linearisation(image, min_separation=90, background=None,
         everything to the right background
     flip_proportion : int or float, optional
         Threshold, above which the data is flipped to (1-data)
+    phase_range : int, optional
+        Sets the range over which the linearisation will occur. If not set, calculates from max-min
     show : bool, optional
         If True, show the data prior to saving
 
@@ -430,15 +623,19 @@ def phase_linearisation(image, min_separation=90, background=None,
     """
     phase_flat = np.array(image).ravel()
     min_phase = int(np.floor(np.min(phase_flat)))
-    max_phase = min_phase + 360
+    if phase_range == None:
+        max_phase = int(np.floor(np.max(phase_flat)))
+        phase_range = max_phase-min_phase
+    else:
+        max_phase = min_phase+phase_range
 
     # Convert original data into histograms and find largest peak
     ydata, bin_edges = np.histogram(phase_flat, bins=360, range=[min_phase, max_phase])
     peak1_index = np.argmax(ydata)
 
     # Find next largest peak a distance away from original peak
-    peak1_exclude_left = wrap(peak1_index - min_separation, 0, 360)
-    peak1_exclude_right = wrap(peak1_index + min_separation, 0, 360)
+    peak1_exclude_left = wrap(peak1_index - min_separation, 0, phase_range)
+    peak1_exclude_right = wrap(peak1_index + min_separation, 0, phase_range)
     if peak1_exclude_left < peak1_exclude_right:
         peak2_search_region = np.delete(ydata,
                                         np.arange(peak1_exclude_left, peak1_exclude_right))
@@ -449,7 +646,10 @@ def phase_linearisation(image, min_separation=90, background=None,
             peak2_index = peak2_index + 2 * min_separation
     else:
         peak2_search_region = ydata[peak1_exclude_right:peak1_exclude_left]
-        peak2_index = np.argmax(peak2_search_region) + peak1_exclude_right - 1
+        if peak2_search_region.size != 0:
+            peak2_index = np.argmax(peak2_search_region) + peak1_exclude_right - 1
+        else:
+            peak2_index = np.mean([peak1_exclude_right, peak1_exclude_left])
 
     # Split wrapped dataset into two number lines; one going up and one down
     if peak1_index > peak2_index:
@@ -457,7 +657,7 @@ def phase_linearisation(image, min_separation=90, background=None,
     peak1_value = peak1_index + min_phase
     peak2_value = peak2_index + min_phase
     range_1to2 = peak2_value - peak1_value
-    range_2to1 = 360 - range_1to2
+    range_2to1 = phase_range - range_1to2
 
     # Create a new array whose values depend on their position on the number lines
     linearised_array = np.copy(image)
@@ -479,6 +679,7 @@ def phase_linearisation(image, min_separation=90, background=None,
             if np.mean(linearised_array[:, :background]) > np.mean(linearised_array):
                 linearised_array = 1 - linearised_array
     pt.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
+          
     linearised = medfilt(cv2.blur(linearised_array, (7, 7)), 7)
     result = pt.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
     return result
@@ -515,31 +716,6 @@ def linearise(entry, peak1_value, peak2_value, range_1to2, range_2to1):
         entry = 1 - ((entry - peak2_value) / range_2to1)
     return entry
 
-
-def normalise(array, new_min=0, new_max=1):
-    """
-    Normalises an array of numbers so each number is within a range fo two numbers
-
-    Parameters
-    ----------
-    array : array_like
-        The array to be normalised
-    new_min : int or float, optional
-        Minimum value of new range (default: 0)
-    new_max : int or float, optional
-        Maximum value of new range (default: 1)
-    Returns
-    -------
-    array : array_like
-        the entry that has been converted
-
-    """
-    old_range = np.max(array) - np.min(array)
-    new_range = new_max - new_min
-    array = array - np.min(array)
-    array = array * new_range / old_range
-    array = array + new_min
-    return array
 
 def m_sum(*args):
     """
@@ -579,11 +755,12 @@ def m_sum(*args):
 # phase: array of phase data to be binarised
 # thresh_estimate (default: 2): initial guess for where the threshold should be placed
 # thresh_search_range (default: 0.8): range of thresholds searched around the estimate
+# blur (default: 7): blur applied to image to help assist in binarisation
 # source_input_count: number of phases summed, used to estimate threshold
 #    OUTPUTS
 # result: hdf5_dict containing the binarised phase, as well as the threshold in attributes
 
-def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None,
+def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None, blur = 7,
                        source_input_count=None):
     if thresh_estimate is None:
         if source_input_count is not None:
@@ -595,7 +772,7 @@ def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None,
             thresh_search_range = source_input_count / 10
         else:
             thresh_search_range = 0.1
-    blurred_phase = cv2.blur(phase, (7, 7))
+    blurred_phase = cv2.blur(phase, (blur, blur))
     best_thresh = threshold_noise(blurred_phase, thresh_estimate, thresh_search_range / 2, 5)
     binary = blurred_phase > best_thresh
 
@@ -1346,25 +1523,26 @@ def final_a_domains(orig_vert, orig_horz, closing_distance=50):
         if np.sum(orig_vert[:, x]) != 0:
             if np.sum(orig_vert[:, x]) == np.shape(new_vert)[0]:
                 vert_list.append([x, 0, x, np.shape(new_vert)[0] - 1])
-            elif np.sum(orig_horz[:, x]) != 0:
-                domains_list = np.where(orig_horz[:, x] == 1)[0]
-                for domain in domains_list:
-                    min_index = np.max([0, domain - closing_distance])
-                    max_index = np.min([domain + 1 + closing_distance, len(orig_horz[:, x])])
-                    vert_top_segment = new_vert[min_index:domain + 1, x]
-                    if (np.sum(vert_top_segment) != 0) and (np.sum(vert_top_segment) !=
-                                                            np.shape(vert_top_segment)[0]):
-                        if vert_top_segment[0] == 1:
-                            new_vert[min_index:domain + 1, x] = np.zeros_like(vert_top_segment) + 1
-                        else:
-                            new_vert[min_index:domain + 1, x] = np.zeros_like(vert_top_segment)
-                    vert_bot_segment = new_vert[domain:max_index, x]
-                    if (np.sum(vert_bot_segment) != 0) and (np.sum(vert_bot_segment) !=
-                                                            np.shape(vert_bot_segment)[0]):
-                        if vert_bot_segment[-1] == 1:
-                            new_vert[domain:max_index, x] = np.zeros_like(vert_bot_segment) + 1
-                        else:
-                            new_vert[domain:max_index, x] = np.zeros_like(vert_bot_segment)
+            else:
+                if np.sum(orig_horz[:, x]) != 0:
+                    domains_list = np.where(orig_horz[:, x] == 1)[0]
+                    for domain in domains_list:
+                        min_index = np.max([0, domain - closing_distance])
+                        max_index = np.min([domain + 1 + closing_distance, len(orig_horz[:, x])])
+                        vert_top_segment = new_vert[min_index:domain + 1, x]
+                        if (np.sum(vert_top_segment) != 0) and (np.sum(vert_top_segment) !=
+                                                                np.shape(vert_top_segment)[0]):
+                            if vert_top_segment[0] == 1:
+                                new_vert[min_index:domain + 1, x] = np.zeros_like(vert_top_segment) + 1
+                            else:
+                                new_vert[min_index:domain + 1, x] = np.zeros_like(vert_top_segment)
+                        vert_bot_segment = new_vert[domain:max_index, x]
+                        if (np.sum(vert_bot_segment) != 0) and (np.sum(vert_bot_segment) !=
+                                                                np.shape(vert_bot_segment)[0]):
+                            if vert_bot_segment[-1] == 1:
+                                new_vert[domain:max_index, x] = np.zeros_like(vert_bot_segment) + 1
+                            else:
+                                new_vert[domain:max_index, x] = np.zeros_like(vert_bot_segment)
                 line_found = False
                 for y in range(np.shape(new_vert)[0]):
                     if (new_vert[y, x] == 1) and (not line_found):
@@ -1382,25 +1560,26 @@ def final_a_domains(orig_vert, orig_horz, closing_distance=50):
         if np.sum(orig_horz[y, :]) != 0:
             if np.sum(orig_horz[y, :]) == np.shape(new_horz)[1]:
                 horz_list.append([0, y, np.shape(new_horz)[1] - 1, y])
-            elif np.sum(orig_vert[y, :]) != 0:
-                domains_list = np.where(orig_vert[y, :] == 1)[0]
-                for domain in domains_list:
-                    min_index = np.max([0, domain - closing_distance])
-                    max_index = np.min([domain + 1 + closing_distance, len(orig_vert[y, :])])
-                    horz_lft_segment = new_horz[y, min_index:domain + 1]
-                    if (np.sum(horz_lft_segment) != 0) and (np.sum(horz_lft_segment) !=
-                                                            np.shape(horz_lft_segment)[0]):
-                        if horz_lft_segment[0] == 1:
-                            new_horz[y, min_index:domain + 1] = np.zeros_like(horz_lft_segment) + 1
-                        else:
-                            new_horz[y, min_index:domain + 1] = np.zeros_like(horz_lft_segment)
-                    horz_rgt_segment = new_horz[y, domain:max_index]
-                    if (np.sum(horz_rgt_segment) != 0) and (np.sum(horz_rgt_segment) !=
-                                                            np.shape(horz_rgt_segment)[0]):
-                        if horz_rgt_segment[-1] == 1:
-                            new_horz[y, domain:max_index] = np.zeros_like(horz_rgt_segment) + 1
-                        else:
-                            new_horz[y, domain:max_index] = np.zeros_like(horz_rgt_segment)
+            else:
+                if np.sum(orig_vert[y, :]) != 0:
+                    domains_list = np.where(orig_vert[y, :] == 1)[0]
+                    for domain in domains_list:
+                        min_index = np.max([0, domain - closing_distance])
+                        max_index = np.min([domain + 1 + closing_distance, len(orig_vert[y, :])])
+                        horz_lft_segment = new_horz[y, min_index:domain + 1]
+                        if (np.sum(horz_lft_segment) != 0) and (np.sum(horz_lft_segment) !=
+                                                                np.shape(horz_lft_segment)[0]):
+                            if horz_lft_segment[0] == 1:
+                                new_horz[y, min_index:domain + 1] = np.zeros_like(horz_lft_segment) + 1
+                            else:
+                                new_horz[y, min_index:domain + 1] = np.zeros_like(horz_lft_segment)
+                        horz_rgt_segment = new_horz[y, domain:max_index]
+                        if (np.sum(horz_rgt_segment) != 0) and (np.sum(horz_rgt_segment) !=
+                                                                np.shape(horz_rgt_segment)[0]):
+                            if horz_rgt_segment[-1] == 1:
+                                new_horz[y, domain:max_index] = np.zeros_like(horz_rgt_segment) + 1
+                            else:
+                                new_horz[y, domain:max_index] = np.zeros_like(horz_rgt_segment)
                 line_found = False
                 for x in range(np.shape(new_horz)[1]):
                     if (new_horz[y, x] == 1) and (not line_found):
@@ -1439,12 +1618,12 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
         mV = mV.split('_')[-1]
         mV = int(mV)
 
-    if voltage_increment is not None:
-        voltage = []
-        for i in range(len(phase_list)):
-            voltage.append(mV + voltage_increment * i)
-    else:
-        voltage = mV
+        if voltage_increment is not None:
+            voltage = []
+            for i in range(len(phase_list)):
+                voltage.append(mV + voltage_increment * i)
+        else:
+            voltage = mV
 
     switchmap = np.zeros_like(phase_list[0].astype(float))
     start_time = time.time()

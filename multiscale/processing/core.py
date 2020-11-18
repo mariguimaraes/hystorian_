@@ -682,6 +682,20 @@ def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
         os.rename(copy_filename, filename)
 
 
+    
+def create_group_path(f, path):
+    groups = path.split('/')
+    curr_path = ''
+    for curr_group in groups:
+        if curr_path == '':
+            if curr_group not in f.keys():
+                f.create_group(curr_group)
+        else:
+            if curr_group not in f[curr_path].keys():
+                f[curr_path].create_group(curr_group)
+        curr_path = curr_path+'/'+curr_group
+        
+
 #####################################################################################################
 #                                                                                                   #
 #                    THESE FUNCTIONS ARE USEFUL FOR HARDCODING COMPLEX FUNCTIONS                    #
@@ -769,3 +783,23 @@ def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
     dataset = f[out_folder_location][output_name]
     write_generic_attributes(dataset, out_folder_location, in_paths, output_name)
     return dataset
+
+
+#   FUNCTION write_output_f
+# Given the filename and input criteria, returns the dataset as an array
+#   INPUTS:
+# filename : name of the hdf5 file where the datas are stored
+# all_input_criteria : Regex expression to describe the inputs searched for
+#   OUTPUTS
+# data: the requested dataset
+
+
+def read_dataset(filename, all_input_criteria):
+    all_in_path_list = path_search(filename, all_input_criteria)
+    all_in_path_list = list(map(list, zip(*all_in_path_list)))
+    data_list = []
+    for path in all_in_path_list:
+        with h5py.File(filename, 'r') as f:
+            data_list.append(np.array(f[path[0]]))
+    data = np.array(data_list)
+    return data

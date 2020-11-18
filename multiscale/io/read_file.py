@@ -80,7 +80,7 @@ def tohdf5(filename,filepath=None, params=None):
             print('file type not yet supported')
     return filetype
 
-def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial'):
+def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False):
     '''
     Take a list of file to convert into a single hdf5 file
 
@@ -93,6 +93,8 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial'):
     erase_file : str, optional
         merge_hdf5 create temporary hdf5 file for each element in filelist and then merge them.
         If set to 'partial', it erases the temp files.
+    merge_process : bool, optional
+        If set to True, merge_hdf5 will attempt to merge the process folders of hdf5 files together
 
     Returns
     -------
@@ -151,16 +153,20 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial'):
                 source_f.copy('type/' + p, f['type/' + '/'.join(p.split('/')[:-1])])
                 f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
                 source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
-                #try:
                 f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
-                #except:
-                #    pass
                 source_f.copy('datasets/' + p, f['datasets/' + '/'.join(p.split('/')[:-1])])
-                try:
+                if merge_process:
                     f.require_group('process/' + '/'.join(p.split('/')[:-1]))
                     source_f.copy('process/' + p, f['process/' + '/'.join(p.split('/')[:-1])])
-                except:
-                    pass
+                else:
+                    for source_proc in source_f['process']:
+                        dest_proc = source_proc.split('-', 1)[1]
+                        num_proc = len(procgrp.keys())
+                        num_proc = num_proc + 1
+                        dest_proc = str(num_proc).zfill(3)+'-'+dest_proc
+                        pt.create_group_path(procgrp, dest_proc)
+                        for source_proc_proc in source_f['process'][source_proc]:
+                            source_f.copy('process/'+source_proc+'/'+source_proc_proc, procgrp[dest_proc])
                 i = i + 1
 
         print('\'' + filename + '\' successfully merged')

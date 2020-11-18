@@ -354,3 +354,30 @@ def plot_RSM(qx, qz, intensity, filename='RSM', xlim = [], ylim = []):
     plt.savefig(filename+'.png')
     plt.show()
     plt.close()
+    
+    
+#   FUNCTION to_csv
+# Exports a dataset into a .csv file
+#   INPUTS:
+# data: data to be exported
+# file_name (default: None): name of the output file. By default, names file 'data'
+# saving_path (default: ''): path to save destination
+# source_path (default: None): for compatibility with source parameter in m_apply;
+#     used to name the output file
+#   OUTPUTS:
+# null
+        
+def to_csv(data,
+           file_name=None,
+           saving_path='',
+           source_path=None):
+    if file_name is None:
+        if source_path is not None:
+            file_name = source_path.replace('/', '_')
+        else:
+            file_name = 'data'
+    if saving_path != '':
+        if saving_path[-1] != '/':
+            saving_path = saving_path + '/'
+    np.savetxt(saving_path+str(file_name) + '.csv', data, delimiter=',')
+    return
