@@ -14,6 +14,8 @@ from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, bin
 from scipy.ndimage.measurements import label
 from scipy import interpolate
 from skimage.morphology import skeletonize
+from skimage import img_as_ubyte
+from random import randrange
 
 
 def normalise(array, new_min=0, new_max=1):
