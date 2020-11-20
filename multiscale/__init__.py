@@ -9,6 +9,7 @@ from .processing import core
 from .processing import ndim
 from .processing import twodim
 from .processing import plot
+from .processing import deprecated
 
 try:
     import h5py

@@ -217,59 +217,6 @@ def l_apply(filename, function, all_input_criteria, repeat=None, **kwargs):
                         all_in_path_list[path_num])
         increment_proc = False
 
-#   FUNCTION l_apply_classic
-# Runs m_apply multiple times successively, intended to operate on an entire process or dataset
-# folder
-#   INPUTS:
-# filename : name of the hdf5 file where the datas are stored
-# function : Custom function that you want to call
-# all_input_criteria : Regex expression to describe the inputs searched for. Can be composed as a
-#     list of a list of strings, with extra list parenthesis automatically generated. Eg:
-#         'process*Trace1*' would pass to m_apply all files that contain 'process*Trace1*'.
-#         ['process*Trace1*'] as above
-#         [['process*Trace1*']] as above
-#         [['process*Trace1*', 'process*Trace2*']] would pass to m_apply all files that contain 
-#             'process*Trace1*' and 'process*Trace2*' in a single list.
-#         [['process*Trace1*'], ['process*Trace2*']] would pass to m_apply all files that contain 
-#             'process*Trace1*' and 'process*Trace2*' in two different lists; and thus will operate
-#             differently on each of these lists.
-# outputs_names (default: None): list of the names of the channels for the writting of the results.
-#     By default, copies names from the first of the in_paths
-# folder_names (default: None): list of the names of the folder containing results data channels.
-#     By default, copies names from the first of the in_paths
-# use_attrs (default: None): string, or list of strings, that are the names of attributes that will
-#     be copied from in_paths, and passed into the function as a kwarg for use. 
-# prop_attrs (default: None): string, or list of strings, that are the names of attributes that will
-#     be copied from in_paths, into each output file. If the same attribute name is in multiple
-#     in_paths, the first in_path with the attribute name will be copied from.
-# repeat (default: None): determines what to do if path_lists generated are of different lengths.
-#     None: Default, no special action is taken, and extra entries are removed. ie, given lists
-#         IJKL and AB, IJKL -> IJ.
-#     'alt': The shorter lists of path names are repeated to be equal in length to the longest list.
-#         ie, given IJKL and AB, AB -> ABAB
-#     'block': Each entry of the shorter list of path names is repeated to be equal in length to the
-#         longest list. ie, given IJKL and AB, AB -> AABB.
-# **kwargs : All the non-data inputs to give to the function
-#    OUTPUTS:
-# null
-#    TO DO:
-# Can we force a None to be passed?
-
-
-def l_apply_classic(filename, function, all_input_criteria, output_names=None, folder_names=None,
-                    use_attrs=None, prop_attrs=None, repeat=None, **kwargs):
-    all_in_path_list = path_search(filename, all_input_criteria, repeat)
-    all_in_path_list = list(map(list, zip(*all_in_path_list)))
-    increment_proc = True
-    start_time = time.time()
-    for path_num in range(len(all_in_path_list)):
-        m_apply(filename, function, all_in_path_list[path_num], output_names=output_names,
-                folder_names=folder_names, increment_proc=increment_proc,
-                use_attrs=use_attrs, prop_attrs=prop_attrs, **kwargs)
-        progress_report(path_num + 1, len(all_in_path_list), start_time, function.__name__,
-                        all_in_path_list[path_num])
-        increment_proc = False
-
 
 #   FUNCTION path_search
 # Uses regex expressions to search for all paths. Useful when writing complicated custom functions
@@ -785,7 +732,7 @@ def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
     return dataset
 
 
-#   FUNCTION write_output_f
+#   FUNCTION read_dataset
 # Given the filename and input criteria, returns the dataset as an array
 #   INPUTS:
 # filename : name of the hdf5 file where the datas are stored
