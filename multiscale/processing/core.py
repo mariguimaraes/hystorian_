@@ -161,7 +161,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                     dataset = create_dataset_with_name_check(f[out_folder_location], name, data)
                     if prop_attrs is not None:
                         dataset = propagate_attrs(dataset, prop_attr_keys, prop_attr_vals)
-                write_generic_attributes(fproc[name], out_folder_location + '/', in_paths, name)
+                write_generic_attributes(fproc[name], out_folder_location + '/', in_paths, name, function)
                 for key, value in kwargs.items():
                     if value is None:
                         value = 'None'
@@ -428,7 +428,7 @@ def hdf5_dict(data, **kwargs):
 #   OUTPUTS
 # null
 
-def write_generic_attributes(dataset, out_folder_location, in_paths, output_name):
+def write_generic_attributes(dataset, out_folder_location, in_paths, output_name, function):
     if type(in_paths) != list:
         in_paths = [in_paths]
     operation_name = out_folder_location.split('/')[1]
@@ -436,7 +436,8 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
     dataset.attrs['path'] = out_folder_location + output_name
     dataset.attrs['shape'] = dataset.shape
     dataset.attrs['name'] = output_name
-    dataset.attrs['operation name'] = operation_name.split('-')[1]
+    #dataset.attrs['operation name'] = operation_name.split('-')[1]
+    dataset.attrs['operation name'] = function.__module__ + '.' + function.__name__
     dataset.attrs['operation number'] = operation_name.split('-')[0]
     dataset.attrs['time'] = str(datetime.now())
     dataset.attrs['source'] = in_paths
