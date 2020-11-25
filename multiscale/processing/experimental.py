@@ -2,6 +2,7 @@ import h5py
 import importlib
 from multiscale import processing
 import ast
+import sys
 
 
 def compress_hdf5(file, error_threshold=0, bypass_verification=False):
@@ -21,24 +22,32 @@ def compress_hdf5(file, error_threshold=0, bypass_verification=False):
         for k in list(processing_lst)[::-1]:
             fname = list(processes[k].keys())[0]
             outputs = list(processes[k][fname])
-            print(outputs)
             module = importlib.import_module('.'.join(
                 processes[k][fname][outputs[0]].attrs['operation name'].split('.')[:-1]))
 
             func = getattr(module,
                            processes[k][fname][outputs[0]].attrs['operation name'].split('.')[-1])
-            kwargs = ast.literal_eval(processes[k][fname][outputs[0]].attrs['kwargs'])
+            kwargs = {}
+            for key in f['process/001-sum_array/kpfm_5V_0000/sum1'].attrs.keys():
+                if k.split('_')[0] == 'kwargs':
+                    short_key = '_'.join(key.split('_')[1:])
+                    kwargs[short_key] = processes[k][fname][outputs[0]].attrs[k]
+
             inputs = []
             for source in processes[k][fname][outputs[0]].attrs['source']:
                 inputs.append(f[source][()])
+            try:
+                results = func(*inputs, **kwargs)
+                for i in range(len(outputs)):
+                    if (results[i] - processes[k][fname][outputs[i]][()] < error_threshold).all():
+                        print('Result is not identical, not compressing')
+                        identical = False
+                        break
+            except Exception as e:
+                print(e.__doc__)
+                print(e.message)
+                identical = False
 
-            results = func(*inputs, **kwargs)
-            for i in range(len(outputs)):
-                print(processes[k][fname][outputs[i]][()])
-                if (results[i] - processes[k][fname][outputs[i]][()] < error_threshold).all():
-                    print('Result is not identical, not compressing')
-                    identical = False
-                    break
             if identical:
                 for i in range(len(outputs)):
                     tmpattrs = {}

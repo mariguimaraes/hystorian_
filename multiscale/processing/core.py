@@ -164,18 +164,12 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                 write_generic_attributes(fproc[name], out_folder_location + '/', in_paths, name, function)
                 dict_kwargs = {}
                 for key, value in kwargs.items():
-                    if value is None:
-                        dict_kwargs[key] = 'None'
-                        value = 'None'
-                    else:
-                        dict_kwargs[key] = value
-                    #try:
-                    #    dataset.attrs[key] = value
-                    #except RuntimeError:
-                    #    print('Attribute was not able to be saved, probably because the attribute'
-                    #          'is too large')
-                    #    dataset.attrs[key] = 'None'
-                dataset.attrs['kwargs'] = str(dict_kwargs)
+                    try:
+                        dataset.attrs['kwargs_' + key] = value
+                    except RuntimeError:
+                        print('Attribute was not able to be saved, probably because the attribute'
+                              'is too large')
+                        dataset.attrs['kwargs_' + key] = 'None'
         else:
             print('Error: Unequal amount of outputs and output names')
     return result

@@ -10,6 +10,7 @@ from .processing import ndim
 from .processing import twodim
 from .processing import plot
 from .processing import deprecated
+from .processing import experimental
 
 try:
     import h5py
