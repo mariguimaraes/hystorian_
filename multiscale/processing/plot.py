@@ -2,7 +2,8 @@ try:
     from matplotlib_scalebar.scalebar import ScaleBar
     scaleBarBool = True
 except ImportError:
-    print('Matplotlib_scalebar was not found, please install the package.')
+    print('Matplotlib_scalebar was not found, please install the package or you will not be able to'
+          ' add scalebar to your images.')
     scaleBarBool = False
 
 import numpy as np
@@ -126,8 +127,8 @@ def save_image(data,
                                         font_properties={'size': labelsize})
                 plt.gca().add_artist(scalebar)
             except:
-                print("Error in the creation of the scalebar, please check that the attribute's\
-                            size and shape are correctly define for each data channel.")
+                print("Error in the creation of the scalebar, please check that the attribute's"
+                      " size and shape are correctly define for each data channel.")
                 raise
         else:
             print("Scalebar package is not installed, please install it if you want to add a scalebar to your image")

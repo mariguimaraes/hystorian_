@@ -28,7 +28,7 @@ def compress_hdf5(file, error_threshold=0, bypass_verification=False):
             func = getattr(module,
                            processes[k][fname][outputs[0]].attrs['operation name'].split('.')[-1])
             kwargs = {}
-            for key in f['process/001-sum_array/kpfm_5V_0000/sum1'].attrs.keys():
+            for key in f[k][fname][outputs[0]].attrs.keys():
                 if k.split('_')[0] == 'kwargs':
                     short_key = '_'.join(key.split('_')[1:])
                     kwargs[short_key] = processes[k][fname][outputs[0]].attrs[k]
