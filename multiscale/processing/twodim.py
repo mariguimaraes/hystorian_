@@ -42,8 +42,11 @@ def normalise(array, new_min=0, new_max=1):
     array = array + new_min
     return array
 
-def distortion_params_(filename, all_input_criteria,
-                       cumulative=False, filterfunc=normalise):
+
+def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offset=False,
+                       cumulative=False, filterfunc=normalise, warp_mode=cv2.MOTION_TRANSLATION,
+                       termination_eps=1e-5, number_of_iterations=10000, max_divisions=8,
+                       warp_check_range = 8, divisor_init = 0.25, lim=50, speed=2):
     """
     Determine cumulative translation matrices for distortion correction and directly write it into
     an hdf5 file
@@ -55,56 +58,97 @@ def distortion_params_(filename, all_input_criteria,
     all_input_criteria : str
         criteria to identify paths to source files using pt.path_search. Should be
         height data to extract parameters from
+    mode : str
+        Determines mode of operation, and thus parameters used. Can be 'SingleECC', 'ManualECC',
+        or 'MultiECC', in decreasing order of speed
+    read_offset : bool, optional
+        If set to True, attempts to read dataset for offset attributes to
+        improve initial guess and thus overall accuracy (default is False).
     cumulative : bool, optional
         Determines if each image is compared to the previous image (default,
         False), or to the original image (True). Output format is identical.
     fitlerfunc : func, optional
         Function applied to image before identifying distortion params
+    warp_mode : int
+        Mode of warp identified. Relevant for SingleECC and MultiECC modes.
+        Only cv2.MOTION_TRANSLATION is currently tested.
+    termination_eps : float
+        Termination precision for SingleECC and MultiECC modes
+    number_of_iterations : int
+        Termination number for SingleECC and MultiECC modes
+    max_divisions : int
+        Number of recursive checks for ManualECC mode
+    warp_check_range : int
+        Length and height of grid checked for ManualECC mode
+    divisor_init : float
+        Spacing between grid points in Manual ECCmode.
+    lim : int
+        External limits examined in ManualECC and MultiECC mode
+    speed : int, optional
+        Value between 1 and 4, which determines speed and accuracy of MultiECC mode. A higher
+        number is faster, but assumes lower distortion and thus may be incorrect. Default value
+        is 2.
 
     Returns
     -------
         None
     """
-    in_path_list = pt.path_search(filename, all_input_criteria)[0]
+    
+    if type(all_input_criteria) != list:
+        all_input_criteria = [all_input_criteria]
+    if type(all_input_criteria[0]) != list:
+        all_input_criteria = [all_input_criteria]
+    all_in_path_list = []
+    for channel_type in all_input_criteria:
+        in_path_list = pt.path_search(filename, channel_type)
+        all_in_path_list.append(in_path_list[0])
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
-                                                          in_path_list)
-    tform21 = np.eye(2, 3, dtype=np.float32)
+                                                          all_in_path_list[0])
+    eyes = np.eye(2, 3, dtype=np.float32)
     cumulative_tform21 = np.eye(2, 3, dtype=np.float32)
     with h5py.File(filename, "a") as f:
         recent_offsets = []
-        for i in range(len(in_path_list)):
+        for i in range(len(all_in_path_list[0])):
             if i == 0:
                 start_time = time.time()
             else:
                 print('---')
-                print('Currently reading path ' + in_path_list[i])
-                i1 = f[in_path_list[0]]
-                if (i > 1) and (not cumulative):
-                    i1 = f[in_path_list[i-1]]
-                i2 = f[in_path_list[i]]
-                if filterfunc is not None:
-                    i1 = filterfunc(i1)
-                    i2 = filterfunc(i2)                    
-                img1 = img_as_ubyte(i1)
-                img2 = img_as_ubyte(i2)
+                print('Currently reading path ' + all_in_path_list[0][i])
+                img1 = []
+                img2 = []
+                for channel_i in range(len(all_in_path_list)):
+                    i1 = f[all_in_path_list[channel_i][0]]
+                    if (i > 1) and (not cumulative):
+                        i1 = f[all_in_path_list[channel_i][i-1]]
+                    i2 = f[all_in_path_list[channel_i][i]]
+                    if filterfunc is not None:
+                        i1 = filterfunc(i1)
+                        i2 = filterfunc(i2)
+                    img1.append(img_as_ubyte(i1))
+                    img2.append(img_as_ubyte(i2))
 
-                # legacy; may be useful to optimise correction by reading offset
-                #if read_offset:
-                #    offset2 = (f[in_path_list[i]]).attrs['offset']
-                #    offset1 = (f[in_path_list[i - 1]]).attrs['offset']
-                #    scan_size = (f[in_path_list[i]]).attrs['size']
-                #    shape = (f[in_path_list[i]]).attrs['shape']
-                #    offset_px = m2px(offset2 - offset1, shape, scan_size)
-                #else:
-                #    offset_px = np.array([0, 0])
-                #if (offset_px[0] != 0) or (offset_px[1] != 0):
-                #    print('Offset found from file attributes: ' + str(offset_px))
-                #    warp_check_range = warp_check_range + 8
-                #    recent_offsets = []
-                
-                tform21 =  generate_transform_xy(img1, img2)
-                timg = cv2.warpAffine(img1, tform21, (512, 512), flags=cv2.INTER_LINEAR +
-                                                                          cv2.WARP_INVERSE_MAP)
+                if read_offset:
+                    offset2 = (f[all_in_path_list[0][i]]).attrs['offset']
+                    offset1 = (f[all_in_path_list[0][i - 1]]).attrs['offset']
+                    scan_size = (f[all_in_path_list[0][i]]).attrs['size']
+                    shape = (f[all_in_path_list[0][i]]).attrs['shape']
+                    offset_px = m2px(offset2 - offset1, shape, scan_size)
+                else:
+                    offset_px = np.array([0, 0])
+                if (offset_px[0] != 0) or (offset_px[1] != 0):
+                    recent_offsets = []
+                if mode == 'SingleECC':
+                    tform21 = generate_transform_xy_single(img1[0], img2[0], offset_px, warp_mode, termination_eps, number_of_iterations)
+                elif mode == 'ManualECC':
+                    tform21 = generate_transform_xy_manual(img1, img2, offset_px, max_divisions, warp_check_range, divisor_init, lim)
+                elif mode == 'MultiECC':
+                    tform21 = generate_transform_xy_multi(img1[0], img2[0], offset_px, warp_mode, termination_eps, number_of_iterations, lim,
+                                                          speed, recent_offsets, cumulative, cumulative_tform21)
+                else:
+                    print('Invalid mode requested. Defaulting to SingleECC')
+                    mode='SingleECC'
+                    tform21 = generate_transform_xy_single(img1[0], img2[0], offset_px, warp_mode, termination_eps, number_of_iterations)
+                        
                 if cumulative:
                     tform21[0, 2] = tform21[0, 2] - cumulative_tform21[0, 2]
                     tform21[1, 2] = tform21[1, 2] - cumulative_tform21[1, 2]
@@ -112,16 +156,17 @@ def distortion_params_(filename, all_input_criteria,
                 cumulative_tform21[1, 2] = cumulative_tform21[1, 2] + tform21[1, 2]
                 print('Scan ' + str(i) + ' Complete. Cumulative Transform Matrix:')
                 print(cumulative_tform21)
-                if cumulative:
-                    print('Scan ' + str(i) + ' Complete. Cumulative Transform Matrix:')
-                else:
-                    print('Scan ' + str(i) + ' Complete. Transform Matrix:')
-                print(tform21)
+                
+                if mode == 'multiECC':
+                    if (offset_px[0] == 0) and (offset_px[1] == 0):
+                        recent_offsets.append([tform21[0, 2], tform21[1, 2]] - offset_px)
+                        if len(recent_offsets) > 3:
+                            recent_offsets = recent_offsets[1:]
+
             data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
-                                     in_path_list[i])
-            data.attrs['cumulative'] = cumulative
-            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_params',
-                               in_path_list[i], clear=False)
+                                     all_in_path_list[0][i])
+            pt.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
+                               all_in_path_list[0][i], clear=False)
 
 
 def m2px(m, points, scan_size):
@@ -146,34 +191,10 @@ def m2px(m, points, scan_size):
     return px
 
 
-def img2cv(img1, sigma_cutoff=10):
-    """
-    Converts image (numpy array, or hdf5 dataset) into cv2
-
-    Parameters
-    ----------
-    img1 : nparray or hdf5 dataset
-        currently used image
-
-    sigma_cutoff : int, optional
-        variation used to convert to cv-viable format (default : 10)
-
-    Returns
-    -------
-    img1 : nparray or hdf5 dataset
-        converted image into cv2 valid format
-    """
-    img1 = img1 - np.min(img1)
-    img1 = img1 / np.max(img1)
-    tmp1 = sigma_cutoff * np.std(img1)
-    img1[img1 > tmp1] = tmp1
-    return img1
-
-
-def generate_transform_xy(img, img_orig, warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
+def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
                           number_of_iterations=10000):
     """
-    Determines transformation matrices in x and y coordinates
+    Determines transformation matrices in x and y coordinates for SingleECC mode
 
     Parameters
     ----------
@@ -181,6 +202,8 @@ def generate_transform_xy(img, img_orig, warp_mode = cv2.MOTION_TRANSLATION, ter
         Currently used image (in cv2 format) to find transformation array of
     img_orig : cv2
         Image (in cv2 format) transformation array is based off of
+    offset_guess : list of ints
+        Estimated shift and offset between images
     warp_mode : see cv2 documentation
         warp_mode used in cv2's findTransformationECC function
     termination_eps : float
@@ -197,12 +220,195 @@ def generate_transform_xy(img, img_orig, warp_mode = cv2.MOTION_TRANSLATION, ter
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
     warp_matrix = np.eye(2, 3, dtype=np.float32)
+    term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
     criteria = (term_flags, number_of_iterations, termination_eps)
+    warp_matrix[0, 2] = offset_guess[0]
+    warp_matrix[1, 2] = offset_guess[1]
     (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
                                          criteria)
     return tform21
 
-            
+
+def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions = 8, warp_check_range = 8, divisor_init = 0.25, lim=50):
+    """
+    Determines transformation matrices in x and y coordinates for ManualECC mode
+
+    Parameters
+    ----------
+    img1 : cv2
+        Currently used image (in cv2 format) to find transformation array of
+    img2 : cv2
+        Image (in cv2 format) transformation array is based off of
+    offset_guess : list of ints
+        Estimated shift and offset between images
+    max_divisions : int
+        Number of recursive checks for ManualECC mode
+    warp_check_range : int
+        Length and height of grid checked for ManualECC mode
+    divisor_init : float
+        Spacing between grid points in Manual ECCmode.
+    lim : int
+        External limits examined in ManualECC and MultiECC mode
+    
+    Returns
+    -------
+    warp_matrix : ndarray
+        Transformation matrix used to convert img_orig into img
+    """
+    divisor = divisor_init
+    warp_matrix = np.eye(2, 3, dtype=np.float32)
+    for num in range(max_divisions):
+        diff = np.Inf
+        last_k = np.Inf
+        last_j = np.Inf
+        offset_guess = np.array(offset_guess)
+        low_offset_check = offset_guess - (warp_check_range/2)/divisor
+        high_offset_check = offset_guess + (warp_check_range/2)/divisor
+        i_check = np.linspace(low_offset_check[0], high_offset_check[0], warp_check_range+1)
+        j_check = np.linspace(low_offset_check[1], high_offset_check[1], warp_check_range+1)
+        for k in i_check:
+            for j in j_check:
+                warp_matrix[0, 2] = k
+                warp_matrix[1, 2] = j
+                if k-offset_guess[0] < last_k*1.5:
+                    if j-offset_guess[1] < last_j*1.5:
+                        currDiff=0
+                        for channel_i in range(len(img1)):
+                            img_test = cv2.warpAffine(img1[channel_i], warp_matrix, (512, 512), flags=cv2.INTER_LINEAR +
+                                                                                          cv2.WARP_INVERSE_MAP)
+                            currDiff = currDiff+np.sum(np.square(img_test[lim:-lim, lim:-lim]
+                                                            - img2[channel_i][lim:-lim, lim:-lim]))
+                        if currDiff < diff:
+                            diff = currDiff
+                            offset1 = k
+                            offset2 = j
+        warp_matrix[0, 2] = offset1
+        warp_matrix[1, 2] = offset2
+        divisor = divisor*4
+        tform21 = warp_matrix
+        offset_guess = [offset1, offset2]
+    return tform21
+
+
+def generate_transform_xy_multi(img, img_orig, offset_px = [0,0], warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
+                          number_of_iterations=10000, lim=50, speed=2, recent_offsets = [], 
+                          cumulative=False, cumulative_tform21=np.eye(2,3,dtype=np.float32)):
+    """
+    Determines transformation matrices in x and y coordinates
+
+    Parameters
+    ----------
+    img : cv2
+        Currently used image (in cv2 format) to find transformation array of
+    img_orig : cv2
+        Image (in cv2 format) transformation array is based off of
+    offset_px : list of ints
+        Actual shift estimated and taken from machine
+    warp_mode : see cv2 documentation
+        warp_mode used in cv2's findTransformationECC function
+    termination_eps : float
+        eps used to terminate fit
+    number_of_iterations : int
+        number of iterations in fit before termination
+    lim : int
+        External limits examined in ManualECC and MultiECC mode
+    speed : int, optional
+        Value between 1 and 4, which determines speed and accuracy of MultiECC mode. A higher
+        number is faster, but assumes lower distortion and thus may be incorrect. Default value
+        is 2.
+    recent_offsets : list
+        List of recent offsets used to increase speed
+    cumulative : bool, optional
+        Determines if each image is compared to the previous image (default, False), or to the original image (True).
+        Output format is identical.
+    cumulative_tform21 : ndarray, optional
+        The transformation matrix, only used if cumulative is switched to True. (default: np.eye(2,3,dtype=np.float32))
+
+    Returns
+    -------
+    warp_matrix : ndarray
+        Transformation matrix used to convert img_orig into img
+    """
+    # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
+    # findTransformECC (OpenCV 3.0+ only).
+    # Returns the transform matrix of the img with respect to img_orig
+    
+    # Redo using the same logic as the previous one; but only use the actual logic to optimise parameters just once
+    
+    if speed != 0 and speed != 1 and speed != 2 and speed != 3 and speed != 4:
+        print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest).\
+                Speed now set to level 2.')
+        speed = 2
+    if len(recent_offsets) == 0:
+        offset_guess = offset_px
+        if speed == 1:
+            warp_check_range = 16
+        elif speed == 2:
+            warp_check_range = 12
+        elif speed == 3:
+            warp_check_range = 10
+        elif speed == 4:
+            warp_check_range = 8
+    elif len(recent_offsets) < 3:
+        offset_guess = offset_px + recent_offsets[-1]
+        if speed == 1:
+            warp_check_range = 12
+        elif speed == 2:
+            warp_check_range = 8
+        elif speed == 3:
+            warp_check_range = 8
+        elif speed == 4:
+            warp_check_range = 6
+    else:
+        offset_guess = (offset_px + recent_offsets[2] / 2 + recent_offsets[1] / 3
+                        + recent_offsets[0] / 6)
+        if speed == 1:
+            warp_check_range = 8
+        elif speed == 2:
+            warp_check_range = 6
+        elif speed == 3:
+            warp_check_range = 4
+        elif speed == 4:
+            warp_check_range = 2
+    if (offset_px[0] != 0) or (offset_px[1] != 0):
+        print('Offset found from file attributes: ' + str(offset_px))
+        warp_check_range = warp_check_range + 8
+        recent_offsets = []
+    
+    warp_matrix = np.eye(2, 3, dtype=np.float32)
+    term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
+
+    if cumulative:
+        offset_guess[0] = offset_guess[0] + cumulative_tform21[0, 2]
+        offset_guess[1] = offset_guess[1] + cumulative_tform21[1, 2]
+
+    criteria = (term_flags, number_of_iterations, termination_eps)
+
+    diff = np.Inf
+    offset1 = 0
+    offset2 = 0
+    for i in range(-warp_check_range // 2, (warp_check_range // 2) + 1):
+        for j in range(-warp_check_range // 2, (warp_check_range // 2) + 1):
+            warp_matrix[0, 2] = 2 * i + offset_guess[0]
+            warp_matrix[1, 2] = 2 * j + offset_guess[1]
+            try:
+                (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
+                                                     criteria)
+                img_test = cv2.warpAffine(img, tform21, (512, 512), flags=cv2.INTER_LINEAR +
+                                                                          cv2.WARP_INVERSE_MAP)
+                currDiff = np.sum(np.square(img_test[lim:-lim, lim:-lim]
+                                            - img_orig[lim:-lim, lim:-lim]))
+                if currDiff < diff:
+                    diff = currDiff
+                    offset1 = tform21[0, 2]
+                    offset2 = tform21[1, 2]
+            except:
+                pass
+            warp_matrix[0, 2] = offset1
+            warp_matrix[1, 2] = offset2
+    return warp_matrix
+
+
 def distortion_correction_(filename, all_input_criteria, cropping=True):
     """
     Applies distortion correction parameters to an image. The distortion corrected data is then
@@ -226,25 +432,30 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     dm_path_list = all_in_path_list[1]
-    channel_number = int(len(in_path_list)/len(dm_path_list))
 
     distortion_matrices = []
     with h5py.File(filename, "a") as f:
         for path in dm_path_list[:]:
             distortion_matrices.append(np.copy(f[path]))
+        xoffsets = []
+        yoffsets = []
+        for matrix in distortion_matrices:
+            xoffsets.append(np.array(matrix[0, 2]))
+            yoffsets.append(np.array(matrix[1, 2]))
+    offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
+
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
                                                           in_path_list)
-    
+
     with h5py.File(filename, "a") as f:
         start_time = time.time()
-        for i in range(len(dm_path_list)):
-            #for j in range(channel_number)
-            #curr_image = np.array(f[in_path_list[(i*channel_number)+j]])
-            curr_image = np.array(f[in_path_list[i]])
-            for k in range(i):
-                prev_image=np.copy(curr_image)
-                curr_image = cv2.warpAffine(prev_image, distortion_matrices[k], tuple(reversed(list(np.shape(prev_image)))), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
-            data = pt.write_output_f(f, curr_image, out_folder_locations[i], [in_path_list[i],
+        for i in range(len(in_path_list)):
+            orig_image = f[in_path_list[i]]
+            if cropping:
+                final_image = array_cropped(orig_image, xoffsets[i], yoffsets[i], offset_caps)
+            else:
+                final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
+            data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
                                                                                dm_path_list[i]])
             propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
@@ -584,10 +795,7 @@ def threshold_noise(image, old_guess, thresh_range, iterations, old_diff=None):
 
 def wrap(x, low=0, high=360):
     angle_range = high - low
-    while x <= low:
-        x = x + angle_range
-    while x > high:
-        x = x - angle_range
+    x = ((x-low)%angle_range)+low
     return x
 
 
