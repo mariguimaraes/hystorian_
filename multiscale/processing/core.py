@@ -712,7 +712,7 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
 #   OUTPUTS
 # dataset: the directory to the dataset, such that f[dataset] would yield data
 
-def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
+def write_output_f(f, data, out_folder_location, in_paths, function, output_name=None):
     f.require_group(out_folder_location)
     if (type(in_paths) != list) and (type(in_paths) != np.ndarray):
         in_paths = [in_paths]
@@ -728,7 +728,7 @@ def write_output_f(f, data, out_folder_location, in_paths, output_name=None):
         pass
     f[out_folder_location].create_dataset(output_name, data=data)
     dataset = f[out_folder_location][output_name]
-    write_generic_attributes(dataset, out_folder_location, in_paths, output_name)
+    write_generic_attributes(dataset, out_folder_location, in_paths, output_name, function)
     return dataset
 
 

@@ -164,7 +164,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                             recent_offsets = recent_offsets[1:]
 
             data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
-                                     all_in_path_list[0][i])
+                                     all_in_path_list[0][i],  distortion_params_)
             pt.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
                                all_in_path_list[0][i], clear=False)
 
@@ -456,7 +456,8 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
             else:
                 final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
-                                                                               dm_path_list[i]])
+                                                                               dm_path_list[i]],
+                                    distortion_correction_)
             propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
                                in_path_list[i])
@@ -1265,7 +1266,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
         warp_matrix = cv2.getRotationMatrix2D((orig_x / 2, orig_y / 2), average_angle, 1)
         data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
-                                 filename.split('.')[0])
+                                 find_a_domain_angle_, filename.split('.')[0])
         data.attrs['angle offset (degs)'] = average_angle
         data.attrs['binarisation_threshold'] = bin_thresh
         data.attrs['filter_width'] = filter_width
@@ -1347,7 +1348,8 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
                 new_img = new_img.astype(bool)
 
             data = pt.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
-                                                                           rm_path_list[i]])
+                                                                           rm_path_list[i]],
+                                    rotation_alignment_)
             propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
                                in_path_list[i])
@@ -1802,22 +1804,22 @@ def switch_type_(filename, all_input_criteria):
                 name = 'Scan_' + str(i).zfill(3)
             current_folder_location = out_folder_locations[0] + name
             data = pt.write_output_f(f, totalmap, current_folder_location, in_path_list,
-                                     'Switchmap')
+                                     switch_type_, 'Switchmap')
             propagate_scale_attrs(data, f[in_path_list[0]])
             pt.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
 
         gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
-        data = pt.write_output_f(f, nucl_centres, gen_loc, in_path_list, 'NucleationCentres')
-        data = pt.write_output_f(f, closure_centres, gen_loc, in_path_list, 'ClosureCentres')
+        data = pt.write_output_f(f, nucl_centres, gen_loc, in_path_list, switch_type_,  'NucleationCentres')
+        data = pt.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_,  'ClosureCentres')
 
         gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
                                                  True)[0]
-        data = pt.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, 'TotalJumps')
-        data = pt.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list, 'Nucleation')
-        data = pt.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, 'Motion')
-        data = pt.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, 'Merging')
-        data = pt.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, 'Errors')
-        data = pt.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, 'Closure')
+        data = pt.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, switch_type_,  'TotalJumps')
+        data = pt.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list, switch_type_,  'Nucleation')
+        data = pt.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, switch_type_,  'Motion')
+        data = pt.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, switch_type_,  'Merging')
+        data = pt.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, switch_type_,  'Errors')
+        data = pt.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, switch_type_,  'Closure')
 
 
 #   FUNCTION fill_blanks
