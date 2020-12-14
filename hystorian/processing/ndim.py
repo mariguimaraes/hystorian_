@@ -76,7 +76,7 @@ def calc_hyst_params(bias, phase):
 
     # UP leg calculations
     x = np.array(bias[up])
-    y = np.array((phase[up] + 360) % 360)
+    y = np.array(phase[up] % 360)
     step_left_up = np.median(y[np.where(x == np.min(x))[0]])
     step_right_up = np.median(y[np.where(x == np.max(x))[0]])
 
@@ -86,14 +86,14 @@ def calc_hyst_params(bias, phase):
         avg_x.append(v)
         avg_y.append(np.mean(y[np.where(x == v)[0]]))
 
-    my_x = np.array(avg_x)[1:] + 0 * (avg_x[0] + avg_x[1]) / 2.0
+    my_x = np.array(avg_x)[1:]
     my_y = np.abs(np.diff(avg_y))
 
     coercive_volt_up = my_x[np.nanargmax(my_y)]
 
     # DOWN leg calculations
     x = np.array(bias[dn])
-    y = np.array((phase[dn] + 360) % 360)
+    y = np.array(phase[dn] % 360)
     step_left_dn = np.median(y[np.where(x == np.min(x))[0]])
     step_right_dn = np.median(y[np.where(x == np.max(x))[0]])
 
@@ -103,7 +103,7 @@ def calc_hyst_params(bias, phase):
         avg_x.append(v)
         avg_y.append(np.mean(y[np.where(x == v)[0]]))
 
-    my_x = np.array(avg_x)[1:] + 0 * (avg_x[0] + avg_x[1]) / 2.0
+    my_x = np.array(avg_x)[1:]
     my_y = np.abs(np.diff(avg_y))
 
     coercive_volt_dn = my_x[np.nanargmax(my_y)]
