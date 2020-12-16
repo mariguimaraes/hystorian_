@@ -95,7 +95,14 @@ def decompress_hdf5(file):
                     results = tuple([results])
 
                 for i in range(len(outputs)):
+                    tmpattrs = {}
+                    for k2 in processes[k][fname][outputs[i]].attrs.keys():
+                        tmpattrs[k2] = processes[k][fname][outputs[i]].attrs[k2]
+
                     del (processes[k][fname][outputs[i]])
                     if processes[k][fname].attrs.__contains__('compressed'):
                         processes[k][fname].attrs.__delitem__('compressed')
                     processes[k][fname].create_dataset(outputs[i], data=results[i])
+                    for k3 in tmpattrs.keys():
+                        val = tmpattrs[k3]
+                        processes[k][fname][outputs[i]].attrs.__setitem__(k3, val)
