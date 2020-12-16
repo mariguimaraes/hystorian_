@@ -59,10 +59,6 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
     if output_names is None:
         output_names = in_paths[0].rsplit('/', 1)[1]
 
-    # Guess folder_names (aka sample names) if not given
-    if folder_names is None:
-        folder_names = in_paths[0].rsplit('/', 2)[1]
-
     # Convert output_names to list if not already
     if type(output_names) != list:
         output_names = [output_names]
@@ -134,13 +130,13 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
         if increment_proc:
             num_proc = num_proc + 1
             out_folder_location = (process_folder + '/' + str(num_proc).zfill(3) + '-' +
-                                   function.__name__ + '/' + folder_names)
+                                   function.__name__)
         else:
             out_folder_location = (process_folder + '/' + str(num_proc).zfill(3) + '-' +
-                                   function.__name__ + '/' + folder_names)
+                                   function.__name__)
             if out_folder_location.split('/')[1] not in f['process'].keys():
                 out_folder_location = (process_folder + '/' + str(num_proc + 1).zfill(3) + '-' +
-                                       function.__name__ + '/' + folder_names)
+                                       function.__name__)
 
         fproc = f.require_group(out_folder_location)
 
@@ -695,7 +691,7 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
             else:
                 folder_centre = folder
             out_folder_location = ('process/' + str(operation_number).zfill(3) + '-' + process_name
-                                   + '/' + folder_centre + '/')
+                                   + '/')
             out_folder_location_list.append(out_folder_location)
     return out_folder_location_list
 
