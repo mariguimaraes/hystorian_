@@ -140,19 +140,18 @@ def load_nanoscope(filename):
 def nanoscope2hdf5(filename, filepath=None):
     data, scan_info, image_infos, header = load_nanoscope(filename)
     with h5py.File(filename.replace('.', '_') + ".hdf5", "w") as f:
-        typegrp = f.create_group("type")
         metadatagrp = f.create_group("metadata")
         f.create_group("process")
 
         if filepath is not None:
-            typegrp.create_dataset(filepath.replace('.', '_'), data='Nanoscope')
             metadatagrp.create_dataset(filepath.replace('.', '_'), data=header)
             datagrp = f.create_group("datasets/" + filepath.replace('.', '_'))
-
         else:
-            typegrp.create_dataset(filename.replace('.', '_'), data='Nanoscope')
             metadatagrp.create_dataset(filename.replace('.', '_'), data=header)
             datagrp = f.create_group("datasets/" + filename.replace('.', '_'))
+
+        datagrp.attrs.__setattr__('type', 'Nanoscope')
+
 
         for key in scan_info.keys():
             datagrp.attrs[key] = scan_info[key]

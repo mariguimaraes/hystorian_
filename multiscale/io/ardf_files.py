@@ -432,18 +432,15 @@ def ardf2hdf5(filename, filepath=None):
                 fd, f)
 
             with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-                typegrp = f.create_group("type")
                 metadatagrp = f.create_group("metadata")
                 f.create_group("process")
 
                 if filepath is not None:
-                    typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
                     datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+                    datagrp.attrs.__setattr__('type', filepath.split('.')[-1])
                 else:
-                    typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
                     datagrp = f.create_group("datasets/" + filename.split('.')[0])
-
-
+                    datagrp.attrs.__setattr__('type', filename.split('.')[-1])
 
                 label_list = list(map(lambda x: x.decode('utf-8').replace('\x00', ''), data_channels_names))
                 y_size = volm_vdef[2]

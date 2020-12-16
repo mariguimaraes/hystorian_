@@ -19,7 +19,6 @@ def dat2hdf5(filename, filepath=None, params=None):
 
 
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-        typegrp = f.create_group("type")
         metadatagrp = f.create_group("metadata")
         f.create_group("process")
 
@@ -27,11 +26,12 @@ def dat2hdf5(filename, filepath=None, params=None):
             if params is not None:
                 metadatagrp.create_dataset(filepath.split('.')[0], data=contents)
             datagrp = f.create_group("datasets/" + filepath.split('.')[0])
-            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
+            datagrp.attrs.__setattr__('type', filepath.split('.')[-1])
+
         else:
             if params is not None:
                 metadatagrp.create_dataset(filename.split('.')[0], data=contents)
             datagrp = f.create_group("datasets/" + filename.split('.')[0])
-            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
+            datagrp.attrs.__setattr__('type', filename.split('.')[-1])
 
         datagrp.create_dataset("SHG", data=data)
