@@ -39,17 +39,17 @@ def ibw2hdf5(filename, filepath=None):
     xoffset = float(str(note).split('XOffset:')[1].split('\\r')[0])
     yoffset = float(str(note).split('YOffset:')[1].split('\\r')[0])
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-        typegrp = f.require_group("type")
         f.require_group("process")
         metadatagrp = f.require_group("metadata")
         if filepath is not None:
-            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
             metadatagrp.create_dataset(filepath.split('.')[0], data=tmpdata['note'])
             datagrp = f.require_group("datasets/" + filepath.split('.')[0])
+            datagrp.attrs.__setattr__('type', filepath.split('.')[-1])
+
         else:
-            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
             metadatagrp.create_dataset(filename.split('.')[0], data=tmpdata['note'])
             datagrp = f.require_group("datasets/" + filename.split('.')[0])
+            datagrp.attrs.__setattr__('type', filename.split('.')[-1])
 
         for i, k in enumerate(label_list):
                 datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:, :, i].T))

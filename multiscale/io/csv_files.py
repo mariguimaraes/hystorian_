@@ -16,11 +16,13 @@ def csv2hdf5(filename, filepath=None):
         np_data = np.array(data).astype('S')
 
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-        typegrp = f.create_group("type")
-        typegrp.create_dataset(file_base, data=filename.split('.')[-1])
         metadatagrp = f.create_group("metadata")
         metadatagrp.create_dataset(file_base, data=str(header))
         datagrp = f.create_group("datasets/" + file_base)
+        if filepath is not None:
+            datagrp.attrs.__setattr__('type', filepath.split('.')[-1])
+        else:
+            datagrp.attrs.__setattr__('type', filename.split('.')[-1])
         f.create_group("process")
 
 

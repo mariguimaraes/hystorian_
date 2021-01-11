@@ -108,7 +108,6 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
         file_path = None
 
     with h5py.File(combined_name + '.hdf5', 'w') as f:
-        typegrp = f.create_group('type')
         metadatagrp = f.create_group('metadata')
         datagrp = f.create_group('datasets')
         procgrp = f.create_group('process')
@@ -140,7 +139,6 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
                         'Warning: \'' + filename + '\' is a non-hdf5 file, but the list containt a hdf5 file with the same name. File has been ignored.')
                     continue
         with h5py.File(combined_name + '.hdf5', 'a') as f:
-            typegrp = f['type']
             metadatagrp = f['metadata']
             datagrp = f['datasets']
             procgrp = f['process']
@@ -149,8 +147,6 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
                     p = file_path[i].split('.')[0]
                 else:
                     p = filename.split('.hdf5')[0]
-                f.require_group('type/' + '/'.join(p.split('/')[:-1]))
-                source_f.copy('type/' + p, f['type/' + '/'.join(p.split('/')[:-1])])
                 f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
                 source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
                 f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
@@ -193,8 +189,6 @@ def create_hdf5(filename, image):
         None
     '''
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-        typegrp = f.create_group("type")
-        typegrp.create_dataset(filename.split('.')[0], data='image')
         metadatagrp = f.create_group("metadata")
         datagrp = f.create_group("datasets/" + filename.split('.')[0])
         f.create_group("process")
