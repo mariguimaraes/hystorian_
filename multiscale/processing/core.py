@@ -7,10 +7,10 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import multiscale.io.read_file as read_file
 import fnmatch
+import inspect
 import sys
 import time
 from glob import glob
-
 
 def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             use_attrs=None, prop_attrs=None, increment_proc=True, process_folder='process',
@@ -54,7 +54,25 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
     # Convert in_paths to a list if not already
     if type(in_paths) != list:
         in_paths = [in_paths]
-
+    
+    # Check if paths needs to be searched, and if so, do so
+    search = False
+    for path in in_paths:
+        if type(path) == list:
+            for path in path:
+                if '*' in path:
+                    search = True
+                    break
+            if search:
+                break
+        else:
+            if '*' in path:
+                search = True
+                break
+    if search:
+        in_paths = path_search(filename, in_paths)
+        in_paths = list(map(list, zip(*in_paths)))[0]
+        
     # Guess output_names (aka channel names) if not given
     if output_names is None:
         output_names = in_paths[0].rsplit('/', 1)[1]
@@ -162,14 +180,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
                     if prop_attrs is not None:
                         dataset = propagate_attrs(dataset, prop_attr_keys, prop_attr_vals)
                 write_generic_attributes(fproc[name], out_folder_location + '/', in_paths, name, function)
-                dict_kwargs = {}
-                for key, value in kwargs.items():
-                    try:
-                        dataset.attrs['kwargs_' + key] = value
-                    except RuntimeError:
-                        print('Attribute was not able to be saved, probably because the attribute'
-                              'is too large')
-                        dataset.attrs['kwargs_' + key] = 'None'
+                write_kwargs_as_attributes(fproc[name], function, kwargs, first_kwarg=len(in_paths))
         else:
             print('Error: Unequal amount of outputs and output names')
     return result
@@ -293,35 +304,6 @@ def path_search(filename, all_input_criteria, repeat=None):
     return all_in_path_list
 
 
-#   FUNCTION e_apply
-# A modified form of m_apply that runs m_apply with path_search to increase the ease of operation
-#   INPUTS:
-# filename : name of the hdf5 file where the datas are stored
-# function : Custom function that you want to call
-# all_input_criteria: input criteria used by path_search
-# outputs_names (default: None): list of the names of the channels the results are written in.
-#     By default, copies names from the first of the in_paths
-# folder_names (default: None): list of the names of the folder containing results data channels.
-#     By default, copies names from the first of the in_paths
-# use_attrs (default: None): string, or list of strings, that are the names of attributes that will
-#     be copied from in_paths, and passed into the function as a kwarg for use. 
-# prop_attrs (default: None): string, or list of strings, that are the names of attributes that will
-#     be copied from in_paths, into each output file. If the same attribute name is in multiple
-#     in_paths, the first in_path with the attribute name will be copied from.
-# increment_proc (default: True): determines whether to increment the process counter
-# **kwargs : All the non-data inputs to give to the function
-#    OUTPUTS:
-# result: the datafile produced after running the custom function
-
-def e_apply(filename, function, all_input_criteria, output_names=None, folder_names=None,
-            use_attrs=None, prop_attrs=None, increment_proc=True, **kwargs):
-    all_in_path_list = path_search(filename, all_input_criteria)
-    all_in_path_list = list(map(list, zip(*all_in_path_list)))[0]
-    m_apply(filename, function, all_in_path_list, output_names=output_names,
-            folder_names=folder_names, increment_proc=increment_proc,
-            use_attrs=use_attrs, prop_attrs=prop_attrs, **kwargs)
-
-
 #   FUNCTION create_dataset_from_dict
 # Subfunction used in m_apply. Converts the hdf5_dict output file into a dataset that is written to
 # the hdf5 file, with all attributes encoded. Also checks if a folder of the same name is present,
@@ -441,6 +423,40 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
     dataset.attrs['time'] = str(datetime.now())
     dataset.attrs['source'] = in_paths
 
+    
+#   FUNCTION write_generic_attributes
+# Writes all other arguments as attributes to a datset.
+#   INPUTS:
+# dataset: the dataset the attributes are written to
+# func: the function from which attributes are pulled
+# all_variables: all variables from the function call. To call properly, set as locals()
+# first_kwarg (default: 1): First kwarg that is to be written in
+#   OUTPUTS
+# null
+    
+def write_kwargs_as_attributes(dataset, func, all_variables, first_kwarg=1):
+    varargs = inspect.getfullargspec(func).varargs
+    signature = inspect.signature(func).parameters
+    first_arg = list(signature.keys())[0]
+    if varargs == first_arg:
+        first_kwarg=1
+    var_names = list(signature.keys())[first_kwarg:]
+    for key in var_names:
+        if key in all_variables:
+            value = all_variables[key]
+        else:
+            value = signature[key].default
+        if callable(value):
+            value = value.__name__
+        elif value is None:
+            value = 'None'
+        try:
+            dataset.attrs['kwargs_' + key] = value
+        except RuntimeError:
+            print('Attribute was not able to be saved, probably because the attribute'
+                  'is too large')
+            dataset.attrs['kwargs_' + key] = 'None'    
+    
 
 #   FUNCTION progress_report
 # Prints progression of a process run in several stages
@@ -707,12 +723,16 @@ def find_output_folder_location(filename_or_f, process_name, folder_names,
 # data: the data to be written
 # out_folder_location: location the dataset is written to
 # in_paths: list of paths for the sources of the data
+# function: the function that calls write_output_f
+# all_variables: all variables from the function call. To call properly, set as locals()
+# first_kwarg (default: 2): First kwarg that is to be written in
 # output_name (default: None): the name of the datafile to be written. If left as None, the output
 #     name is inherited from the name of the first entry of in_paths
 #   OUTPUTS
 # dataset: the directory to the dataset, such that f[dataset] would yield data
 
-def write_output_f(f, data, out_folder_location, in_paths, function, output_name=None):
+def write_output_f(f, data, out_folder_location, in_paths, function, all_variables, first_kwarg=2,
+                   output_name=None):
     f.require_group(out_folder_location)
     if (type(in_paths) != list) and (type(in_paths) != np.ndarray):
         in_paths = [in_paths]
@@ -729,7 +749,11 @@ def write_output_f(f, data, out_folder_location, in_paths, function, output_name
     f[out_folder_location].create_dataset(output_name, data=data)
     dataset = f[out_folder_location][output_name]
     write_generic_attributes(dataset, out_folder_location, in_paths, output_name, function)
+    write_kwargs_as_attributes(dataset, function, all_variables, first_kwarg)
     return dataset
+
+
+
 
 
 #   FUNCTION read_dataset
