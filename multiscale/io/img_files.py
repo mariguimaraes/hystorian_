@@ -8,18 +8,19 @@ def image2hdf5(filename, filepath=None):
     arr = np.array(img)
 
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-        typegrp = f.create_group("type")
         metadatagrp = f.create_group("metadata")
         f.create_group("process")
 
         if filepath is not None:
             datagrp = f.create_group("datasets/" + filepath.split('.')[0])
-            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
             metadatagrp.create_dataset(filepath.split('.')[0], data='no metadata')
+            datagrp.attrs.__setattr__('type', filepath.split('.')[-1])
+
         else:
             datagrp = f.create_group("datasets/" + filename.split('.')[0])
-            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
             metadatagrp.create_dataset(filename.split('.')[0], data='no metadata')
+            datagrp.attrs.__setattr__('type', filename.split('.')[-1])
+
 
         keys = ['red', 'green', 'blue']
         for indx, key in enumerate(keys):

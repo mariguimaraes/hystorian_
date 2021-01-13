@@ -67,7 +67,6 @@ def gsf2hdf5(filename, filepath=None):
     filename = filename.replace('.', '-') + '.gsf'
     print(filename)
     with h5py.File(filename.split('.')[0] + ".hdf5", "w") as f:
-        typegrp = f.create_group("type")
         metadatagrp = f.create_group("metadata")
         f.create_group("process")
 
@@ -78,12 +77,14 @@ def gsf2hdf5(filename, filepath=None):
 
         if filepath is not None:
             metadatagrp.create_dataset(filepath.split('.')[0], data=str(meta))
-            typegrp.create_dataset(filepath.split('.')[0], data=filename.split('.')[-1])
             datagrp = f.create_group("datasets/" + filepath.split('.')[0])
+            datagrp.attrs.__setattr__('type', filepath.split('.')[-1])
+
         else:
             metadatagrp.create_dataset(filename.split('.')[0], data=str(meta))
-            typegrp.create_dataset(filename.split('.')[0], data=filename.split('.')[-1])
             datagrp = f.create_group("datasets/" + filename.split('.')[0])
+            datagrp.attrs.__setattr__('type', filename.split('.')[-1])
+
 
         datagrp.create_dataset(name, data=data)
 
