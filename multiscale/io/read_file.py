@@ -203,6 +203,7 @@ def create_hdf5(filename, image):
 def shorten_path(filelist):
     if type(filelist) == str:
         filelist = [filelist]
+    filelist = [i.replace('\\', '/') for i in filelist]
     pad = max([len(i.split('/')) for i in filelist])
     splitted = np.array([i.split('/') + ['NAN'] * (pad - len(i.split('/'))) for i in filelist])
     for i in range(np.shape(splitted)[1]):
