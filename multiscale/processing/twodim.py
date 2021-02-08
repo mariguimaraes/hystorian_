@@ -972,7 +972,7 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
                                                        filter_width=filter_width,
                                                        plots=plots)
     else:
-        domain_wall_filter = np.zeros_like(f[path]) + 1
+        domain_wall_filter = np.zeros_like(amplitude) + 1
     a_estimate, bin_thresh = estimate_a_domains(amplitude, domain_wall_filter,
                                                 direction=direction,
                                                 plots=plots,
@@ -1284,7 +1284,10 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
                          max_line_gap=80, plots=None):
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
-    pb_path_list = all_in_path_list[1]
+    if len(all_in_path_list) != 1:
+        pb_path_list = all_in_path_list[1]
+    else:
+        pb_path_list = None
 
     out_folder_locations = pt.find_output_folder_location(filename, 'rotation_params', in_path_list)
 

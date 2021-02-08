@@ -2,19 +2,20 @@ import numpy as np
 import h5py
 
 def convert_length_to_SI_unit(value, unit):
-    unit_dic = {'am': 1e-18,
-                'fm': 1e-15,
-                'pm': 1e-12,
-                'nm': 1e-9,
-                '~m': 1e-6,
-                'mm': 1e-3,
-                'cm': 1e-2,
-                'dm': 1e-1,
-                'm': 1.,
-                'km': 1e3}
+    unit_dic = {b'am': 1e-18,
+                b'fm': 1e-15,
+                b'pm': 1e-12,
+                b'nm': 1e-9,
+                b'~m': 1e-6,
+                b'mm': 1e-3,
+                b'cm': 1e-2,
+                b'dm': 1e-1,
+                b'm': 1.,
+                b'km': 1e3}
 
     if unit not in unit_dic.keys():
         scale = 1
+        print(unit)
         print('The unit type is not supported!')
     else:
         scale = unit_dic[unit]
@@ -34,14 +35,14 @@ def extract_scan_info_from_header(header):
             key, value = line.split(b': ')
         except ValueError:
             continue
-        if key in ['Samps/line', 'Lines']:
+        if key in [b'Samps/line', b'Lines']:
             value = int(value)
-        elif key in ['Rotate Ang.', 'Scan rate', 'Tip velocity']:
+        elif key in [b'Rotate Ang.', b'Scan rate', b'Tip velocity']:
             value = float(value)
-        elif key in ['Scan Size', 'X Offset', 'Y Offset']:
+        elif key in [b'Scan Size', b'X Offset', b'Y Offset']:
             value, unit = value.split(b' ')
             value = convert_length_to_SI_unit(float(value), unit)
-
+        
         scan_dic[key] = value
     return scan_dic
 
@@ -66,12 +67,11 @@ def extract_image_info_from_header(header):
             key, value = line.split(b': ')
         except ValueError:
             continue
-
-        if key in ['Data offset', 'Data length', 'Bytes/pixel', 'Samps/line',
-                   'Number of lines']:
+        if key in [b'Data offset', b'Data length', b'Bytes/pixel', b'Samps/line',
+                   b'Number of lines']:
             value = int(value)
-        elif key in ['Scan Size']:
-            value_x, value_y, unit = value.split(' ')
+        elif key in [b'Scan Size']:
+            value_x, value_y, unit = value.split(b' ')
             value_x = convert_length_to_SI_unit(float(value_x), unit)
             value_y = convert_length_to_SI_unit(float(value_y), unit)
             value = np.array([value_x, value_y], dtype='float')
@@ -114,11 +114,11 @@ def load_nanoscope(filename):
     image_infos = extract_image_infos_from_header(header)
 
     # extract the image data
-    data_offset = int(image_infos[0][b'Data offset'].decode('iso-8859-1'))
+    data_offset = int(image_infos[0][b'Data offset'])
 
     data_orig = np.frombuffer(file_str, dtype='<h', offset=data_offset)
-    pixels = int(scan_info[b'Samps/line'].decode('iso-8859-1'))
-    lines = int(scan_info[b'Lines'].decode('iso-8859-1'))
+    pixels = int(scan_info[b'Samps/line'])
+    lines = int(scan_info[b'Lines'])
     data = np.zeros((len(image_infos), pixels, lines))
     start = 0
     for chan in range(len(image_infos)):
@@ -127,14 +127,20 @@ def load_nanoscope(filename):
         tempD = data_orig[start:start + tempX * tempY].reshape((tempY, tempX))
         data[chan][0:tempY, 0:tempX] = tempD
         start = start + tempX * tempY
-
-    scan_info = {y.decode('iso-8859-1'): scan_info.get(y).decode('iso-8859-1') for y in scan_info.keys()}
+    
+    scan_info = {y.decode('iso-8859-1'): decode_values(scan_info, y) for y in scan_info.keys()}
     for i, k in enumerate(image_infos):
-        image_infos[i] = {y.decode('iso-8859-1'): image_infos[i].get(y).decode('iso-8859-1') for y in
+        image_infos[i] = {y.decode('iso-8859-1'): decode_values(image_infos[i], y) for y in
                           image_infos[i].keys()}
     header = header.decode('iso-8859-1')
 
     return data, scan_info, image_infos, header
+
+def decode_values(scan_dict, y):
+    value = scan_dict.get(y)
+    if type(value) == bytes:
+        value = value.decode('iso-8859-1')
+    return value
 
 
 def nanoscope2hdf5(filename, filepath=None):
@@ -167,3 +173,4 @@ def nanoscope2hdf5(filename, filepath=None):
             dtst = datagrp.create_dataset(name, data=data[indx])
             for key in image_infos[indx].keys():
                 dtst.attrs[key] = image_infos[indx][key]
+            dtst.attrs['scale_m_per_px'] = scan_info['Scan Size']/scan_info['Samps/line']

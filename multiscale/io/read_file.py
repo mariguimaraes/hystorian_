@@ -12,6 +12,7 @@ from . import csv_files
 from . import nanoscope_files
 from . import img_files
 from . import shg_files
+from ..processing import core
 import h5py
 import os
 import re
@@ -143,14 +144,20 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
             datagrp = f['datasets']
             procgrp = f['process']
             with h5py.File(filename, 'r') as source_f:
-                if file_path is not None:
-                    p = file_path[i].split('.')[0]
-                else:
-                    p = filename.split('.hdf5')[0]
-                f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
-                source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
-                f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
-                source_f.copy('datasets/' + p, f['datasets/' + '/'.join(p.split('/')[:-1])])
+                #if file_path is not None:
+                #    p = file_path[i].split('.')[0]
+                #else:
+                #    p = filename.split('.hdf5')[0]
+                #f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
+                #source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
+                #f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
+                #source_f.copy('datasets/' + p, f['datasets/' + '/'.join(p.split('/')[:-1])])
+                
+                for source_metadata in source_f['metadata']:
+                    source_f.copy('metadata/' + source_metadata, metadatagrp)
+                for source_data in source_f['datasets']:
+                    source_f.copy('datasets/' + source_data, datagrp)
+                
                 if merge_process:
                     f.require_group('process/' + '/'.join(p.split('/')[:-1]))
                     source_f.copy('process/' + p, f['process/' + '/'.join(p.split('/')[:-1])])
@@ -160,7 +167,7 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
                         num_proc = len(procgrp.keys())
                         num_proc = num_proc + 1
                         dest_proc = str(num_proc).zfill(3)+'-'+dest_proc
-                        pt.create_group_path(procgrp, dest_proc)
+                        core.create_group_path(procgrp, dest_proc)
                         for source_proc_proc in source_f['process'][source_proc]:
                             source_f.copy('process/'+source_proc+'/'+source_proc_proc, procgrp[dest_proc])
                 i = i + 1

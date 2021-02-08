@@ -36,18 +36,27 @@ def compress_hdf5(file, error_threshold=0, bypass_verification=False):
                 inputs = []
                 for source in processes[k][fname][outputs[0]].attrs['source']:
                     inputs.append(f[source][()])
-                try:
-                    results = func(*inputs, **kwargs)
-                    if type(results) != tuple:
-                        results = tuple([results])
-                    for i in range(len(outputs)):
-                        if (results[i] - processes[k][fname][outputs[i]][()] < error_threshold).all():
-                            print(func.__name__ + ': Result is not identical, not compressing')
-                            identical = False
-                            break
-                except Exception as e:
-                    print('ERROR: ' + e.__doc__)
-                    identical = False
+                return inputs
+                input()
+                #try:
+                results = func(*inputs, **kwargs)
+                if type(results) != tuple:
+                    results = tuple([results])
+                for i in range(len(outputs)):
+                    if type(results[i]) == dict:
+                        if 'hdf5_dict' in results[i]:
+                            result_data = results[i]['data']
+                        else:
+                            result_data = results[i]
+                    else:
+                        result_data = results[i]
+                    if (result_data - processes[k][fname][outputs[i]][()] < error_threshold).all():
+                        print(func.__name__ + ': Result is not identical, not compressing')
+                        identical = False
+                        break
+                #except Exception as e:
+                #    print('ERROR: ' + e.__doc__)
+                #    identical = False
 
                 if identical:
                     for i in range(len(outputs)):

@@ -424,7 +424,7 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
     dataset.attrs['source'] = in_paths
 
     
-#   FUNCTION write_generic_attributes
+#   FUNCTION write_kwargs_as_attributes
 # Writes all other arguments as attributes to a datset.
 #   INPUTS:
 # dataset: the dataset the attributes are written to
