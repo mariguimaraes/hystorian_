@@ -1,6 +1,6 @@
 import h5py
 import importlib
-from multiscale import processing
+from hystorian import processing
 import ast
 import sys
 import numpy as np
