@@ -359,6 +359,7 @@ def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions =
     warp_matrix : ndarray
         Transformation matrix used to convert img_orig into img
     """
+    offset_guess[1] = -offset_guess[1]
     divisor = divisor_init
     warp_matrix = np.eye(2, 3, dtype=np.float32)
     for num in range(max_divisions):
@@ -438,7 +439,8 @@ def generate_transform_xy_multi(img, img_orig, offset_px = [0,0], warp_mode = cv
     # Returns the transform matrix of the img with respect to img_orig
     
     # Redo using the same logic as the previous one; but only use the actual logic to optimise parameters just once
-    
+
+    offset_px[1] = -offset_px[1]
     if speed != 0 and speed != 1 and speed != 2 and speed != 3 and speed != 4:
         print('Error: Speed should be an integer between 1 (slowest) and 4 (fastest).\
                 Speed now set to level 2.')
