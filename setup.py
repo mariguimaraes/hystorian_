@@ -21,7 +21,6 @@ setuptools.setup(
     license='CC-By 4.0',
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: CC-By 4.0",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
