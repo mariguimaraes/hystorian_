@@ -11,15 +11,13 @@ here = pathlib.Path(__file__).parent.resolve()
 
 setuptools.setup(
     name="hystorian",
-    version="0.0.4",
+    version="0.0.5",
     author="Loïc Musy <loic.musy@unige.ch>, Ralph Bulanadi <ralph.bulanadi@unige.ch>",
     author_email="loic.musy@unige.ch",
     description="a generic materials science data analysis Python package built with processing traceability, reproducibility, and archival ability at its core.",
     long_description=(here / 'README.md').read_text(encoding='utf-8'),
     url='https://gitlab.unige.ch/paruch-group/hystorian',
-    packages=setuptools.find_packages()
-    + setuptools.find_packages(where="./io")
-    + setuptools.find_packages(where="./processing"),
+    packages=['hystorian', 'hystorian.io', 'hystorian.process']
     license='CC-By 4.0',
     classifiers=[
         "Programming Language :: Python :: 3",
