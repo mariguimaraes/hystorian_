@@ -11,7 +11,7 @@ here = pathlib.Path(__file__).parent.resolve()
 
 setuptools.setup(
     name="hystorian",
-    version=0.0.1,
+    version="0.0.1",
     author="Loïc Musy <loic.musy@unige.ch>, Ralph Bulanadi <ralph.bulanadi@unige.ch>",
     author_email="loic.musy@unige.ch",
     description="a generic materials science data analysis Python package built with processing traceability, reproducibility, and archival ability at its core.",
