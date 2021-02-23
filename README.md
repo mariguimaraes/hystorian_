@@ -1,5 +1,7 @@
 # Multiscale
 
+Please go see the wiki if you want to have more informations https://gitlab.unige.ch/paruch-group/multiscale/-/wikis/home
+
 ## Intoduction
 Multiscale is a large scale project. Which has the motivation to gatherer all the snippets of code currently in the group under an organised library.
 
@@ -9,7 +11,7 @@ The first part of the project is to create a file convert, which will convert mo
 
 ## How to participate?
 The easiest way to help develop this project would be to setup a github repository on your computer. On windows https://gitforwindows.org/ seems to work nicely.
-Once installed, you need to create a ssh key pair to share your code with gitlab. `https://gitlab.unige.ch/help/ssh/README#generating-a-new-ssh-key-pair`
+Once installed, you need to create a ssh key pair to share your code with gitlab. https://gitlab.unige.ch/help/ssh/README#generating-a-new-ssh-key-pair
 
 Once it is done, open Git Bash and clone the project by typing:
 
