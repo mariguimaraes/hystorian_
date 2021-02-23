@@ -329,7 +329,7 @@ def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = 
     warp_matrix[0, 2] = offset_guess[0]
     warp_matrix[1, 2] = offset_guess[1]
     (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                         criteria, None, 1)
+                                         criteria)
     return tform21
 
 
@@ -379,7 +379,7 @@ def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions =
                     if j-offset_guess[1] < last_j*1.5:
                         currDiff=0
                         for channel_i in range(len(img1)):
-                            img_test = cv2.warpAffine(img1[channel_i], warp_matrix, (512, 512), flags=cv2.INTER_LINEAR +
+                            img_test = cv2.warpAffine(img1[channel_i], warp_matrix, (np.shape(img2)[2], np.shape(img2)[1]), flags=cv2.INTER_LINEAR +
                                                                                           cv2.WARP_INVERSE_MAP)
                             currDiff = currDiff+np.sum(np.square(img_test[lim:-lim, lim:-lim]
                                                             - img2[channel_i][lim:-lim, lim:-lim]))
@@ -499,11 +499,11 @@ def generate_transform_xy_multi(img, img_orig, offset_px = [0,0], warp_mode = cv
             warp_matrix[1, 2] = 2 * j + offset_guess[1]
             try:
                 (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                                     criteria)
-                img_test = cv2.warpAffine(img, tform21, (512, 512), flags=cv2.INTER_LINEAR +
-                                                                          cv2.WARP_INVERSE_MAP)
+                                                         criteria)
+                img_test = cv2.warpAffine(img, tform21, (np.shape(img)[1], np.shape(img)[0]), flags=cv2.INTER_LINEAR +
+                                                                              cv2.WARP_INVERSE_MAP)
                 currDiff = np.sum(np.square(img_test[lim:-lim, lim:-lim]
-                                            - img_orig[lim:-lim, lim:-lim]))
+                                                - img_orig[lim:-lim, lim:-lim]))
                 if currDiff < diff:
                     diff = currDiff
                     offset1 = tform21[0, 2]

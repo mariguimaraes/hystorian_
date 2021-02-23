@@ -11,6 +11,7 @@ import inspect
 import sys
 import time
 from glob import glob
+import types
 
 def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             use_attrs=None, prop_attrs=None, increment_proc=True, process_folder='process',
@@ -418,7 +419,10 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
     dataset.attrs['shape'] = dataset.shape
     dataset.attrs['name'] = output_name
     #dataset.attrs['operation name'] = operation_name.split('-')[1]
-    dataset.attrs['operation name'] = function.__module__ + '.' + function.__name__
+    if function.__module__ is None:
+        dataset.attrs['operation name'] = 'None.' + function.__name__
+    else:
+        dataset.attrs['operation name'] = function.__module__ + '.' + function.__name__
     dataset.attrs['operation number'] = operation_name.split('-')[0]
     dataset.attrs['time'] = str(datetime.now())
     dataset.attrs['source'] = in_paths
@@ -435,27 +439,30 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
 # null
     
 def write_kwargs_as_attributes(dataset, func, all_variables, first_kwarg=1):
-    varargs = inspect.getfullargspec(func).varargs
-    signature = inspect.signature(func).parameters
-    first_arg = list(signature.keys())[0]
-    if varargs == first_arg:
-        first_kwarg=1
-    var_names = list(signature.keys())[first_kwarg:]
-    for key in var_names:
-        if key in all_variables:
-            value = all_variables[key]
-        else:
-            value = signature[key].default
-        if callable(value):
-            value = value.__name__
-        elif value is None:
-            value = 'None'
-        try:
-            dataset.attrs['kwargs_' + key] = value
-        except RuntimeError:
-            print('Attribute was not able to be saved, probably because the attribute'
-                  'is too large')
-            dataset.attrs['kwargs_' + key] = 'None'    
+    if isinstance(func, types.BuiltinFunctionType):
+        dataset.attrs['BuiltinFunctionType'] = True
+    else:
+        varargs = inspect.getfullargspec(func).varargs
+        signature = inspect.signature(func).parameters
+        first_arg = list(signature.keys())[0]
+        if varargs == first_arg:
+            first_kwarg=1
+        var_names = list(signature.keys())[first_kwarg:]
+        for key in var_names:
+            if key in all_variables:
+                value = all_variables[key]
+            else:
+                value = signature[key].default
+            if callable(value):
+                value = value.__name__
+            elif value is None:
+                value = 'None'
+            try:
+                dataset.attrs['kwargs_' + key] = value
+            except RuntimeError:
+                print('Attribute was not able to be saved, probably because the attribute'
+                      'is too large')
+                dataset.attrs['kwargs_' + key] = 'None'
     
 
 #   FUNCTION progress_report
