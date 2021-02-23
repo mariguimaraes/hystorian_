@@ -6,12 +6,12 @@ here = pathlib.Path(__file__).parent.resolve()
 setuptools.setup(
     version_config={
         "template": "{tag}",
-        "dev_template": "{tag}.dev{ccount}+git.{sha}",
-        "dirty_template": "{tag}.dev{ccount}+git.{sha}.dirty",
+        "dev_template": "{tag}.dev{ccount}",
+        "dirty_template": "{tag}.dev{ccount}",
         "starting_version": "0.0.1",
         "version_callback": None,
         "version_file": None,
-        "count_commits_from_version_file": False
+        "count_commits_from_version_file": True
     },
     setup_requires=['setuptools-git-versioning'],
     name="hystorian",
