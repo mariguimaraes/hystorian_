@@ -17,7 +17,7 @@ setuptools.setup(
     description="a generic materials science data analysis Python package built with processing traceability, reproducibility, and archival ability at its core.",
     long_description=(here / 'README.md').read_text(encoding='utf-8'),
     url='https://gitlab.unige.ch/paruch-group/hystorian',
-    packages=packages=find_packages()
+    packages=find_packages()
     + find_packages(where="./hystorian")
     + find_packages(where="./hystorian/io")
     + find_packages(where="./hystorian/processing"),
