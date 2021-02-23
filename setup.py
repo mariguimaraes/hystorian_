@@ -10,8 +10,17 @@ here = pathlib.Path(__file__).parent.resolve()
 #    version = os.environ['CI_JOB_ID']
 
 setuptools.setup(
+    version_config={
+        "template": "{tag}",
+        "dev_template": "{tag}.dev{ccount}+git.{sha}",
+        "dirty_template": "{tag}.dev{ccount}+git.{sha}.dirty",
+        "starting_version": "0.0.1",
+        "version_callback": None,
+        "version_file": None,
+        "count_commits_from_version_file": False
+    },
+    setup_requires=['setuptools-git-versioning'],
     name="hystorian",
-    version="0.0.5",
     author="Loïc Musy <loic.musy@unige.ch>, Ralph Bulanadi <ralph.bulanadi@unige.ch>",
     author_email="loic.musy@unige.ch",
     description="a generic materials science data analysis Python package built with processing traceability, reproducibility, and archival ability at its core.",
