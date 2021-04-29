@@ -12,7 +12,7 @@ from . import csv_files
 from . import nanoscope_files
 from . import img_files
 from . import shg_files
-from ..processing import core
+from .processing import core
 import h5py
 import os
 import re
@@ -144,19 +144,19 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
             datagrp = f['datasets']
             procgrp = f['process']
             with h5py.File(filename, 'r') as source_f:
-                #if file_path is not None:
-                #    p = file_path[i].split('.')[0]
-                #else:
-                #    p = filename.split('.hdf5')[0]
-                #f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
-                #source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
-                #f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
-                #source_f.copy('datasets/' + p, f['datasets/' + '/'.join(p.split('/')[:-1])])
+                if file_path is not None:
+                    p = file_path[i].split('.')[0]
+                else:
+                    p = filename.split('.hdf5')[0]
+                f.require_group('metadata/' + '/'.join(p.split('/')[:-1]))
+                source_f.copy('metadata/' + p, f['metadata/' + '/'.join(p.split('/')[:-1])])
+                f.require_group('datasets/' + '/'.join(p.split('/')[:-1]))
+                source_f.copy('datasets/' + p, f['datasets/' + '/'.join(p.split('/')[:-1])])
                 
-                for source_metadata in source_f['metadata']:
-                    source_f.copy('metadata/' + source_metadata, metadatagrp)
-                for source_data in source_f['datasets']:
-                    source_f.copy('datasets/' + source_data, datagrp)
+                #for source_metadata in source_f['metadata']:
+                #    source_f.copy('metadata/' + source_metadata, metadatagrp)
+                #for source_data in source_f['datasets']:
+                #    source_f.copy('datasets/' + source_data, datagrp)
                 
                 if merge_process:
                     f.require_group('process/' + '/'.join(p.split('/')[:-1]))
