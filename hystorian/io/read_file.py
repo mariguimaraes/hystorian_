@@ -12,7 +12,7 @@ from . import csv_files
 from . import nanoscope_files
 from . import img_files
 from . import shg_files
-from .processing import core
+from ..processing import core
 import h5py
 import os
 import re
@@ -36,7 +36,7 @@ def tohdf5(filename,filepath=None, params=None):
     '''
     filetype = 'unknown'
     if type(filename) == list:
-        merge_hdf5(filename, 'merged_file', erase_file='partial')
+        merge_hdf5(filename, 'merged_file', erase_file='partial', verbose=False)
     else:
         if filename.split('.')[-1] == 'ibw':
             ibw_files.ibw2hdf5(filename, filepath)
@@ -81,7 +81,7 @@ def tohdf5(filename,filepath=None, params=None):
             print('file type not yet supported')
     return filetype
 
-def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False):
+def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False, verbose=True):
     '''
     Take a list of file to convert into a single hdf5 file
 
@@ -172,16 +172,17 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
                             source_f.copy('process/'+source_proc+'/'+source_proc_proc, procgrp[dest_proc])
                 i = i + 1
 
-        print('\'' + filename + '\' successfully merged')
+        if verbose:
+            print('\'' + filename + '\' successfully merged')
         if erase_file == 'partial' and temporary:
             temporary = False
             if filename.split('.')[-1] == 'hdf5':
                 os.remove(filename)
-
-    print(str(i) + '/' + str(len(filelist)) + ' files merged into \'' + combined_name + '.hdf5\'')
+    if verbose:
+        print(str(i) + '/' + str(len(filelist)) + ' files merged into \'' + combined_name + '.hdf5\'')
 
     
-def create_hdf5(filename, image):
+def create_hdf5(filename, image, verbose=True):
     '''
     Create an hdf5 file from an array-like.
 
@@ -204,7 +205,8 @@ def create_hdf5(filename, image):
         datagrp[label].attrs['name'] = filename
         datagrp[label].attrs['shape'] = image.shape
         datagrp[label].attrs['path'] = ("datasets/" + filename.split('.')[0])
-    print('file successfully converted')
+    if verbose:
+        print('file successfully converted')
 
 
 def shorten_path(filelist):
