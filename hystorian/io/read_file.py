@@ -216,7 +216,7 @@ def shorten_path(filelist):
     if type(filelist) == str:
         filelist = [filelist]
     if len(filelist) == 1:
-        return os.path.basename(filelist[0])
+        return [os.path.basename(filelist[0])]
     
     start = os.path.commonpath(filelist)
     short_list = [os.path.relpath(path, start).replace('\\', '/') for path in filelist]
