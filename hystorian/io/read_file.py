@@ -81,7 +81,7 @@ def tohdf5(filename,filepath=None, params=None):
             print('file type not yet supported')
     return filetype
 
-def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False, verbose=True):
+def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False, verbose=True, overwrite=False):
     '''
     Take a list of file to convert into a single hdf5 file
 
@@ -212,18 +212,7 @@ def create_hdf5(filename, image, verbose=True):
 def shorten_path(filelist):
     if type(filelist) == str:
         filelist = [filelist]
-    filelist = [i.replace('\\', '/') for i in filelist]
-    pad = max([len(i.split('/')) for i in filelist])
-    splitted = np.array([i.split('/') + ['NAN'] * (pad - len(i.split('/'))) for i in filelist])
-    for i in range(np.shape(splitted)[1]):
-        if len(set(splitted[:, i])) != 1:
-            breakpoint = i
-            break
-        else:
-            breakpoint = -1
-    result = []
-    for i in range(np.shape(splitted)[0]):
-        unpadded = np.delete(splitted[i, breakpoint:], np.where(splitted[i, breakpoint:] == 'NAN'))
-        result.append('/'.join(unpadded))
+    start = os.path.commonpath(filelist)
+    short_list = [os.path.relpath(path, start).replace('\\', '/') for path in filelist]
 
-    return result
+    return short_list
