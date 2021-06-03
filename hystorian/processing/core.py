@@ -12,6 +12,7 @@ import sys
 import time
 from glob import glob
 import types
+import inspect
 
 def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             use_attrs=None, prop_attrs=None, increment_proc=True, process_folder='process',
@@ -423,6 +424,9 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
         dataset.attrs['operation name'] = 'None.' + function.__name__
     else:
         dataset.attrs['operation name'] = function.__module__ + '.' + function.__name__
+    print(function.__module__)
+    if function.__module__ == '__main__':
+        dataset.attrs['function code'] = inspect.getsource(function)
     dataset.attrs['operation number'] = operation_name.split('-')[0]
     dataset.attrs['time'] = str(datetime.now())
     dataset.attrs['source'] = in_paths
