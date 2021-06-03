@@ -107,11 +107,14 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
         file_path = shorten_path(filelist)
     else:
         file_path = None
-
-    with h5py.File(combined_name + '.hdf5', 'w') as f:
-        metadatagrp = f.create_group('metadata')
-        datagrp = f.create_group('datasets')
-        procgrp = f.create_group('process')
+    if overwrite:
+        file_mode = 'w'
+    else:
+        file_mode = 'a'
+    with h5py.File(combined_name + '.hdf5', file_mode) as f:
+        metadatagrp = f.require_group('metadata')
+        datagrp = f.require_group('datasets')
+        procgrp = f.require_group('process')
         # print(f.keys())
 
     for i, filename in enumerate(filelist):
