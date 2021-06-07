@@ -13,6 +13,10 @@ from scipy import interpolate, ndimage, signal
 
 from skimage.morphology import skeletonize
 from skimage import img_as_ubyte
+
+from skimage.draw import disk
+from random import randrange
+
 import itertools
 
 
@@ -3749,3 +3753,43 @@ def autocorrelate(data, mode='full', padding=None, normalise=True):
         padded=np.pad(normalised, l, padding)
         return signal.fftconvolve(normalised, padded[::-1,::-1], mode='same')/data.size
     return signal.fftconvolve(normalised, normalised[::-1,::-1], mode=mode)/data.size
+
+def generate_triangular_lattice(lattsize = 1000, r=10, dr=0, d=50, dd=0):
+    '''
+    Generate a triangular lattice of circles with disorder, Usefull to test autocorrelation
+    
+    Parameters
+    ----------
+    lattsize : int, the shape of the resulting array will be (lattsize, lattsize)
+    r : the mean radius of the circles in the lattice
+    dr : the standard deviation of the distribution of radii (each individual circle radius is
+         drawn from a normal distribution with mean r and standard deviation dr)
+    d : int, the mean distance between two circles on the lattice
+    dd : the standard deviation of the shift of the position of each circle (each circle will be
+         shifted from its ideal position by an amount drawn from a normal distribution with mean 
+         0 and standard deviation dd)
+         
+    Returns
+    -------
+    A lattsize x lattsize numpy array with 1 at the positions of the circles and 0 elswhere
+    '''
+    y_spacing = int(d*np.sqrt(3)/2)
+    lattice = np.zeros((lattsize, lattsize))
+    centers = []
+
+    for i, y in enumerate(range(0, lattsize + y_spacing, y_spacing)):
+        for x in range(0, lattsize + d, d):
+            direction = 2*np.pi*np.random.random()
+            size = np.random.normal(0, dd)
+            x_shift = size*np.cos(direction)
+            y_shift = size*np.sin(direction)
+
+            if i%2 == 1:
+                centers.append((x + d//2 + x_shift, y + y_shift))
+            else:
+                centers.append((x + x_shift,y + y_shift))
+
+    for center in centers:
+        lattice[disk(center, r + np.random.normal(0, dr), shape=(lattsize, lattsize))] = 1
+        
+    return lattice
