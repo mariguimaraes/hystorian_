@@ -9,7 +9,7 @@ from scipy.signal import medfilt, cspline2d
 from scipy.optimize import curve_fit
 from scipy.ndimage.morphology import binary_erosion, binary_dilation
 from scipy.ndimage.measurements import label
-from scipy import interpolate, ndimage
+from scipy import interpolate, ndimage, signal
 
 from skimage.morphology import skeletonize
 from skimage import img_as_ubyte
@@ -3629,4 +3629,123 @@ def find_grown_element(contour_init, contour_end, path1, path2, img_contour_end)
 
     data = (img_bin).astype(np.uint8)
     (cnts, img) = cv2.findContours(data, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
     return cnts
+           
+def radial_average(data, angle=None, tol=np.pi/18):
+    '''
+    Do the radial avarage of an image
+
+    Parameters
+    ----------
+    data : 2d array-like
+    angle : if None, the avarge is over all directions
+            else, indicates the direction in which to do the average, as an angle in radians
+    tol : if an angle is given, the average will be done between angle-tol and angle+tol
+
+    Returns
+    -------
+    index : 1d array of the distances from the center, in pixel
+    mean : 1d array of the same size as index with the corresponding averages
+    '''
+    
+    #find the distance of each pixel to the center
+    sx,sy = data.shape
+    X,Y = np.ogrid[0:sx, 0:sy]
+    R = np.hypot(X - sx/2, Y - sy/2)
+    
+    #round to closest pixel and extract unique values
+    labels = R.astype(np.int)
+    index = np.unique(labels)
+    
+    #if angle is specified, mask the data to only include data in the slice defined by angle +/- tol
+    if angle is not None:
+        mask = np.logical_and(np.arctan2(X - sx/2, Y - sy/2) < (angle + tol),
+                              np.arctan2(X - sx/2, Y - sy/2) > (angle - tol))
+        return index, ndimage.mean(data[mask], labels=labels[mask], index=index)
+    
+    return index, ndimage.mean(data, labels=labels, index=index)
+
+def projected_average(data, angle=0, symmetrical=True):
+    '''
+    Project an image along an axis passing through its center
+
+    Parameters
+    ----------
+    data : 2d array-like
+    angle : the direction of the axis on which to project, as an angle in radians
+    symmetrical : if True, the projection is done symmetrically around the center of the image
+                    else, it is done from one edge of the image to the other
+
+    Returns
+    -------
+    index : 1d array of the distances along the projection axis from the center, in pixel
+    mean : 1d array of the same size as index with the corresponding averages
+    '''
+    
+    #Calculate the projection of each point on the unit vector in the direction of angle
+    sx,sy = data.shape
+    X,Y = np.ogrid[0:sx, 0:sy]
+    P = (X-sx/2)*np.cos(angle) + (Y-sy/2)*np.sin(angle)
+    
+    #round to closest pixel, in absolute value if symmetrical is True
+    if symmetrical:
+        labels = np.abs(P.round().astype(np.int))
+    else:
+        labels = P.round().astype(np.int)
+    index = np.unique(labels)
+        
+    return index, ndimage.mean(data, labels=labels, index=index)
+
+def gaussian_blur(data, r=1, padding='wrap'):
+    '''
+    Blur an image using a gaussian kernel
+    
+    Parameters
+    ----------
+    data : 2d array-like
+    r : the standard deviation of the kernel
+    padding : passed to np.pad(), determines how the image is padded to avoid edge effects
+    
+    Returns
+    -------
+    The blurred image, same shape as the original
+    '''
+    
+    if r == 0: #no blurring
+        return data
+    else:
+        l=len(data[0])
+        padded=np.pad(data, l, padding) #pad each direction the size of the image
+        k=np.outer(signal.gaussian(6*r,r),signal.gaussian(6*r,r))
+        return signal.fftconvolve(padded,k,mode='same')[l:2*l,l:2*l]/k.sum()
+
+def autocorrelate(data, mode='full', padding=None, normalise=True):
+    '''
+    Compute the 2D autocorrelation of an image
+    
+    Parameters
+    ----------
+    data : 2d array-like
+    mode : 'full' or 'same'. 'full' returns the full autocorrelation, which is twice as
+           large in every dimension as the original image. Same returns the central region
+           of the same dimension as the input data
+    padding : None or valid mode for np.pad(). If not None, determines how the image is
+              padded to avoid edge effects
+    normalise: boolean, whether to normalise the data to z-scores before computing the autocorrelation
+    
+    Returns
+    -------
+    The 2D autocorrelation
+    '''
+    
+    if normalise:
+        normalised = (data-data.mean())/data.std()
+    else:
+        normalised = data
+        
+    if padding is not None:
+        l=len(data[0])
+        padded=np.pad(normalised, l, padding)
+        return signal.fftconvolve(normalised, padded[::-1,::-1], mode='same')/data.size
+    return signal.fftconvolve(normalised, normalised[::-1,::-1], mode=mode)/data.size
