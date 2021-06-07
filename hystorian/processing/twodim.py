@@ -100,6 +100,19 @@ def plane_flatten_image(data, order=1, box=[]):
     m = polyfit2d(xxfit.ravel(), yyfit.ravel(), fitdata.ravel(), order=order)
     return data - polyval2d(xx, yy, m)
 
+def line_median_align(data, axis=0):
+    if axis == 1:
+        data = data.T
+
+    ndata = np.zeros_like(data)
+
+    for i, line in enumerate(data):
+        ndata[i, :] = line - np.median(line)
+
+    if axis == 1:
+        ndata = ndata.T
+
+    return ndata
 
 def polyfit2d(x, y, z, order=1):
     """
