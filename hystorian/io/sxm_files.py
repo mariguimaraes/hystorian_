@@ -9,6 +9,12 @@ DEBUG_PRINT_WARNING = True
 DEBUG_PRINT_ERROR = True
 
 
+def string_scinot_to_float(string):
+    split_string = string.split('E')
+    float_ = float(split_string[0])*10**float(split_string[1])
+    return float_
+
+
 def debug_print_info(s):
     if not DEBUG_PRINT_INFO:
         return
@@ -183,6 +189,17 @@ def sxm2hdf5(filename, filepath=None):
 
         for indx, key in enumerate(channel_data.keys()):
             datagrp.create_dataset(key, data=channel_data[key])
+            datagrp[key].attrs['name'] = key
+            datagrp[key].attrs['shape'] = (int(header[':Scan>pixels/line:']), int(header[':Scan>lines:']))
+            offsets = header[':SCAN_OFFSET:'].split(' ')
+            while '' in offsets:
+                offsets.remove('')
+            datagrp[key].attrs['offset'] = (string_scinot_to_float(offsets[0]), string_scinot_to_float(offsets[1]))
+            sizes = header[':SCAN_RANGE:'].split(' ')
+            while '' in sizes:
+                sizes.remove('')
+            datagrp[key].attrs['size'] = (string_scinot_to_float(sizes[0]), string_scinot_to_float(sizes[1]))
+            
             for info in channel_info:
                 if info['Name'] == key.split(' - ')[0]:
                     for k2 in info.keys():
