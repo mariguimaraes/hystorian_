@@ -48,6 +48,28 @@ def extract_hist(*input_data, bias):
     output = tuple(output)
     return output
 
+def get_phase_unwrapping_shift_(phase, phase_step=1):
+    '''
+    Finds the smallest shift that minimizes the phase jump in a phase series
+    
+    Parameters
+    ----------
+    phase : a 1D array of consecutive phase measurements
+    phase_step : the algorithm will try shifts every phase_step. Increase this to speed up execution.
+    
+    Returns
+    -------
+    The phase shift. (phase + shift) % 360 will have the smallest jumps between consecutive phase points.
+    '''
+    phase_step = 90
+    jumps = []
+    for shift in range(0, 360, phase_step):
+        y = (phase + shift) % 360
+        #what is the biggest phase jump?
+        max_phase_jump = np.max(np.abs(np.diff(y)))
+        jumps.append(max_phase_jump)
+        
+    return phase_step * np.argmin(np.array(jumps))
 
 def calc_hyst_params(bias, phase):
     """
@@ -73,10 +95,11 @@ def calc_hyst_params(bias, phase):
     biasdiff = np.diff(bias)
     up = np.sort(np.unique(np.hstack((np.where(biasdiff > 0)[0], np.where(biasdiff > 0)[0] + 1))))
     dn = np.sort(np.unique(np.hstack((np.where(biasdiff < 0)[0], np.where(biasdiff < 0)[0] + 1))))
+    phase_shift = get_phase_unwrapping_shift_(phase)
 
     # UP leg calculations
     x = np.array(bias[up])
-    y = np.array(phase[up] % 360)
+    y = (np.array(phase[up])+phase_shift) % 360
     step_left_up = np.median(y[np.where(x == np.min(x))[0]])
     step_right_up = np.median(y[np.where(x == np.max(x))[0]])
 
@@ -93,7 +116,7 @@ def calc_hyst_params(bias, phase):
 
     # DOWN leg calculations
     x = np.array(bias[dn])
-    y = np.array(phase[dn] % 360)
+    y = (np.array(phase[dn])+phase_shift) % 360
     step_left_dn = np.median(y[np.where(x == np.min(x))[0]])
     step_right_dn = np.median(y[np.where(x == np.max(x))[0]])
 
