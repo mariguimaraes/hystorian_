@@ -98,41 +98,51 @@ def calc_hyst_params(bias, phase):
     phase_shift = get_phase_unwrapping_shift_(phase)
 
     # UP leg calculations
-    x = np.array(bias[up])
-    y = (np.array(phase[up])+phase_shift) % 360
-    step_left_up = np.median(y[np.where(x == np.min(x))[0]])
-    step_right_up = np.median(y[np.where(x == np.max(x))[0]])
-
-    avg_x = []
-    avg_y = []
-    for v in np.unique(x):
-        avg_x.append(v)
-        avg_y.append(np.mean(y[np.where(x == v)[0]]))
-
-    my_x = np.array(avg_x)[1:]
-    my_y = np.abs(np.diff(avg_y))
-
-    coercive_volt_up = my_x[np.nanargmax(my_y)]
+    if up.size == 0:
+        step_left_up = np.nan
+        step_right_up = np.nan
+        coercive_volt_up = np.nan
+    else:
+        x = np.array(bias[up])
+        y = (np.array(phase[up])+phase_shift) % 360
+        step_left_up = np.median(y[np.where(x == np.min(x))[0]])
+        step_right_up = np.median(y[np.where(x == np.max(x))[0]])
+    
+        avg_x = []
+        avg_y = []
+        for v in np.unique(x):
+            avg_x.append(v)
+            avg_y.append(np.mean(y[np.where(x == v)[0]]))
+    
+        my_x = np.array(avg_x)[1:]
+        my_y = np.abs(np.diff(avg_y))
+    
+        coercive_volt_up = my_x[np.nanargmax(my_y)]
 
     # DOWN leg calculations
-    x = np.array(bias[dn])
-    y = (np.array(phase[dn])+phase_shift) % 360
-    step_left_dn = np.median(y[np.where(x == np.min(x))[0]])
-    step_right_dn = np.median(y[np.where(x == np.max(x))[0]])
+    if dn.size == 0:
+        step_left_dn = np.nan
+        step_right_dn = np.nan
+        coercive_volt_dn = np.nan
+    else:
+        x = np.array(bias[dn])
+        y = (np.array(phase[dn])+phase_shift) % 360
+        step_left_dn = np.median(y[np.where(x == np.min(x))[0]])
+        step_right_dn = np.median(y[np.where(x == np.max(x))[0]])
+    
+        avg_x = []
+        avg_y = []
+        for v in np.unique(x):
+            avg_x.append(v)
+            avg_y.append(np.mean(y[np.where(x == v)[0]]))
+    
+        my_x = np.array(avg_x)[1:]
+        my_y = np.abs(np.diff(avg_y))
+    
+        coercive_volt_dn = my_x[np.nanargmax(my_y)]
 
-    avg_x = []
-    avg_y = []
-    for v in np.unique(x):
-        avg_x.append(v)
-        avg_y.append(np.mean(y[np.where(x == v)[0]]))
-
-    my_x = np.array(avg_x)[1:]
-    my_y = np.abs(np.diff(avg_y))
-
-    coercive_volt_dn = my_x[np.nanargmax(my_y)]
-
-    return [coercive_volt_up, coercive_volt_dn, 0.5 * step_left_dn + 0.5 * step_left_up,
-            0.5 * step_right_dn + 0.5 * step_right_up]
+    return [coercive_volt_up, coercive_volt_dn, np.nanmean([step_left_dn, step_left_up]),
+            np.nanmean([step_right_dn, step_right_up])]
 
 
 def PFM_params_map(bias, phase):
