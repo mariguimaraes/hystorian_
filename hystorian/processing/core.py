@@ -536,17 +536,24 @@ def intermediate_plot(data, condition='', plotlist=[], text='Intermediate Plot',
             plt.close()
 
 
-# FUNCTION find_paths_of_all_subgroups
-# Recursively determines list of paths for all datafiles in current_path, as well as datafiles in
-# all subfolders (and sub-subfolders and...) of current path. If no path given, will find all 
-# subfolders in entire file.
-#   INPUTS:
-# f: open hdf5 file
-# current_path (default: ''): current group searched
-#   OUTPUTS:
-# path_list: list of paths to datafiles
-
 def find_paths_of_all_subgroups(f, current_path=''):
+    """
+    Recursively determines list of paths for all datafiles in current_path, as well as datafiles in
+    all subfolders (and sub-subfolders and...) of current path. If no path given, will find all 
+    subfolders in entire file.
+      
+    Parameters
+    ----------
+    f : open file
+        open hdf5 file
+    current_path : string
+        current group searched
+    
+    Returns
+    ------
+    path_list : list
+        list of paths to datafiles
+    """
     path_list = []
     if current_path == '':
         curr_group = f
@@ -580,17 +587,23 @@ def rms(array):
     return np.sqrt(mu2), mu3 / (mu2 ** (3.0 / 2.0)), mu4 / mu2 ** 2 - 3
 
 
-# FUNCTION deallocate_hdf5_memory
-# By default, .hdf5 files do not deallocate memory after component datasets or groups are deleted.
-# This function overcomes this issue by 'repacking' the data in a .hdf5 file into a new .hdf5 file.
-# The original file is then deleted and replaced with the new file.
-#   INPUTS:
-# filename: the hdf5 file to have memory deallocated
-# verify (default: True): If true, asks for the verification request.
-#   OUTPUTS:
-# null
-
 def deallocate_hdf5_memory(filename, verify=True):
+    """
+    By default, .hdf5 files do not deallocate memory after component datasets or groups are deleted.
+    This function overcomes this issue by 'repacking' the data in a .hdf5 file into a new .hdf5 file.
+    The original file is then deleted and replaced with the new file.
+      
+    Parameters
+    ----------
+    filename : string
+        the hdf5 file to have memory deallocated
+    verify : bool
+        If true, asks for the verification request.
+    
+    Returns
+    ------
+        None
+    """
     if verify:
         print('WARNING: The basic process of this function involves:')
         print('    1) Copying all components of a .hdf5 file into another .hdf5 file,')
@@ -615,15 +628,21 @@ def deallocate_hdf5_memory(filename, verify=True):
     os.rename(copy_filename, filename)
 
 
-# FUNCTION deallocate_hdf5_memory_of_folder
-# As above, but operates on an entire folder of .hdf5 files.
-#   INPUTS:
-# folder_path: path to folder to have memory deallocated
-# verify (default: True): If true, asks for the verification request.
-#   OUTPUTS:
-# null
-
 def deallocate_hdf5_memory_of_folder(folder_path, verify=True):
+    """
+    As above, but operates on an entire folder of .hdf5 files.
+      
+    Parameters
+    ----------
+    folder_path : string
+        path to folder to have memory deallocated
+    verify : bool
+        If true, asks for the verification request.
+    
+    Returns
+    ------
+        None
+    """
     os.chdir(folder_path)
     filelist = glob('*.hdf5')
     if verify:
