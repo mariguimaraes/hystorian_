@@ -495,7 +495,7 @@ def generate_transform_xy_multi(img, img_orig, offset_px = [0,0], warp_mode = cv
             warp_matrix[1, 2] = 2 * j + offset_guess[1]
             try:
                 (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                                         criteria)
+                                                         criteria, None, 1)
                 img_test = cv2.warpAffine(img, tform21, (np.shape(img)[1], np.shape(img)[0]), flags=cv2.INTER_LINEAR +
                                                                               cv2.WARP_INVERSE_MAP)
                 currDiff = np.sum(np.square(img_test[lim:-lim, lim:-lim]
