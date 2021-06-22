@@ -1,7 +1,7 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from . import core
+from . import core as pt
 import cv2
 import time
 
@@ -156,7 +156,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
     filename : str
         name of hdf5 file containing data
     all_input_criteria : str
-        criteria to identify paths to source files using core.path_search. Should be
+        criteria to identify paths to source files using pt.path_search. Should be
         height data to extract parameters from
     mode : str
         Determines mode of operation, and thus parameters used. Can be 'SingleECC', 'ManualECC',
@@ -200,9 +200,9 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
         all_input_criteria = [all_input_criteria]
     all_in_path_list = []
     for channel_type in all_input_criteria:
-        in_path_list = core.path_search(filename, channel_type)
+        in_path_list = pt.path_search(filename, channel_type)
         all_in_path_list.append(in_path_list[0])
-    out_folder_locations = core.find_output_folder_location(filename, 'distortion_params',
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
                                                           all_in_path_list[0])
     eyes = np.eye(2, 3, dtype=np.float32)
     cumulative_tform21 = np.eye(2, 3, dtype=np.float32)
@@ -263,9 +263,9 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                         if len(recent_offsets) > 3:
                             recent_offsets = recent_offsets[1:]
 
-            data = core.write_output_f(f, cumulative_tform21, out_folder_locations[i],
+            data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
                                      all_in_path_list[0][i],  distortion_params_, locals())
-            core.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
+            pt.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
                                all_in_path_list[0][i], clear=False)
 
 
@@ -495,7 +495,7 @@ def generate_transform_xy_multi(img, img_orig, offset_px = [0,0], warp_mode = cv
             warp_matrix[1, 2] = 2 * j + offset_guess[1]
             try:
                 (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                                         criteria, None, 1)
+                                                         criteria)
                 img_test = cv2.warpAffine(img, tform21, (np.shape(img)[1], np.shape(img)[0]), flags=cv2.INTER_LINEAR +
                                                                               cv2.WARP_INVERSE_MAP)
                 currDiff = np.sum(np.square(img_test[lim:-lim, lim:-lim]
@@ -521,7 +521,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
     filename : str
         Filename of hdf5 file containing data
     all_input_criteria : list
-        Criteria to identify paths to source files using core.path_search. First should
+        Criteria to identify paths to source files using pt.path_search. First should
         be data to be corrected, second should be the distortion parameters.
     cropping : bool, optional
         If set to True, each dataset is cropped to show only the common area. If
@@ -531,7 +531,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
     -------
     None
     """
-    all_in_path_list = core.path_search(filename, all_input_criteria, repeat='block')
+    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     dm_path_list = all_in_path_list[1]
 
@@ -546,7 +546,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
             yoffsets.append(np.array(matrix[1, 2]))
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
-    out_folder_locations = core.find_output_folder_location(filename, 'distortion_correction',
+    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
                                                           in_path_list)
 
     with h5py.File(filename, "a") as f:
@@ -557,11 +557,11 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
                 final_image = array_cropped(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             else:
                 final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
-            data = core.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
+            data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
                                                                                dm_path_list[i]],
                                     distortion_correction_, locals())
             propagate_scale_attrs(data, f[in_path_list[i]])
-            core.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
                                in_path_list[i])
 
 
@@ -748,10 +748,10 @@ def phase_linearisation(image, min_separation=90, background=None,
         elif background > 0:
             if np.mean(linearised_array[:, :background]) > np.mean(linearised_array):
                 linearised_array = 1 - linearised_array
-    core.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
+    pt.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
           
     linearised = medfilt(cv2.blur(linearised_array, (7, 7)), 7)
-    result = core.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
+    result = pt.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
     return result
 
 
@@ -814,7 +814,7 @@ def m_sum(*args):
             arg = arg.astype(int)
         total = total + arg
     input_count = len(args)
-    result = core.hdf5_dict(total, input_count=input_count)
+    result = pt.hdf5_dict(total, input_count=input_count)
     return result
 
 
@@ -858,7 +858,7 @@ def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None, bl
 
     if np.mean(binary) > 0.95:
         binary = 1 - binary
-    result = core.hdf5_dict(binary, threshold=best_thresh)
+    result = pt.hdf5_dict(binary, threshold=best_thresh)
     return result
 
 
@@ -1056,7 +1056,7 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
                     cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                     phase_filter_lines.append(line)
         lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
-        core.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
+        pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
         # Find angles of each line
         angles = []
@@ -1090,9 +1090,9 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
             for x1, y1, x2, y2 in line:
                 cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
         lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
-        core.intermediate_plot(line_image, 'clean', plots, 'Lines Found, after filtering')
+        pt.intermediate_plot(line_image, 'clean', plots, 'Lines Found, after filtering')
 
-    result = core.hdf5_dict(line_image, binarisation_threshold=bin_thresh)
+    result = pt.hdf5_dict(line_image, binarisation_threshold=bin_thresh)
     return result
 
 
@@ -1121,105 +1121,126 @@ def create_domain_wall_filter(phase, filter_width=15, plots=[]):
     """
     # Binarised_Phase
     binPhase = np.copy(phase)
-    core.intermediate_plot(binPhase, 'phase', plots, 'Binarised Phase')
+    pt.intermediate_plot(binPhase, 'phase', plots, 'Binarised Phase')
 
     # Create Filter
     ite = filter_width // 2
     domain_wall_filter = ~(binary_dilation(binPhase, iterations=ite) ^
                            binary_erosion(binPhase, iterations=ite, border_value=1))
-    core.intermediate_plot(domain_wall_filter, 'filter', plots, 'Domain Wall Filter')
+    pt.intermediate_plot(domain_wall_filter, 'filter', plots, 'Domain Wall Filter')
     return domain_wall_filter
 
 
-#   FUNCTION estimate_a_domains
-# Refines an amplitude image to points of higher second derivative, which are likely to correspond
-# to domain walls. If phase is given, this is used to further the filter the lines to find only
-# the a-domains. Function allows for optional viewing of intermediate steps.
-#   INPUTS:
-# amplitude: Amplitude image from which domain walls are to be emphasised
-# domain_wall_filter (default: None): Filter used during row alignment to ignore effects of 180
-#     degree walls
-# direction (default: None): Direction of the derivative taken:
-#     None: Takes both derivatives, adding together the values of the second derivative.
-#     'Vert': Finds vertical domain walls (differentiates horizontally)
-#     'Horz': Finds horizontal domain walls (differentiates vertically)
-# plots (default: []): option to plot intermediary steps. Plots if the following are in array:
-#     'amp': Raw amplitude data that contains a-domains
-#     'row_align': Data after row-alignment (if any)
-#     'spline': Spline fit of original amplitude data
-#     'first_deriv': First derivitave of amplitude
-#     'second_deriv': Second derivitave of amplitude
-#     'binary': Binarisation of second derivative
-#     'erode': Binarisation data after an erosion filter is applied
-# thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
-# dilation (default: 2): amount of dilation steps to clean image
-# erosion (default: 4): amount of erosion steps to clean image
-#   OUTPUTS
-# filtered_deriv_amp: adjusted amplitude image made to highlight points of higher second derivative
-# thresh: the threshold value used to find the a-domains
-
 def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots=[],
                        thresh_factor=2, dilation=2, erosion=4):
+    """
+    Refines an amplitude image to points of higher second derivative, which are likely to correspond
+    to domain walls. If phase is given, this is used to further the filter the lines to find only
+    the a-domains. Function allows for optional viewing of intermediate steps.
+      
+    Parameters
+    ----------
+    amplitude : 2d array
+        Amplitude image from which domain walls are to be emphasised
+    domain_wall_filter : 2d array
+        Filter used during row alignment to ignore effects of 180
+        degree walls
+    direction : string
+        Direction of the derivative taken:
+            None: Takes both derivatives, adding together the values of the second derivative.
+            'Vert': Finds vertical domain walls (differentiates horizontally)
+            'Horz': Finds horizontal domain walls (differentiates vertically)
+    plots : list
+        option to plot intermediary steps. Plots if the following are in array:
+            'amp': Raw amplitude data that contains a-domains
+            'row_align': Data after row-alignment (if any)
+            'spline': Spline fit of original amplitude data
+            'first_deriv': First derivitave of amplitude
+            'second_deriv': Second derivitave of amplitude
+            'binary': Binarisation of second derivative
+            'erode': Binarisation data after an erosion filter is applied
+    thresh_factor : int or float
+        factor used by binarisation. A higher number gives fewer valid points.
+    dilation : int or float
+        amount of dilation steps to clean image
+    erosion : int or float
+        amount of erosion steps to clean image
+    
+    Returns
+    ------
+    filtered_deriv_amp : 2d array
+        adjusted amplitude image made to highlight points of higher second derivative
+    thresh : int or float
+        the threshold value used to find the a-domains
+    """
     # Raw Data
     amp = np.copy(amplitude)
-    core.intermediate_plot(amp, 'amp', plots, 'Original Data')
+    pt.intermediate_plot(amp, 'amp', plots, 'Original Data')
 
     # Row Alignment, if direction set
     if direction == 'Vert':
         amp = align_rows(amp, domain_wall_filter)
     elif direction == 'Horz':
         amp = align_rows(amp, domain_wall_filter, cols=True)
-    core.intermediate_plot(amp, 'row_align', plots, 'Row Aligned Data')
+    pt.intermediate_plot(amp, 'row_align', plots, 'Row Aligned Data')
 
     # Fit to a spline (reduce high frequency noise)
     spline_amp = cspline2d(amp, 2.0)
-    core.intermediate_plot(spline_amp, 'spline', plots, 'Spline Fitted Data')
+    pt.intermediate_plot(spline_amp, 'spline', plots, 'Spline Fitted Data')
 
     # Find derivatives to highlight peaks
     if direction == 'Vert':
         first_deriv = np.gradient(spline_amp)[1]
-        core.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
+        pt.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
         deriv_amp = (np.gradient(first_deriv))[1]
-        core.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
+        pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
     elif direction == 'Horz':
         first_deriv = np.gradient(spline_amp)[0]
-        core.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
+        pt.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
         deriv_amp = (np.gradient(first_deriv))[0]
-        core.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
+        pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
     else:
         if direction is not None:
             print('Direction should be set to either \'Vert\', \'Horz\' or None. Behaviour\
                     defaulting to None')
         first_deriv = np.gradient(spline_amp)
-        core.intermediate_plot(first_deriv[0] + first_deriv[1], 'first_deriv', plots,
+        pt.intermediate_plot(first_deriv[0] + first_deriv[1], 'first_deriv', plots,
                              'First Derivatives')
         second_deriv_y = np.gradient(first_deriv[0])[0]
         second_deriv_x = np.gradient(first_deriv[1])[1]
         deriv_amp = second_deriv_y + second_deriv_x
-        core.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
+        pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
 
     # Binarise second derivative
     thresh = threshold_after_peak(deriv_amp, thresh_factor)
     binary = (deriv_amp > thresh)
-    core.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
+    pt.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
 
     # Remove Small Points
     filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations=dilation),
                                         iterations=erosion)
-    core.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
+    pt.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
     return filtered_deriv_amp.astype(np.uint8), thresh
 
 
-#   FUNCTION align_rows
-# Aligns rows (or cols) of an array, with a mask provided
-#   INPUTS:
-# array: the array to be aligned
-# mask (default: None): mask of data to be ignored when aligning rows
-# cols (default: False): If set to true, the columns are instead aligned
-#   OUTPUTS
-# new_array: the row (or col) aligned array
-
 def align_rows(array, mask=None, cols=False):
+    """
+    Aligns rows (or cols) of an array, with a mask provided
+      
+    Parameters
+    ----------
+    array : 2d array
+        the array to be aligned
+    mask : 2d array
+        mask of data to be ignored when aligning rows
+    cols : bool
+        If set to true, the columns are instead aligned
+    
+    Returns
+    ------
+    new_array : 2d array
+        the row (or col) aligned array
+    """
     if mask is None:
         mask = 1 + np.zeros_like(array)
     if cols:
@@ -1238,19 +1259,26 @@ def align_rows(array, mask=None, cols=False):
     return new_array
 
 
-#   FUNCTION threshold_after_peak
-# Creates a threshold value, used when finding a-domains. This works by creatinga histogram of all
-# valid values, and finding the maximum value of this histogram. The threshold is the point where
-# the height of the maximum is less than the the maximum divided by the factor passed to this
-# function.
-#   INPUTS:
-# deriv_amp: data passed in to obtain the threshold.
-# thresh_factor (default: 2): The factor the maximum is divided by to find the threshold. A higher
-#     number gives fewer valid points.
-#   OUTPUTS
-# thresh: the determined value of the optimal threshold
-
 def threshold_after_peak(deriv_amp, factor=4):
+    """
+    Creates a threshold value, used when finding a-domains. This works by creatinga histogram of all
+    valid values, and finding the maximum value of this histogram. The threshold is the point where
+    the height of the maximum is less than the the maximum divided by the factor passed to this
+    function.
+      
+    Parameters
+    ----------
+    deriv_amp : 2d array
+        data passed in to obtain the threshold.
+    thresh_factor : int or float
+        The factor the maximum is divided by to find the threshold. A higher
+        number gives fewer valid points.
+    
+    Returns
+    ------
+    thresh : int or float
+        the determined value of the optimal threshold
+    """
     deriv_hist = np.histogram(deriv_amp.ravel(), bins=256)
     max_counts = np.max(deriv_hist[0])
     found_max = False
@@ -1265,16 +1293,22 @@ def threshold_after_peak(deriv_amp, factor=4):
     return thresh
 
 
-#   FUNCTION find_desired_angles
-# Finds best angles to find a-domains, by sorting all angles into a histogram and finding the most
-# common angle. A list of this angle, its antiparallel, and its two perpendiculars are then 
-# returned.
-#   INPUTS:
-# raw_data: a list of angles to be given
-#   OUTPUTS
-# angles: A list of the four angles that the a-domains should fit to
-
 def find_desired_angles(raw_data):
+    """
+    Finds best angles to find a-domains, by sorting all angles into a histogram and finding the most
+    common angle. A list of this angle, its antiparallel, and its two perpendiculars are then 
+    returned.
+      
+    Parameters
+    ----------
+    raw_data : 2d array
+        a list of angles to be given
+    
+    Returns
+    ------
+    angles : 
+        A list of the four angles that the a-domains should fit to
+    """
     angles = np.zeros(4)
     ydata, bin_edges = np.histogram(raw_data, bins=360, range=[-180, 180])
     base_angle = (np.argmax(ydata)) - 180
@@ -1283,19 +1317,29 @@ def find_desired_angles(raw_data):
     return angles
 
 
-#   FUNCTION check_within_angle_range
-# Checks if an angle is within a valid range around another angle given. This function uses the wrap
-# functionality to search a full revolution.
-#   INPUTS:
-# angle: one of the angles to be searched
-# key_angle: another angle to be compared to
-# angle_range: the range that angle and key_angle must be within one another
-# low (default: -180): the minimum value of the angle span
-# high (default: 180): the maximum value of the angle span
-#   OUTPUTS
-# status: a bool stating whether the angles are in range (True) or not (False)
-
 def check_within_angle_range(angle, key_angle, angle_range, low=-180, high=180):
+    """
+    Checks if an angle is within a valid range around another angle given. This function uses the wrap
+    functionality to search a full revolution.
+      
+    Parameters
+    ----------
+    angle : int or float
+        one of the angles to be searched
+    key_angle : int or float
+        another angle to be compared to
+    angle_range : list
+        the range that angle and key_angle must be within one another
+    low : int or float
+        the minimum value of the angle span
+    high : int or float
+        the maximum value of the angle span
+    
+    Returns
+    ------
+    status : 
+        a bool stating whether the angles are in range (True) or not (False)
+    """
     low_angle = wrap(key_angle - angle_range, low, high)
     high_angle = wrap(key_angle + angle_range, low, high)
     status = False
@@ -1310,47 +1354,61 @@ def check_within_angle_range(angle, key_angle, angle_range, low=-180, high=180):
     return status
 
 
-#   FUNCTION find_a_domain_angle_
-# Creates a transformation matrix that would rotate each image around the centre such that a-domains
-# (or some other vertical feature) is oriented vertically and horizontally. Works by finding the
-# a-domains (by looking for points of high second derivative), finding the most common angles in
-# for these a-domains, and taking the median of these angles along all images
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using core.path_search. First pass
-#     amplitude data, then pass phase binarisation data.
-# filter_width (default: 15): total width of the filter, in pixels, around the domain-wall
-#     boundaries. This is the total distance - so half this value is applied to each side.
-# thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
-# dilation (default: 2): amount of dilation steps to clean image
-# erosion (default: 4): amount of erosion steps to clean image
-# line_threshold (default: 80): minimum number of votes (intersections in Hough grid cell)
-# min_line_length (default: 80): minimum number of pixels making up a line
-# max_line_gap (default: 80): maximum gap in pixels between connectable line segments
-# plots (default: [None]): option to plot intermediary steps. Plots if the following are in array:
-#     'amp': Raw amplitude data that contains a-domains
-#     'phase': Binarised phase data
-#     'filter': Filter made from the domain walls visible in phase
-#     'spline': Spline fit of original amplitude data
-#     'first_deriv': First derivitave of amplitude
-#     'second_deriv': Second derivitave of amplitude
-#     'binary': Binarisation of second derivative
-#     'erode': Binarisation data after an erosion filter is applied
-#     'lines': Lines found, and should correspond to a-domains on original amplitude image
-#    OUTPUTS
-# null
-
 def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_factor=2,
                          dilation=2, erosion=4, line_threshold=80, min_line_length=80,
                          max_line_gap=80, plots=None):
-    all_in_path_list = core.path_search(filename, all_input_criteria, repeat='block')
+    """
+    Creates a transformation matrix that would rotate each image around the centre such that a-domains
+    (or some other vertical feature) is oriented vertically and horizontally. Works by finding the
+    a-domains (by looking for points of high second derivative), finding the most common angles in
+    for these a-domains, and taking the median of these angles along all images
+      
+    Parameters
+    ----------
+    filename : string
+        name of hdf5 file containing data
+    all_input_criteria : list
+        criteria to identify paths to source files using pt.path_search. First pass
+        amplitude data, then pass phase binarisation data.
+    filter_width : int or float
+        total width of the filter, in pixels, around the domain-wall
+        boundaries. This is the total distance - so half this value is applied to each side.
+    thresh_factor : int or float
+        factor used by binarisation. A higher number gives fewer valid points.
+    dilation : int or float
+        amount of dilation steps to clean image
+    erosion : int or float
+        amount of erosion steps to clean image
+    line_threshold : int or float
+        minimum number of votes (intersections in Hough grid cell)
+    min_line_length : int or float
+        minimum number of pixels making up a line
+    max_line_gap : int or float
+        maximum gap in pixels between connectable line segments
+    plots : list
+        option to plot intermediary steps. Plots if the following are in array:
+            'amp': Raw amplitude data that contains a-domains
+            'phase': Binarised phase data
+            'filter': Filter made from the domain walls visible in phase
+            'spline': Spline fit of original amplitude data
+            'first_deriv': First derivitave of amplitude
+            'second_deriv': Second derivitave of amplitude
+            'binary': Binarisation of second derivative
+            'erode': Binarisation data after an erosion filter is applied
+            'lines': Lines found, and should correspond to a-domains on original amplitude image
+    
+    Returns
+    ------
+        None
+    """
+    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     if len(all_in_path_list) != 1:
         pb_path_list = all_in_path_list[1]
     else:
         pb_path_list = None
 
-    out_folder_locations = core.find_output_folder_location(filename, 'rotation_params', in_path_list)
+    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_params', in_path_list)
 
     rotation_list = []
     with h5py.File(filename, "a") as f:
@@ -1398,7 +1456,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
                             if (x1 != x2) and (y1 != y2):
                                 valid_lines.append(line)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
-                core.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
+                pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
                 # Find first angle guess
                 angles = []
@@ -1425,7 +1483,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
                 rotation_deg = -key_angles[np.argmin(np.abs(key_angles))]
                 rotation_list.append(rotation_deg)
                 average_angle = np.mean(rotation_list)
-            core.progress_report(index + 1, len(in_path_list), start_time, 'a_angle',
+            pt.progress_report(index + 1, len(in_path_list), start_time, 'a_angle',
                                in_path_list[index])
 
         rotation_array = np.array(rotation_list)
@@ -1433,7 +1491,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
         average_angle = rotation_array[int(len(rotation_array) / 2)]
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
         warp_matrix = cv2.getRotationMatrix2D((orig_x / 2, orig_y / 2), average_angle, 1)
-        data = core.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
+        data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
                                  find_a_domain_angle_, locals(), output_name = filename.split('.')[0])
         data.attrs['angle offset (degs)'] = average_angle
         data.attrs['binarisation_threshold'] = bin_thresh
@@ -1444,26 +1502,33 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
         data.attrs['thresh_factor'] = thresh_factor
 
 
-#   FUNCTION rotation_alignment_
-# Applies a rotation matrix to an image. An option also allows for cropping to the largest common
-# area, which is found via trial and error. If one rotation matrix is given, it is applied to all
-# images given. If multiple rotation matrices are given, it applies each rotation matrix n times
-# consecutively, where n is the amount of images divided by the number of rotation matrices. If this
-# would not be a whole number, the program returns an error and ends without running.
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using core.path_search. First should
-#     be data to be corrected. Second should be rotation parameters.
-# cropping (default: True): determines if the image should be cropped to the maximum common area.
-#     If this value is set to False, the image will not be intentionally cropped and the image will
-#     maintain consistent dimensions. This will often result in some cropping regardless.
-#   OUTPUTS
-# null
-#   TO DO:
-# Allow for true non-cropping, which would extend the border to the maximum possible limit.
-
 def rotation_alignment_(filename, all_input_criteria, cropping=True):
-    all_in_path_list = core.path_search(filename, all_input_criteria, repeat='block')
+    """
+    Applies a rotation matrix to an image. An option also allows for cropping to the largest common
+    area, which is found via trial and error. If one rotation matrix is given, it is applied to all
+    images given. If multiple rotation matrices are given, it applies each rotation matrix n times
+    consecutively, where n is the amount of images divided by the number of rotation matrices. If this
+    would not be a whole number, the program returns an error and ends without running.
+      
+    Parameters
+    ----------
+    filename : string
+        name of hdf5 file containing data
+    all_input_criteria : list
+        criteria to identify paths to source files using pt.path_search. First should
+        be data to be corrected. Second should be rotation parameters.
+    cropping : bool
+        determines if the image should be cropped to the maximum common area.
+        If this value is set to False, the image will not be intentionally cropped and the image will
+        maintain consistent dimensions. This will often result in some cropping regardless.
+    
+    Returns
+    ------
+        None  TO DO:
+    Allow : 
+        for true non-cropping, which would extend the border to the maximum possible limit.
+    """
+    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     rm_path_list = all_in_path_list[1]
 
@@ -1472,7 +1537,7 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
         for path in rm_path_list[:]:
             rotation_matrices.append(np.copy(f[path]))
 
-    out_folder_locations = core.find_output_folder_location(filename, 'rotation_alignment',
+    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_alignment',
                                                           in_path_list)
     with h5py.File(filename, "a") as f:
         start_time = time.time()
@@ -1515,50 +1580,67 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
             if array_is_bool:
                 new_img = new_img.astype(bool)
 
-            data = core.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
+            data = pt.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
                                                                            rm_path_list[i]],
                                     rotation_alignment_, locals())
             propagate_scale_attrs(data, f[in_path_list[i]])
-            core.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
+            pt.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
                                in_path_list[i])
 
 
-#   FUNCTION threshold_ratio
-# Thresholds an image by passing in a ratio between the minimum and maximum values of this image
-#   INPUTS:
-# image: image to be thresholded
-# thresh_ratio (default: 0.5): ratio between the minimum and maximum of the image to threshold
-#   OUTPUTS
-# result: hdf5_dict thresholded image, and the threshold value in attrs
-
 def threshold_ratio(image, thresh_ratio=0.5):
+    """
+    Thresholds an image by passing in a ratio between the minimum and maximum values of this image
+      
+    Parameters
+    ----------
+    image : 2d array
+        image to be thresholded
+    thresh_ratio : int or float
+        ratio between the minimum and maximum of the image to threshold
+    
+    Returns
+    ------
+    result : 
+        hdf5_dict thresholded image, and the threshold value in attrs
+    """
     max_level = np.nanmax(image)
     min_level = np.nanmin(image)
     real_threshold = min_level + (thresh_ratio * (max_level - min_level))
     thresh_data = image > real_threshold
-    result = core.hdf5_dict(thresh_data, threshold=real_threshold)
+    result = pt.hdf5_dict(thresh_data, threshold=real_threshold)
     return result
 
 
-#   FUNCTION directional_skeletonize
-# 'skeletonizes' a binary image either vertically or horizontally. This is done by finding the
-# contours of each shape. The centre of each of these contours are then taken and extended either
-# vertically or horizontally to the edge of each shape. If the edge of this shape is within 10
-# pixels of the edge of the image, the line is further extended to the end of the image. Extra lines
-# can also be removed via the false_positives variable
-#   INPUTS:
-# domain_guess: image showing the estimates for the a_domains
-# direction (default: 'Vert'): Direction of the a skeletonization process:
-#     'Vert': Draws vertical lines
-#     'Horz': Draws horizontal lines
-# false_positives (default: None): a list of ints that defines which lines to be ignored. Each line
-#     is described by an int, starting from number 0, which is the left- or up-most line.
-# max_edge (default: 10): the distance a line will stretch to read the edge or another line
-#   OUTPUTS
-# all_domains: image showing all domains found
-# good_domains: image showing only good domains that have not been filtered
-
 def directional_skeletonize(domain_guess, direction='Vert', false_positives=None, max_edge=10):
+    """
+    'skeletonizes' a binary image either vertically or horizontally. This is done by finding the
+    contours of each shape. The centre of each of these contours are then taken and extended either
+    vertically or horizontally to the edge of each shape. If the edge of this shape is within 10
+    pixels of the edge of the image, the line is further extended to the end of the image. Extra lines
+    can also be removed via the false_positives variable
+      
+    Parameters
+    ----------
+    domain_guess : 2d array
+        image showing the estimates for the a_domains
+    direction : string
+        Direction of the a skeletonization process:
+            'Vert': Draws vertical lines
+            'Horz': Draws horizontal lines
+    false_positives : list
+        a list of ints that defines which lines to be ignored. Each line
+        is described by an int, starting from number 0, which is the left- or up-most line.
+    max_edge : int or float
+        the distance a line will stretch to read the edge or another line
+    
+    Returns
+    ------
+    all_domains : 
+        image showing all domains found
+    good_domains : 
+        image showing only good domains that have not been filtered
+    """
     if (direction != 'Vert') and (direction != 'Horz'):
         print('direction should be set to either \'Vert\' or \'Horz\'')
         return
@@ -1628,28 +1710,40 @@ def directional_skeletonize(domain_guess, direction='Vert', false_positives=None
     return all_domains, good_domains
 
 
-#   FUNCTION final_a_domains
-# Creates a folder with all a-domain data from the directionally skeletonized binary images (both
-# horz and vert). This includes the final cleaning steps, where both vertical and horizontal lines
-# are overlayed and compared; if one line overlaps (or approaches) a perpendicular and ends at a
-# distance less than that described by closing_distance, the extra line is cut (or the approaching
-# line extended) such that the line terminates where it would coincide with the perpendicular. The
-# final dataset folder contains images of both the horizontal and vertical a-domains, a composite
-# image made from both the horizontal and vertical domains, and separate lists of both the
-# horizontal and vertical domains that contain coordinates for a start and end of each domain
-#   INPUTS:
-# orig_vert: image showing the vertical a-domains
-# orig_horz: image showing the horizontal a-domains
-# closing distance (default: 50): extra distance a line is extended to (or cut by) if it approaches
-#     a perpendicular
-#   OUTPUTS
-# new_all: all a-domains
-# new_vert: vert a-domains
-# new_horz: horz a-domains
-# np.array(vert_list): coordinates of end points of vert a-domains
-# np.array(horz_list): coordinates of end points of horz a-domains
-
 def final_a_domains(orig_vert, orig_horz, closing_distance=50):
+    """
+    Creates a folder with all a-domain data from the directionally skeletonized binary images (both
+    horz and vert). This includes the final cleaning steps, where both vertical and horizontal lines
+    are overlayed and compared; if one line overlaps (or approaches) a perpendicular and ends at a
+    distance less than that described by closing_distance, the extra line is cut (or the approaching
+    line extended) such that the line terminates where it would coincide with the perpendicular. The
+    final dataset folder contains images of both the horizontal and vertical a-domains, a composite
+    image made from both the horizontal and vertical domains, and separate lists of both the
+    horizontal and vertical domains that contain coordinates for a start and end of each domain
+      
+    Parameters
+    ----------
+    orig_vert : 2d array
+        image showing the vertical a-domains
+    orig_horz : 2d array
+        image showing the horizontal a-domains
+    closing : int or float
+        extra distance a line is extended to (or cut by) if it approaches
+        a perpendicular
+    
+    Returns
+    ------
+    new_all : 
+        all a-domains
+    new_vert : 
+        vert a-domains
+    new_horz : 
+        horz a-domains
+    np.array(vert_list) : list
+        coordinates of end points of vert a-domains
+    np.array(horz_list) : list
+        coordinates of end points of horz a-domains
+    """
     new_vert = np.copy(orig_vert)
     # Lines defined by x1, y1, x2, y2
     vert_list = []
@@ -1729,24 +1823,33 @@ def final_a_domains(orig_vert, orig_horz, closing_distance=50):
     return new_all, new_vert, new_horz, np.array(vert_list), np.array(horz_list)
 
 
-#   FUNCTION switchmap
-# Generates a switchmap from binarised phase data. A switchmap is a 2D array, where the number
-# at each coordinate corresponds to the 'time' it takes that coordinate to switch phase. If a
-# coordinate did not switch, it is set to a NaN.
-#   INPUTS:
-# *phase_list: list of all binarised phases used to identify the switchmap
-# method (default: 'total'): determines the method used to generate the switchmap:
-#     'maximum': switching occurs at the final time the coordinate switches
-#     'minimum': switching occurs at the first time the coordinate switches
-#     'median': switching occurs at the median of all times the coordinate switches
-#     'total': switching occurs at the number of total scans that the coordinate is not switched
-# source_path (default: None): path name of first source, used to find initial voltage (in mV)
-# voltage_increment (default: None): increment of voltage (in mV) on each step, used to find
-#     subsequent voltages
-#   OUTPUTS
-# result: hdf5_dict showing the switchmap, as well as the relevant voltages in attributes
-
 def switchmap(*phase_list, method='total', source_path=None, voltage_increment=None):
+    """
+    Generates a switchmap from binarised phase data. A switchmap is a 2D array, where the number
+    at each coordinate corresponds to the 'time' it takes that coordinate to switch phase. If a
+    coordinate did not switch, it is set to a NaN.
+      
+    Parameters
+    ----------
+    *phase_list : list
+        list of all binarised phases used to identify the switchmap
+    method : string
+        determines the method used to generate the switchmap:
+            'maximum': switching occurs at the final time the coordinate switches
+            'minimum': switching occurs at the first time the coordinate switches
+            'median': switching occurs at the median of all times the coordinate switches
+            'total': switching occurs at the number of total scans that the coordinate is not switched
+    source_path : string
+        path name of first source, used to find initial voltage (in mV)
+    voltage_increment : int or float
+        increment of voltage (in mV) on each step, used to find
+        subsequent voltages
+    
+    Returns
+    ------
+    result : 
+        hdf5_dict showing the switchmap, as well as the relevant voltages in attributes
+    """
     if source_path is not None:
         mV = source_path.split('mV')[-2]
         mV = mV.split('_')[-1]
@@ -1788,27 +1891,33 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
                 else:
                     print('Error: Invalid method submitted')
                 switchmap[i, j] = switch_scan
-        core.progress_report(i + 1, phase_list[0].shape[0], start_time, 'switchmap',
+        pt.progress_report(i + 1, phase_list[0].shape[0], start_time, 'switchmap',
                            'Scanning Row ' + str(i + 1))
 
     if source_path is None:
         result = switchmap
     else:
         if voltage_increment is None:
-            result = core.hdf5_dict(switchmap, voltage_mV=voltage)
+            result = pt.hdf5_dict(switchmap, voltage_mV=voltage)
         else:
-            result = core.hdf5_dict(switchmap, voltage_list_mV=voltage)
+            result = pt.hdf5_dict(switchmap, voltage_list_mV=voltage)
     return result
 
 
-#   FUNCTION wherechanged
-# Returns the indices where a list changes values
-#   INPUTS:
-# arr: the array or list that may contain changes
-#   OUTPUTS
-# where: a list of indices that changes occur
-
 def wherechanged(arr):
+    """
+    Returns the indices where a list changes values
+      
+    Parameters
+    ----------
+    arr : array or list
+        the array or list that may contain changes
+    
+    Returns
+    ------
+    where : 
+        a list of indices that changes occur
+    """
     where = []
     for i in range(len(arr) - 1):
         diff = arr[i + 1] ^ arr[i]
@@ -1817,33 +1926,39 @@ def wherechanged(arr):
     return where
 
 
-#   FUNCTION switch_type_
-# Generates data regarding the type of switch. This data is placed into two folders. In switch_type,
-# a folder is made for each scan. This folder contains an array, where the number defines the type
-# of switch that had occurred at that coordinate by that point (no distinction is made in the
-# recency of switches). NaN = no switch; 1 = nucleation; 2 = motion; 3 = merging; 4 = errors. These
-# are defined by the amount of neighbours for a switch (nucleation has 0, motion has 1, merging has
-# 2, errors have another value). The second folder, switch_type_general, holds information common to
-# the entire switchmap. In the 'Centres' subfolder, two 2D arrays are given. NucleationCentres has 1 
-# at the centre of a nucleation, and 0 elsewhere, while ClosureCentres has 1 at the centre of a
-# closure (the opposite of nucleation; where no more motion or merging can continue off of it), and
-# 0 elsewhere (note that as closure can be either motion or merging, switch_type does not contain
-# any information on closure). In the "JumpTypes" subfolder, 6 arrays are stored, which contain
-# information on the type of switch. These are the four types of switching used in switch_type
-# (Nucleation; Motion; Merging; and Errors), as well as one for all switching (TotalJumps) and one
-# for closure (Closure), which has redundancy with Motion and Merging. In these arrays, each row
-# signifies scan. Each entry shows the size of a switch at that scan. As the length of each row
-# is thus arbitirary, NaNs are made to fill each row to ensure constant length.
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using core.path_search. Should lead
-#     to switchmap only.
-#   OUTPUTS
-# null
-
 def switch_type_(filename, all_input_criteria):
-    in_path_list = core.path_search(filename, all_input_criteria)[0]
-    out_folder_locations = core.find_output_folder_location(filename, 'switch_type', '')
+    """
+    Generates data regarding the type of switch. This data is placed into two folders. In switch_type,
+    a folder is made for each scan. This folder contains an array, where the number defines the type
+    of switch that had occurred at that coordinate by that point (no distinction is made in the
+    recency of switches). NaN = no switch; 1 = nucleation; 2 = motion; 3 = merging; 4 = errors. These
+    are defined by the amount of neighbours for a switch (nucleation has 0, motion has 1, merging has
+    2, errors have another value). The second folder, switch_type_general, holds information common to
+    the entire switchmap. In the 'Centres' subfolder, two 2D arrays are given. NucleationCentres has 1 
+    at the centre of a nucleation, and 0 elsewhere, while ClosureCentres has 1 at the centre of a
+    closure (the opposite of nucleation; where no more motion or merging can continue off of it), and
+    0 elsewhere (note that as closure can be either motion or merging, switch_type does not contain
+    any information on closure). In the "JumpTypes" subfolder, 6 arrays are stored, which contain
+    information on the type of switch. These are the four types of switching used in switch_type
+    (Nucleation; Motion; Merging; and Errors), as well as one for all switching (TotalJumps) and one
+    for closure (Closure), which has redundancy with Motion and Merging. In these arrays, each row
+    signifies scan. Each entry shows the size of a switch at that scan. As the length of each row
+    is thus arbitirary, NaNs are made to fill each row to ensure constant length.
+      
+    Parameters
+    ----------
+    filename : string
+        name of hdf5 file containing data
+    all_input_criteria : list
+        criteria to identify paths to source files using pt.path_search. Should lead
+        to switchmap only.
+    
+    Returns
+    ------
+        None
+    """
+    in_path_list = pt.path_search(filename, all_input_criteria)[0]
+    out_folder_locations = pt.find_output_folder_location(filename, 'switch_type', '')
     with h5py.File(filename, "a") as f:
         switchmap = np.copy(f[in_path_list[0]])
 
@@ -1971,35 +2086,41 @@ def switch_type_(filename, all_input_criteria):
             else:
                 name = 'Scan_' + str(i).zfill(3)
             current_folder_location = out_folder_locations[0] + name
-            data = core.write_output_f(f, totalmap, current_folder_location, in_path_list,
+            data = pt.write_output_f(f, totalmap, current_folder_location, in_path_list,
                                      switch_type_, locals(), output_name='Switchmap')
             propagate_scale_attrs(data, f[in_path_list[0]])
-            core.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
+            pt.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
 
-        gen_loc = core.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
-        data = core.write_output_f(f, nucl_centres, gen_loc, in_path_list, switch_type_, locals(), output_name='NucleationCentres')
-        data = core.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_, locals(), output_name='ClosureCentres')
+        gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
+        data = pt.write_output_f(f, nucl_centres, gen_loc, in_path_list, switch_type_, locals(), output_name='NucleationCentres')
+        data = pt.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_, locals(), output_name='ClosureCentres')
 
-        gen_loc = core.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
+        gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
                                                  True)[0]
-        data = core.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, switch_type_, locals(), output_name='TotalJumps')
-        data = core.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list, switch_type_, locals(), output_name='Nucleation')
-        data = core.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, switch_type_, locals(), output_name='Motion')
-        data = core.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, switch_type_, locals(), output_name='Merging')
-        data = core.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, switch_type_, locals(), output_name='Errors')
-        data = core.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, switch_type_, locals(), output_name='Closure')
+        data = pt.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, switch_type_, locals(), output_name='TotalJumps')
+        data = pt.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list, switch_type_, locals(), output_name='Nucleation')
+        data = pt.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, switch_type_, locals(), output_name='Motion')
+        data = pt.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, switch_type_, locals(), output_name='Merging')
+        data = pt.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, switch_type_, locals(), output_name='Errors')
+        data = pt.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, switch_type_, locals(), output_name='Closure')
 
-
-#   FUNCTION fill_blanks
-# Takes a list of lists, and extends each individual list such that each list is the same size. This
-# is done by introducing NaNs. An list that is, for example, [[1,2,3],[],[1]], would then become
-# [[1,2,3],[np.nan, np.nan, np.nan],[1, np.nan, np.nan]]
-#   INPUTS:
-# list_of_lists: list of lists to be altered so each component list is the same length
-#   OUTPUTS
-# list_of_lists: the new list of lists, where each list is extended to the same length
 
 def fill_blanks(list_of_lists):
+    """
+    Takes a list of lists, and extends each individual list such that each list is the same size. This
+    is done by introducing NaNs. An list that is, for example, [[1,2,3],[],[1]], would then become
+    [[1,2,3],[np.nan, np.nan, np.nan],[1, np.nan, np.nan]]
+      
+    Parameters
+    ----------
+    list_of_lists : list
+        list of lists to be altered so each component list is the same length
+    
+    Returns
+    ------
+    list_of_lists : list
+        the new list of lists, where each list is extended to the same length
+    """
     longest_list_length = 0
     for one_list in list_of_lists:
         longest_list_length = max(longest_list_length, len(one_list))
@@ -2009,14 +2130,20 @@ def fill_blanks(list_of_lists):
     return list_of_lists
 
 
-#   FUNCTION interpolated_features
-# Creates isolines from a switchmap, then interpolates it
-#   INPUTS:
-# switchmap: the switchmap used as the base for key features
-#   OUTPUTS
-# interpolation: interpolated features
-
 def interpolated_features(switchmap):
+    """
+    Creates isolines from a switchmap, then interpolates it
+      
+    Parameters
+    ----------
+    switchmap : 2d array
+        the switchmap used as the base for key features
+    
+    Returns
+    ------
+    interpolation : 
+        interpolated features
+    """
     isolines = find_isolines(switchmap)
 
     isoline_y = []
@@ -2034,17 +2161,24 @@ def interpolated_features(switchmap):
     return interpolation
 
 
-#   FUNCTION find_isolines
-# Finds key features on a switchmap (or similar structures), by finding edges and subtracting 1. If
-# the point is at the bottom of an edge with height greater than two, and not otherwise defined, the
-# point is set to the switchmap value. Borders are also set to nan.
-#   INPUTS:
-# switchmap: the switchmap used as the base for key features
-# set_midpoints (default: True): sets the middle of each contour as 0.5 less than switchmap value
-#   OUTPUTS
-# isolines: the key features on the switchmap
-
 def find_isolines(switchmap, set_midpoints=True):
+    """
+    Finds key features on a switchmap (or similar structures), by finding edges and subtracting 1. If
+    the point is at the bottom of an edge with height greater than two, and not otherwise defined, the
+    point is set to the switchmap value. Borders are also set to nan.
+      
+    Parameters
+    ----------
+    switchmap : 2d array
+        the switchmap used as the base for key features
+    set_midpoints : bool
+        sets the middle of each contour as 0.5 less than switchmap value
+    
+    Returns
+    ------
+    isolines : 
+        the key features on the switchmap
+    """
     isolines = np.zeros_like(switchmap)
     for i in range(np.shape(switchmap)[0]):
         for j in range(np.shape(switchmap)[1]):
@@ -2080,42 +2214,57 @@ def find_isolines(switchmap, set_midpoints=True):
     return isolines
 
 
-#   FUNCTION differentiate
-# Differentiates an image. Creates files corresponding to the magnitude, of the derivative and
-# optionally, derivatives along both axis separately.
-#   INPUTS:
-# image: data to be differentiated
-# return_directions (default: True): If set to false, only the derivative magnitude is stored.
-#   OUTPUTS
-# mag_deriv (if return_directions == False): array showing magnitude of the derivative at all points
-# result (if return_directions == True): A tuple. The first entry is mag_deriv as above. Subsequent
-#    entries are different derivatives of from different directions
-
 def differentiate(image, return_directions=True):
+    """
+    Differentiates an image. Creates files corresponding to the magnitude, of the derivative and
+    optionally, derivatives along both axis separately.
+      
+    Parameters
+    ----------
+    image : 2d array
+        data to be differentiated
+    return_directions : bool
+        If set to false, only the derivative magnitude is stored.
+    
+    Returns
+    ------
+    mag_deriv : 
+        array showing magnitude of the derivative at all points
+    result : 
+        A tuple. The first entry is mag_deriv as above. Subsequent
+       entries are different derivatives of from different directions
+    """
     deriv = np.gradient(image)
     abs_deriv = np.abs(deriv)
     mag_deriv = np.sqrt(abs_deriv[0] ** 2 + abs_deriv[1] ** 2)
-    mag_deriv = core.hdf5_dict(mag_deriv, dimension='Abs')
+    mag_deriv = pt.hdf5_dict(mag_deriv, dimension='Abs')
     if not return_directions:
         result = mag_deriv
     else:
         result = [mag_deriv]
         for i in range(len(deriv)):
-            result.append(core.hdf5_dict(deriv[i], dimension=[i]))
+            result.append(pt.hdf5_dict(deriv[i], dimension=[i]))
         result = tuple(result)
     return result
 
 
-#   FUNCTION crop
-# Crops first and last rows and columns to remove regions without any meaningful data. The columns
-# that are removed are defined by that in background
-#   INPUTS:
-# array: array to be cropped
-# background (default: 0): value of background data that can be cropped out
-#   OUTPUTS
-# cropped_array: the array after being cropped
-
 def crop(array, background=0):
+    """
+    Crops first and last rows and columns to remove regions without any meaningful data. The columns
+    that are removed are defined by that in background
+      
+    Parameters
+    ----------
+    array : 2d array
+        array to be cropped
+    background : int or float
+        value of background data that can be cropped out
+    
+    Returns
+    ------
+    cropped_array : 
+        the array after being cropped
+    """
     empty_rows = []
     for i in range(np.shape(array)[0]):
         if len(set(array[i])) == 1:
@@ -2165,20 +2314,28 @@ def crop(array, background=0):
     return cropped_array
 
 
-#   FUNCTION uncrop_to_multiple
-# Adds additional columns and rows around an array. The values added are defined by background,
-# while the amount of rows and columns are defined by an array. The cols and rows are added equally
-# in all directions, preferentially to the right/bottom if an odd amount are added
-#   INPUTS:
-# array: array to be uncropped
-# multiple (default: [50,50]): list of dimensions that the data will be uncropped by. Data will be
-#     uncropped to the the next multiple of the values provided here. ie, given the default value,
-#     rows and cols will be extended such that there are 60, 120, 180, ... or etc. rows or cols
-# background (default: 0): the values granted to the uncropped regions
-#   OUTPUTS
-# extended_array: array after it is uncropped
-
 def uncrop_to_multiple(array, multiple=[50,50], background=0):
+    """
+    Adds additional columns and rows around an array. The values added are defined by background,
+    while the amount of rows and columns are defined by an array. The cols and rows are added equally
+    in all directions, preferentially to the right/bottom if an odd amount are added
+      
+    Parameters
+    ----------
+    array : 2d array
+        array to be uncropped
+    multiple : list
+        list of dimensions that the data will be uncropped by. Data will be
+        uncropped to the the next multiple of the values provided here. ie, given the default value,
+        rows and cols will be extended such that there are 60, 120, 180, ... or etc. rows or cols
+    background : int or float
+        the values granted to the uncropped regions
+    
+    Returns
+    ------
+    extended_array : 
+        array after it is uncropped
+    """
     extended_rows = int(np.ceil(np.shape(array)[0]/multiple[0])*multiple[0])
     extra_rows = extended_rows-np.shape(array)[0]
     offset_rows = int(np.floor(extra_rows/2))
@@ -2191,18 +2348,25 @@ def uncrop_to_multiple(array, multiple=[50,50], background=0):
     return extended_array
 
 
-#   FUNCTION compress_to_shape
-# Compresses an array to a smaller size. This takes rectangular sections of the original array,
-# takes the average of it, and averages it into a single pixel. The size of the compressed shape is
-# defined by the shape argument. If the initial array is not a direct multiple of the desired shape,
-# the function will call uncrop_to_multiple to extend it and ensure clean rectangles.
-#   INPUTS:
-# array: array to be compressed
-# shape (default: [50,50]): dimensions of the output array.
-#   OUTPUTS
-# compressed_array: array after it is compressed
-
 def compress_to_shape(array, shape=[50,50]):
+    """
+    Compresses an array to a smaller size. This takes rectangular sections of the original array,
+    takes the average of it, and averages it into a single pixel. The size of the compressed shape is
+    defined by the shape argument. If the initial array is not a direct multiple of the desired shape,
+    the function will call uncrop_to_multiple to extend it and ensure clean rectangles.
+      
+    Parameters
+    ----------
+    array : 2d array
+        array to be compressed
+    shape : list
+        dimensions of the output array.
+    
+    Returns
+    ------
+    compressed_array : 
+        array after it is compressed
+    """
     compressed_array = np.zeros(shape)
     extended_array = uncrop_to_multiple(array, shape)
     row_compression = int(np.shape(extended_array)[0]/shape[0])
@@ -2216,16 +2380,23 @@ def compress_to_shape(array, shape=[50,50]):
     return compressed_array
 
 
-#   FUNCTION decompress_to_shape
-# Decompresses a smaller array into a larger array. Each pixel of the initial, smaller array is
-# expanded into a larger rectangle of pixels, with the same value, on the larger array.
-#   INPUTS:
-# array: array to be decompressed
-# shape: shape of the final, larger array
-#   OUTPUTS
-# decompressed_array: array after it is decompressed
-
 def decompress_to_shape(array, shape):
+    """
+    Decompresses a smaller array into a larger array. Each pixel of the initial, smaller array is
+    expanded into a larger rectangle of pixels, with the same value, on the larger array.
+      
+    Parameters
+    ----------
+    array : 2d array
+        array to be decompressed
+    shape : list
+        shape of the final, larger array
+    
+    Returns
+    ------
+    decompressed_array : 
+        array after it is decompressed
+    """
     decompressed_array = np.zeros(shape)
     row_compression = np.ceil(shape[0]/np.shape(array)[0])
     col_compression = np.ceil(shape[1]/np.shape(array)[1])
@@ -2236,21 +2407,29 @@ def decompress_to_shape(array, shape):
     return decompressed_array
     
 
-#   FUNCTION sample_fraction
-# Randomly samples a contiguous block and small fraction of a larger array. Works by taking a small
-# point (or smaller shape) and randomly expanding in all directions. To ensure uniformity, a
-# 'supershape' is constructed, which takes the initial array and adds 5 pixels on each direction
-# to reduce edge effects during sampling.
-#   INPUTS:
-# array: array to be sampled
-# shape_fraction (default: 0.1): the fraction of the array that is actually sampled. eg., by
-#     default, an area of 0.1 will return a block of area 10% of the overall array
-# start_shape (default: None): A shape used to start the sample. Allows sample_fraction to feed into
-#     itself and generate larger samples from smaller ones.
-#   OUTPUTS
-# curr_shape: the sample generated from the main array
-
 def sample_fraction(array, shape_fraction=0.1, start_shape=None):
+    """
+    Randomly samples a contiguous block and small fraction of a larger array. Works by taking a small
+    point (or smaller shape) and randomly expanding in all directions. To ensure uniformity, a
+    'supershape' is constructed, which takes the initial array and adds 5 pixels on each direction
+    to reduce edge effects during sampling.
+      
+    Parameters
+    ----------
+    array : 2d array
+        array to be sampled
+    shape_fraction : int or float
+        the fraction of the array that is actually sampled. eg., by
+        default, an area of 0.1 will return a block of area 10% of the overall array
+    start_shape : 2d array
+        A shape used to start the sample. Allows sample_fraction to feed into
+        itself and generate larger samples from smaller ones.
+    
+    Returns
+    ------
+    curr_shape : 
+        the sample generated from the main array
+    """
     basic_array = np.zeros_like(array)
     total_shapes = 300000 
     target_shape_size = shape_fraction*np.sum(array)
@@ -2359,17 +2538,25 @@ def sample_fraction(array, shape_fraction=0.1, start_shape=None):
     return curr_shape
 
 
-#   FUNCTION MLE
-# Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
-# estimation
-#   INPUTS:
-# x_list: list of events/avalanches
-# show (default: False): shows the MLE plot
-#   OUTPUTS
-# x0_list: list of all x0 (cutoffs)
-# a_list: list of all a (scaling parameters)
-
 def MLE(x_list, show=False):
+    """
+    Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
+    estimation
+      
+    Parameters
+    ----------
+    x_list : list
+        list of events/avalanches
+    show : bool
+        shows the MLE plot
+    
+    Returns
+    ------
+    x0_list : list
+        list of all x0 (cutoffs)
+    a_list : list
+        list of all a (scaling parameters)
+    """
     x_arr = np.array(x_list)
     max_x0_check = round(max(x_list)/2)
     x0_arr=np.linspace(1, max_x0_check, max_x0_check)
@@ -2388,17 +2575,25 @@ def MLE(x_list, show=False):
     return x0_list, a_list
 
 
-#   FUNCTION KS_statistic
-# Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
-# estimation
-#   INPUTS:
-# x_list: list of events/avalanches
-# show (default: False): shows the MLE plot
-#   OUTPUTS
-# x0_list: list of all x0 (cutoffs)
-# a_list: list of all a (scaling parameters)
-
 def KS_statistic(x_list, x0_list, a_list, show=False):
+    """
+    Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
+    estimation
+      
+    Parameters
+    ----------
+    x_list : list
+        list of events/avalanches
+    show : bool
+        shows the MLE plot
+    
+    Returns
+    ------
+    x0_list : list
+        list of all x0 (cutoffs)
+    a_list : list
+        list of all a (scaling parameters)
+    """
     x_ks_all = np.array(sorted(x_list))
     D_list = []
     for i in range(len(x0_list)):
@@ -2422,34 +2617,52 @@ def KS_statistic(x_list, x0_list, a_list, show=False):
     return D_list
 
 
-#   FUNCTION power_law_CDF
-# Returns the CDF of a power law fit, given an event size, scaling parameter, and power law cutoff
-#   INPUTS:
-# x: an event size to find the cumulative probability of
-# a: scaling parameter
-# x0: power law cutoff
-#   OUTPUTS
-# P: cumulative probability
-
 def power_law_CDF(x, a, x0):
+    """
+    Returns the CDF of a power law fit, given an event size, scaling parameter, and power law cutoff
+      
+    Parameters
+    ----------
+    x : int or float
+        an event size to find the cumulative probability of
+    a : int or float
+        scaling parameter
+    x0 : int or float
+        power law cutoff
+    
+    Returns
+    ------
+    P : 
+        cumulative probability
+    """
     P = 1-((x/x0)**(1-a))
     return P
 
 
-#   FUNCTION power_law_params
-# Generates important parameters of a power law fit, given MLE and KS results
-#   INPUTS:
-# x_list: list of events
-# x0_list: list of minimum cutoffs
-# a_list: list of scaling parameters
-# D_list: list of KS statistics
-# max_x0 (default: 20): maximum value of x0 that will be considered
-#   OUTPUTS
-# P: parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic for
-#     optimal cutoff and scaling parameter; number of events above cutoff; total number of events;
-#     average event size considered; largest event size considered
-
 def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
+    """
+    Generates important parameters of a power law fit, given MLE and KS results
+      
+    Parameters
+    ----------
+    x_list : list
+        list of events
+    x0_list : list
+        list of minimum cutoffs
+    a_list : list
+        list of scaling parameters
+    D_list : list
+        list of KS statistics
+    max_x0 : int or float
+        maximum value of x0 that will be considered
+    
+    Returns
+    ------
+    P : 
+        parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic for
+        optimal cutoff and scaling parameter; number of events above cutoff; total number of events;
+        average event size considered; largest event size considered
+    """
     x_array = np.array(x_list)
     min_D_arg = np.argmin(D_list[0:max_x0])
     optimal_x0 = x0_list[min_D_arg]
@@ -2466,18 +2679,26 @@ def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
     return P
 
 
-#   FUNCTION power_law_params_force_fit
-# Generates important parameters of a power law fit, given the scaling parameters and minimum cutoff
-#   INPUTS:
-# x_list: list of events
-# optimal_x0: minimum cutoff used
-# optimal_a: scaling parameter used
-#   OUTPUTS
-# P: parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic for
-#     optimal cutoff and scalign parameter; number of events above cutoff; total number of events;
-#     average event size considered; largest event size considered
-
 def power_law_params_force_fit(x_list, optimal_x0, optimal_a):
+    """
+    Generates important parameters of a power law fit, given the scaling parameters and minimum cutoff
+      
+    Parameters
+    ----------
+    x_list : list
+        list of events
+    optimal_x0 : int or float
+        minimum cutoff used
+    optimal_a : int or float
+        scaling parameter used
+    
+    Returns
+    ------
+    P : 
+        parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic for
+        optimal cutoff and scalign parameter; number of events above cutoff; total number of events;
+        average event size considered; largest event size considered
+    """
     x_array = np.array(x_list)
     x_ks_all = np.array(sorted(x_list))
     x_ks = x_ks_all[x_ks_all >= optimal_x0]
@@ -2498,21 +2719,31 @@ def power_law_params_force_fit(x_list, optimal_x0, optimal_a):
     return P
 
 
-#   FUNCTION all_sample_fractions
-# Generates a 4D array of several samples; the first axis allows choice of the fraction of each
-# sampling; the second axis allows for each iteration of this fraction. The remaining two axes
-# are the 2D array of each individual sample.
-#   INPUTS:
-# array: the array to be sampled
-# iterations (default: 100): number of samples to be taken of for each fraction
-# fractions (default: [0.1, 0.15, 0.2, 0.25]): fractions to be sampled of the array
-# compression (default: [50,50]): the size to which the array is compressed to during sampling
-# background (default: np.nan): values of background areas that may be removed during compression
-#   OUTPUTS
-# sample_fractions_all_fractions: 4D array describing all samples extracted
-
 def all_sample_fractions(array, iterations=100, fractions=[0.1,0.15,0.2,0.25], compression=[50,50],
                          background=np.nan):
+    """
+    Generates a 4D array of several samples; the first axis allows choice of the fraction of each
+    sampling; the second axis allows for each iteration of this fraction. The remaining two axes
+    are the 2D array of each individual sample.
+      
+    Parameters
+    ----------
+    array : 2d array
+        the array to be sampled
+    iterations : int or float
+        number of samples to be taken of for each fraction
+    fractions : list
+        fractions to be sampled of the array
+    compression : list
+        the size to which the array is compressed to during sampling
+    background : int or float
+        values of background areas that may be removed during compression
+    
+    Returns
+    ------
+    sample_fractions_all_fractions : 
+        4D array describing all samples extracted
+    """
     #Compress array and generate "supershape" template from which subshapes are drawn
     if np.isnan(background):
         bool_array = ~np.isnan(array)
@@ -2551,22 +2782,31 @@ def all_sample_fractions(array, iterations=100, fractions=[0.1,0.15,0.2,0.25], c
     return sample_fractions_all_fractions
 
 
-#   FUNCTION multi_power_law
-# Applies a power law fit to a switchmap (or similar), multiple times according to samples extracted
-# from sample_fractions, and extracts parameters
-#   INPUTS:
-# switchmap: the array to be sampled
-# sample_fractions: 4D array showing all samples, extracted from function all_sample_fractions
-# compression (default: [50,50]): the size to which the array is compressed to during sampling
-# background (default: np.nan): values of background areas that may be removed during compression
-#   OUTPUTS
-# all_params: parameters in an 3D array. First axis represents each fraction value provided by
-#     sample_fractions. Second axis represents data for each particular sample. What remains is a 1D
-#     array, which contains the following parameters in order: optimal cutoff; scaling parameter;
-#     KS statistic for the optimal cutoff and scaling parameter; number of events above cutoff;
-#     total number of events; average event size considered; largest event size considered
-
 def multi_power_law(switchmap, sample_fractions, compression=[50,50], background=np.nan):
+    """
+    Applies a power law fit to a switchmap (or similar), multiple times according to samples extracted
+    from sample_fractions, and extracts parameters
+      
+    Parameters
+    ----------
+    switchmap : 2d array
+        the array to be sampled
+    sample_fractions : array
+        4D array showing all samples, extracted from function all_sample_fractions
+    compression : list
+        the size to which the array is compressed to during sampling
+    background : int or float
+        values of background areas that may be removed during compression
+    
+    Returns
+    ------
+    all_params : 
+        parameters in an 3D array. First axis represents each fraction value provided by
+        sample_fractions. Second axis represents data for each particular sample. What remains is a 1D
+        array, which contains the following parameters in order: optimal cutoff; scaling parameter;
+        KS statistic for the optimal cutoff and scaling parameter; number of events above cutoff;
+        total number of events; average event size considered; largest event size considered
+    """
     all_params = np.zeros([np.shape(sample_fractions)[0], np.shape(sample_fractions)[1],9])
 
     #Recenter initial array in same manner as supershape
@@ -2854,19 +3094,26 @@ def qvector(twtheta, omega, wavelength = 1.5405980, source_unit='deg'):
     return qx,qz
 
 
-# FUNCTION add_lattice_param_attributes_
-# Adds lattice-parameter related attributes to a dataset containing q-vectors
-#   INPUTS:
-# filename: name of hdf5 file containing data
-# all_input_criteria: criteria to identify paths to source files using core.path_search. Should be
-#        q-vector data to write attributes to
-# out_index: out-of-plane lattice index
-# in_index (default: 0): in-plane lattice index
-#   OUTPUTS:
-# NULL
-
 def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_index=0):
-    in_path_list = core.path_search(filename, all_input_criteria)[0]
+    """
+    Adds lattice-parameter related attributes to a dataset containing q-vector
+
+    Parameters
+    ----------
+    filename : string
+        Name of hdf5 file containing data
+    all_input_criteria : list of strings
+        criteria to identify paths to source files using pt.path_search. Should refer to
+        q-vector data to write attributes to
+    out_index : int or float
+        out-of-plane lattice index
+    out_index : int or float, optional
+        in-plane lattice index (default : 0)
+    Returns
+    -------
+        None
+    """
+    in_path_list = pt.path_search(filename, all_input_criteria)[0]
     with h5py.File(filename, "a") as f:
         for i in range(len(in_path_list)):
             path = in_path_list[i]

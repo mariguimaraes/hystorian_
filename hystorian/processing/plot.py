@@ -262,19 +262,29 @@ def plot_hysteresis_parameters_(filename, PATH,
         print(str(image_name) + '.png saved.')
 
         
-#   FUNCTION plot_RSM
-# Saves an image from processed reciprocal space map data
-#   INPUTS:
-# qx: in-plane reciprocal space vector
-# qz: out-of-plane reciprocal space vector
-# intensity: intensity at the site defined by qx, qz
-# filename (default: 'RSM'): name of the output file
-# xlim (default: []): plot xlim
-# ylim (default: []): plot ylim
-#   OUTPUTS:
-# null
-        
 def plot_RSM(qx, qz, intensity, filename='RSM', xlim = [], ylim = []):
+    """
+    Saves an image from processed reciprocal space map data
+      
+    Parameters
+    ----------
+    qx : array
+        in-plane reciprocal space vector
+    qz : array
+        out-of-plane reciprocal space vector
+    intensity : array
+        intensity at the site defined by qx, qz
+    filename : string
+        name of the output file
+    xlim : list
+        plot xlim
+    ylim : list
+        plot ylim
+    
+    Returns
+    ------
+        None
+    """
     x = qx.flatten()
     y = qz.flatten()
     z = np.log(intensity.flatten())
@@ -357,21 +367,29 @@ def plot_RSM(qx, qz, intensity, filename='RSM', xlim = [], ylim = []):
     plt.close()
     
     
-#   FUNCTION to_csv
-# Exports a dataset into a .csv file
-#   INPUTS:
-# data: data to be exported
-# file_name (default: None): name of the output file. By default, names file 'data'
-# saving_path (default: ''): path to save destination
-# source_path (default: None): for compatibility with source parameter in m_apply;
-#     used to name the output file
-#   OUTPUTS:
-# null
-        
 def to_csv(data,
            file_name=None,
            saving_path='',
            source_path=None):
+    """
+    Exports a dataset into a .csv file
+      
+    Parameters
+    ----------
+    data : array
+        data to be exported
+    file_name : 2d array
+        name of the output file. By default, names file 'data'
+    saving_path : string
+        path to save destination
+    source_path : string
+        for compatibility with source parameter in m_apply;
+        used to name the output file
+    
+    Returns
+    ------
+        None
+    """
     if file_name is None:
         if source_path is not None:
             file_name = source_path.replace('/', '_')
