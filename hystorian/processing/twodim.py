@@ -818,20 +818,30 @@ def m_sum(*args):
     return result
 
 
-#   FUNCTION phase_binarisation
-# Converts each entry of an array that is between two values to either 0 or 1. Designed for use
-# with linearised phase data, where peaks exist at endpoints.
-#   INPUTS:
-# phase: array of phase data to be binarised
-# thresh_estimate (default: 2): initial guess for where the threshold should be placed
-# thresh_search_range (default: 0.8): range of thresholds searched around the estimate
-# blur (default: 7): blur applied to image to help assist in binarisation
-# source_input_count: number of phases summed, used to estimate threshold
-#    OUTPUTS
-# result: hdf5_dict containing the binarised phase, as well as the threshold in attributes
-
-def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None, blur = 7,
+def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None, blur=7,
                        source_input_count=None):
+    """
+    Converts each entry of an array that is between two values to either 0 or 1. Designed for use
+    with linearised phase data, where peaks exist at endpoints.
+
+    Parameters
+    ----------
+    phase : array_like
+        Array of phase data to be binarised
+    thresh_estimate : int or float, optional
+        Initial guess for where the threshold should be placed (default: 2)
+    thresh_search_range : int or float, optional
+        range of thresholds searched around the estimate (default: 0.8)
+    blur : int, optional
+        blur applied to image to help assist in binarisation, using cv2.blur (default: 7)
+    source_input_count: int, optional
+        number of phases summed, used to estimate threshold (default: None)
+
+    Returns
+    -------
+    result : hdf5 dict
+        Contains the binarised phase, as well as the threshold in attributes
+    """
     if thresh_estimate is None:
         if source_input_count is not None:
             thresh_estimate = source_input_count / 2
@@ -852,23 +862,32 @@ def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None, bl
     return result
 
 
-#   FUNCTION threshold_noise
-# Iterative threshold function designed for phase_binarisation). Decides threshold based on what
-# gives the "cleanest" image, with minimal high frequency noise.
-#   INPUTS:
-# image: data to be thresholded
-# old_guess: initial estimate of threshold
-# thresh_range: span searched (in both positive and negative directions) for optimal threshold
-# iterations: number of times the function is run iteratively
-# old_diff (default: None): number that represents the number of noise. Determines best threshold.
-#   OUTPUTS
-# best_guess: final guess for best threshold
-
 def threshold_noise(image, old_guess, thresh_range, iterations, old_diff=None):
+    """
+    Iterative threshold function designed for phase_binarisation. Decides threshold based on what
+    gives the "cleanest" image, with minimal high frequency noise.
+
+    Parameters
+    ----------
+    image : array_like
+        data to be threshold
+    old_guess : int or float
+        initial estimate of threshold
+    thresh_range : int or float
+        span searched (in both positive and negative directions) for optimal threshold
+    iterations : int
+        number of times the function is run iteratively
+    old_diff: float, optional
+         number that represents the number of noise. Determines best threshold. (default: None)
+
+    Returns
+    -------
+    best_guess : float
+        final guess for best threshold
+    """
     if old_diff is None:
         binary = image > old_guess
         binary_filt = medfilt(binary, 3)
-        # binary_filt = contour_closure(binary_filt)
         old_diff = np.sum(np.abs(binary_filt - binary))
     if iterations > 0:
         new_guesses = [old_guess - thresh_range, old_guess + thresh_range]
@@ -876,7 +895,6 @@ def threshold_noise(image, old_guess, thresh_range, iterations, old_diff=None):
         for thresh in new_guesses:
             binary = image > thresh
             binary_filt = medfilt(binary, 3)
-            # binary_filt = contour_closure(binary_filt)
             diffs.append(np.sum(np.abs(binary_filt - binary)))
         best_i = np.argmin(diffs)
         best_guess = threshold_noise(image, new_guesses[best_i], thresh_range / 2, iterations - 1,
@@ -886,34 +904,50 @@ def threshold_noise(image, old_guess, thresh_range, iterations, old_diff=None):
     return best_guess
 
 
-#   FUNCTION wrap
-# Extended modulo function. Converts a number outside of a range between two numbers by continually
-# adding or substracting the span between these numbers.
-#   INPUTS:
-# x: number to be wrapped
-# low (default: 0): lowest value of the wrap
-# high (default: 0): highest value of the wrap
-#   OUTPUTS
-# x: wrapped number
-
 def wrap(x, low=0, high=360):
+    """
+    Extended modulo function. Converts a number outside of a range between two numbers by continually
+    adding or substracting the span between these numbers.
+
+    Parameters
+    ----------
+    x : int or float
+        number to be wrapped
+    low : int or float, optional
+        lowest value of the wrap (default: 0)
+    high : int or float, optional
+        lowest value of the wrap (default: 360)
+
+    Returns
+    -------
+    x : float
+        wrapped number
+    """
     angle_range = high - low
-    x = ((x-low)%angle_range)+low
+    x = ((x-low) % angle_range)+low
     return x
 
 
-#   FUNCTION contour_closure
-# Removes regions on a binarised image with an area less than a value defined by size_threshold.
-# This is performed by finding the contours and the area of the contours, thus providing no change
-# to the bulk of the image itself (as a morphological closure would)
-#   INPUTS:
-# source: image to be closed
-# size_threshold (default: 100): area in pixels that a contour is compared to before being closed
-# type_bool (default: True): sets data to a boolean type
-#   OUTPUTS
-# image: data with contours closed
-
 def contour_closure(source, size_threshold=50, type_bool=True):
+    """
+    Removes regions on a binarised image with an area less than a value defined by size_threshold.
+    This is performed by finding the contours and the area of the contours, thus providing no change
+    to the bulk of the image itself (as a morphological closure would)
+
+    Parameters
+    ----------
+    source : array-like
+        image to be closed
+    size-threshold : int, optional
+         area in pixels that a contour is compared to before being closed (default: 100)
+    type_bool : bool, optional
+        sets data to a boolean type (default: True)
+
+    Returns
+    -------
+    image : array-like
+        data with contours closed
+    """
     source = np.array(source).astype('uint8')
     image = np.zeros_like(source)
     cv2_image, contours, hierarchy = cv2.findContours(source, cv2.RETR_TREE,
@@ -928,43 +962,62 @@ def contour_closure(source, size_threshold=50, type_bool=True):
     return image
 
 
-#   FUNCTION find_a_domains
-# Determines the a-domains in an amplitude image, by looking for points of high second derivative.
-# These points are then fit to lines, and these lines filtered to the most common lines that are 
-# either parallel or perpendicular to one another. If given, the phase data can also be used to
-# distinguish between a-domains and 180 degree walls.
-#   INPUTS:
-# amplitude: amplitude data containing the a-domains to be found
-# binarised_phase: binarised phase data used to differentiate a-domain walls from c-domain walls
-# direction (default: None): Direction of the a domains found:
-#     None: Finds domain walls at any angle
-#     'Vert': Finds vertical domain walls
-#     'Horz': Finds horizontal domain walls
-# filter_width (default: 15): total width of the filter, in pixels, around the domain-wall
-#     boundaries. This is the total distance - so half this value is applied to each side.
-# thresh_factor (default: 2): factor used by binarisation. A higher number gives fewer valid points.
-# dilation (default: 2): amount of dilation steps to clean image
-# erosion (default: 4): amount of erosion steps to clean image
-# line_threshold (default: 80): minimum number of votes (intersections in Hough grid cell)
-# min_line_length (default: 80): minimum number of pixels making up a line
-# max_line_gap (default: 80): maximum gap in pixels between connectable line segments
-# plots (default: [None]): option to plot intermediary steps. Plots if the following are in array:
-#     'amp': Raw amplitude data that contains a-domains
-#     'phase': Binarised phase data
-#     'filter': Filter made from the domain walls visible in phase
-#     'spline': Spline fit of original amplitude data
-#     'first_deriv': First derivitave of amplitude
-#     'second_deriv': Second derivitave of amplitude
-#     'binary': Binarisation of second derivative
-#     'erode': Binarisation data after an erosion filter is applied
-#     'lines': Lines found, and should correspond to a-domains on original amplitude image
-#     'clean': Lines found, after filtering to the most common angles
-#   OUTPUTS
-# result: hdf5_dict containing the predicted a-domains, and the binarisation threshold in attributes
-
 def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width=15,
                    thresh_factor=2, dilation=2, erosion=4, line_threshold=50,
                    min_line_length=50, max_line_gap=10, plots=None):
+    """
+    Determines the a-domains in an amplitude image, by looking for points of high second derivative.
+    These points are then fit to lines, and these lines filtered to the most common lines that are
+    either parallel or perpendicular to one another. If given, the phase data can also be used to
+    distinguish between a-domains and 180 degree walls.
+
+    Parameters
+    ----------
+    amplitude : array-like
+        amplitude data containing the a-domains to be found
+    binarised_phase : array-like, optional
+        binarised phase data used to differentiate a-domain walls from c-domain walls (default: None)
+        If set to None the binarised phase will be generated from amplitude using estimate_a_domains
+    direction : str, optional
+        Direction of the a domains to be found.
+        Possible parameters are:
+            None (default): Finds domain walls at any angle
+      '     'Vert': Finds vertical domain walls
+      '     'Horz': Finds horizontal domain walls
+    filter_width : int, optional
+        total width of the filter, in pixels, around the domain-wall
+        boundaries. This is the total distance - so half this value is applied to each side. (default: 15)
+    thresh_factor : int or float, optional
+        factor used by binarisation. A higher number gives fewer valid points. (default: 2)
+    dilation : int, optional
+        amount of dilation steps to clean image.  (default: 2)
+    erosion : int, optional
+        amount of erosion steps to clean image.  (default: 4)
+    line_threshold : int, optional
+        minimum number of votes (intersections in Hough grid cell). (default: 80)
+    min_line_length : int, optional
+        minimum number of pixels making up a line.  (default: 80)
+    max_line_gap : int, optional
+        maximum gap in pixels between connectable line segments. (default: 80):
+    plots  : list, optional
+        option to plot intermediary steps. Plots if the following are in array:
+        If the list contain ['None'] (default) nothing is drawn.
+            'amp': Raw amplitude data that contains a-domains
+            'phase': Binarised phase data
+            'filter': Filter made from the domain walls visible in phase
+            'spline': Spline fit of original amplitude data
+            'first_deriv': First derivitave of amplitude
+            'second_deriv': Second derivitave of amplitude
+            'binary': Binarisation of second derivative
+            'erode': Binarisation data after an erosion filter is applied
+            'lines': Lines found, and should correspond to a-domains on original amplitude image
+            'clean': Lines found, after filtering to the most common angles
+
+    Returns
+    -------
+    result : hdf5_dict
+        hdf5_dict containing the predicted a-domains, and the binarisation threshold in attributes
+    """
     if binarised_phase is not None:
         domain_wall_filter = create_domain_wall_filter(binarised_phase,
                                                        filter_width=filter_width,
@@ -1043,19 +1096,29 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
     return result
 
 
-#   FUNCTION create_domain_wall_filter
-# Creates a filter from the phase binarisation data, which can be used to find a-domains
-#   INPUTS:
-# phase: Binarised phase image from which images are to be obtained
-# filter_width (default: 15): total width of the filter, in pixels, around the domain-wall
-#     boundaries. This is the total distance - so half this value is applied to each side.
-# plots (default: []): option to plot intermediary steps. Plots if the following are in array:
-#     'phase': Binarised phase data
-#     'filter': Filter made from the domain walls visible in phase
-#   OUTPUTS
-# domain_wall_filter: filter made from phase binarisation data
-
 def create_domain_wall_filter(phase, filter_width=15, plots=[]):
+    """
+    Creates a filter from the phase binarisation data, which can be used to find a-domains
+
+    Parameters
+    ----------
+    phase : array-like
+        Binarised phase image from which images are to be obtained
+    filter_width : int, optional
+        Total width of the filter, in pixels, around the domain-wall
+        boundaries. This is the total distance - so half this value is applied to each side. (default: 15)
+    type_bool : bool, optional
+        sets data to a boolean type (default: True)
+    plots  : list, optional
+        option to plot intermediary steps. Plots if the following are in array:
+        If the list contain ['None'] (default) nothing is drawn.
+            'phase': Binarised phase data
+            'filter': Filter made from the domain walls visible in phase
+    Returns
+    -------
+    domain_wall_filter : array-like
+        filter made from phase binarisation data
+    """
     # Binarised_Phase
     binPhase = np.copy(phase)
     pt.intermediate_plot(binPhase, 'phase', plots, 'Binarised Phase')
