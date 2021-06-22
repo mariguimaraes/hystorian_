@@ -1,22 +1,18 @@
-
-#234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
-
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from . import core as pt
-import os
 import cv2
 import time
 
 from scipy.signal import medfilt, cspline2d
 from scipy.optimize import curve_fit
-from scipy.ndimage.morphology import distance_transform_edt, binary_erosion, binary_dilation
+from scipy.ndimage.morphology import binary_erosion, binary_dilation
 from scipy.ndimage.measurements import label
-from scipy import interpolate
+from scipy import interpolate, ndimage
+
 from skimage.morphology import skeletonize
 from skimage import img_as_ubyte
-from random import randrange
 import itertools
 
 
@@ -2830,4 +2826,265 @@ def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_in
                 in_param = in_index*2*np.pi/q_in
                 f[path].attrs['in_param'] = in_param
                 
-            
+
+def find_contours(data):
+    data = data.astype(np.uint8)
+    (cnts, _) = cv2.findContours(data, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    c = max(cnts, key=cv2.contourArea)
+    img_contours = np.zeros(data.shape)
+    cv2.drawContours(img_contours, c, -1, (1), 2)
+    return c, img_contours
+
+
+def morphological_interpolation_filled(c1, c2, f1, f2):
+    MaxVal=np.max([c1, c2])+1
+
+    Fmin = np.minimum(c1, c2)
+    Fmax = np.maximum(c1, c2)
+
+    Fw = np.where(c1+c2 == 0, f1 ^ f2, 0)*MaxVal
+    Fmin = np.where(Fmin == 0, np.maximum(Fmin, Fw), Fmin)
+
+    i = 0
+    while np.max(Fmin) == MaxVal:
+        i = i+1
+        Fw = np.maximum(Fmin, Fmax)
+        while True:
+            tmp = ndimage.grey_erosion(Fw, footprint=1.0*ndimage.generate_binary_structure(2, 1))
+            mask = Fw == MaxVal
+            Fw = np.where(mask, tmp, Fw)
+            if np.max(Fw) < MaxVal:
+                break
+
+        Ft = np.where(Fw != 0, ndimage.grey_dilation(Fw, footprint=ndimage.generate_binary_structure(2, 1)), 0)
+        Fw = np.where(np.logical_and(Fw != 0, Fw != Ft), Fw, 0)
+        Fw = np.where(Fw != 0, (Fw+Ft)/2, 0)
+        Fmin = np.where(Fw != 0, np.minimum(Fmin, Fw), Fmin)
+        Fmax = np.where(Fw != 0, np.maximum(Fmax, Fw), Fmax)
+        if i > 20:
+            Fmin = np.where(Fmin == MaxVal, 0, Fmin)
+            Fmax = np.where(Fmin == MaxVal, 0, Fmax)
+
+    return Fmin, Fmax
+
+
+def dpad8(angle):
+    '''
+    given an angle, return the direction to go (x,y)
+    '''
+    step = np.pi / 8.0
+    if (angle < step) and (angle >= -step):
+        return (1, 0)
+    if np.pi / 4.0 + step > angle >= np.pi / 4.0 - step:
+        return (1, 1)
+    if np.pi / 2.0 + step > angle >= np.pi / 2.0 - step:
+        return (0, 1)
+    if 3 * np.pi / 4.0 + step > angle >= 3 * np.pi / 4.0 - step:
+        return (-1, 1)
+    if (-np.pi <= angle < -3 * np.pi / 4.0 - step) or (np.pi >= angle >= 3 * np.pi / 4.0 + step):
+        return (-1, 0)
+    if -3 * np.pi / 4.0 + step > angle >= -3 * np.pi / 4.0 - step:
+        return (-1, -1)
+    if -np.pi / 2.0 + step > angle >= -np.pi / 2.0 - step:
+        return (0, -1)
+    if -np.pi / 4.0 + step > angle >= -np.pi / 4.0 - step:
+        return (1, -1)
+
+    print(angle)
+    print("ERROR NO ORIENTATION WAS FOUND")
+    return (0, 0)
+
+
+def dpad8_val(angle):
+    '''
+    given an angle, return the direction to go (x,y)
+    '''
+    step = np.pi / 8.0
+    if (angle < step) and (angle >= -step):
+        return 0
+    if np.pi / 4.0 + step > angle >= np.pi / 4.0 - step:
+        return 1
+    if np.pi / 2.0 + step > angle >= np.pi / 2.0 - step:
+        return 2
+    if 3 * np.pi / 4.0 + step > angle >= 3 * np.pi / 4.0 - step:
+        return 3
+    if (-np.pi <= angle < -3 * np.pi / 4.0 - step) or (np.pi >= angle >= 3 * np.pi / 4.0 + step):
+        return 4
+    if -3 * np.pi / 4.0 + step > angle >= -3 * np.pi / 4.0 - step:
+        return 5
+    if -np.pi / 2.0 + step > angle >= -np.pi / 2.0 - step:
+        return 6
+    if -np.pi / 4.0 + step > angle >= -np.pi / 4.0 - step:
+        return 7
+
+    print("ERROR NO ORIENTATION WAS FOUND")
+    return -1
+
+
+def nan_gradient(array):
+    # Calculates gradient of array, using the central difference method of np.gradient
+    # If this generates nans, attempts to replace nans with backwards and forwards difference
+    # calculated using np.diff
+    array = np.array(array)
+    y_grad, x_grad = np.gradient(array)
+
+    # y_direction
+    y_diff = np.diff(array.T)
+    col1 = y_diff[:, 0]
+    y_bwd_diff = np.insert(y_diff, 0, col1, axis=1).T
+    col2 = y_diff[:, -1]
+    y_fwd_diff = np.insert(y_diff, -1, col2, axis=1).T
+
+    final_y_diff = np.where(np.isnan(y_grad), y_bwd_diff, y_grad)
+    final_y_diff = np.where(np.isnan(final_y_diff), y_fwd_diff, final_y_diff)
+
+    # x_direction
+    x_diff = np.diff(array)
+    col1 = x_diff[:, 0]
+    x_bwd_diff = np.insert(x_diff, 0, col1, axis=1)
+    col2 = x_diff[:, -1]
+    x_fwd_diff = np.insert(x_diff, -1, col2, axis=1)
+
+    final_x_diff = np.where(np.isnan(x_grad), x_bwd_diff, x_grad)
+    final_x_diff = np.where(np.isnan(final_x_diff), x_fwd_diff, final_x_diff)
+
+    return final_y_diff, final_x_diff
+
+
+def find_path_growth(interpolation, contour_init, surf2, loop_exit=100):
+    # Compute the gradient
+    gradx, grady = nan_gradient(interpolation)
+    angle_map = np.arctan2(grady, gradx)
+    direction_map_x = angle_map.copy()
+    direction_map_y = angle_map.copy()
+
+    # For each gradient value choose which direction the gradient is pointing using dpad8
+    for x in range(np.shape(angle_map)[0]):
+        for y in range(np.shape(angle_map)[1]):
+            if np.isnan(angle_map[x][y]):
+                pass
+            else:
+                dirx, diry = dpad8(angle_map[x][y])
+                direction_map_x[x][y] = dirx
+                direction_map_y[x][y] = diry
+
+    tmp_cnt = 0
+    paths = []
+
+    contour_end, img_contour = find_contours(surf2)
+
+    # Generate a list containing all the initial pixels of the growing paths
+    for elem in contour_init:
+        init_y = elem[0][0]
+        init_x = elem[0][1]
+        tmp_path = [[init_y, init_x]]
+        paths.append(tmp_path)
+
+    path_check = [False for i in paths]  # Used to check if the path is complete
+    path_cnt = [0 for i in paths]  # Count the number of loop to exit if it take too long
+    path_warning = [False for i in paths]  # Used to know if the loop was exited because it took too loog
+
+    while True:
+        for idx, path in enumerate(paths):  # Loop through all the paths
+            if not path_check[idx]:
+
+                # Check if the path finding is taking too long
+                path_cnt[idx] += 1
+                if loop_exit is not None:
+                    if path_cnt[idx] > loop_exit:
+                        print(
+                            'more than ' + str(loop_exit) + ' steps where taken, breaking out of the loop. IDX: ' + str(
+                                idx))
+                        print(direction_map_x[current_x][current_y])
+                        print(direction_map_y[current_x][current_y])
+                        print(path[-3:])
+                        path_check[idx] = True
+                        path_warning[idx] = True
+                        break
+
+                # Get the current x,y position of the growing path
+                current = path[-1]
+                current_x = current[1]
+                current_y = current[0]
+
+                # Check if an element of the growing path is ON the final path
+                for element in contour_end:
+                    if current_x == element[0][1] and current_y == element[0][0]:
+                        path_check[idx] = True
+                        break
+
+                # compute the next step of the growing path
+                stepx = direction_map_x[current_x][current_y]
+                stepy = direction_map_y[current_x][current_y]
+                newx = current_x + int(stepx)
+                newy = current_y + int(stepy)
+
+                # Check if the new position is outside of the external surface
+                if not path_check[idx]:
+                    if not surf2[newx][newy]:
+                        path_check[idx] = True
+                        break
+
+                if not path_check[idx]:
+                    for p in path:
+                        if p[0] == newy and p[1] == newx:
+                            path_check[idx] = True
+                            break
+
+                if not path_check[idx]:
+                    path.append([newy, newx])
+
+        # Once all paths are completed, exit the infinite loop
+        if all(path_check):
+            break
+
+    return paths, path_warning
+
+
+def find_grown_element(contour_init, contour_end, path1, path2, img_contour_end):
+    idx_1 = 0
+    idx_2 = -1
+    for i, px in enumerate(contour_init):
+        if path1[0][0] == px[0][0] and path1[0][1] == px[0][1]:
+            idx_1 = i
+            break
+
+    for i, px in enumerate(contour_init):
+        if path2[0][0] == px[0][0] and path2[0][1] == px[0][1]:
+            idx_2 = i
+            break
+
+    if idx_2 < idx_1:
+        contour_init = contour_init[idx_2:idx_1]
+    # Check if the first element is one of the index, to see if it is the last one, which need to be handle differently
+    # (since we are linking [-1] to [0])
+    if idx_1 == 0 or idx_2 == 0:
+        if idx_1 < idx_2:
+            if len(contour_init[idx_1:idx_2]) < len(contour_init[idx_2:]):
+                contour_init = contour_init[idx_1:idx_2]
+            else:
+
+                contour_init = contour_init[idx_2:]
+    else:
+        contour_init = contour_init[idx_1:idx_2]
+
+    img_bin = np.zeros(np.shape(img_contour_end))
+
+    for px in contour_init:
+        px = px[0]
+        img_bin[px[1], px[0]] = 1
+
+    for px in contour_end:
+        px = px[0]
+        img_bin[px[1], px[0]] = 1
+
+    for px in path1:
+        img_bin[px[1], px[0]] = 1
+
+    for px in path2:
+        img_bin[px[1], px[0]] = 1
+
+    data = (img_bin).astype(np.uint8)
+    (cnts, img) = cv2.findContours(data, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    return cnts
