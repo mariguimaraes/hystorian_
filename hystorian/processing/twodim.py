@@ -3683,7 +3683,7 @@ def radial_average(data, angle=None, tol=np.pi/18):
     
     return index, ndimage.mean(data, labels=labels, index=index)
 
-def projected_average(data, angle=0, symmetrical=True):
+def projected_average(data, angle=0, symmetrical=True, mean=True):
     '''
     Project an image along an axis passing through its center
 
@@ -3693,7 +3693,8 @@ def projected_average(data, angle=0, symmetrical=True):
     angle : the direction of the axis on which to project, as an angle in radians
     symmetrical : if True, the projection is done symmetrically around the center of the image
                     else, it is done from one edge of the image to the other
-
+    mean : if False, the projection is summed instead of averaged
+    
     Returns
     -------
     index : 1d array of the distances along the projection axis from the center, in pixel
@@ -3711,8 +3712,11 @@ def projected_average(data, angle=0, symmetrical=True):
     else:
         labels = P.round().astype(np.int)
     index = np.unique(labels)
-        
-    return index, ndimage.mean(data, labels=labels, index=index)
+    
+    if mean:    
+        return index, ndimage.mean(data, labels=labels, index=index)
+    else:
+        return index, ndimage.sum(data, labels=labels, index=index)
 
 def gaussian_blur(data, r=1, padding='wrap'):
     '''
