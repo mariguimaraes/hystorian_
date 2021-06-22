@@ -4,17 +4,25 @@ import h5py
 import matplotlib.pyplot as plt
 
 
-# FUNCTION extract_hist
-## Split the SSPFM curve into on and off signal.
-## Function was rewritten to work with m_apply, and to take account a bug into Cypher machine, leading to pulse not
-## all being the same size.
-# INPUTS:
-## input_data: data which needs to be splitted
-## data_folder: data of the bias waveform applied during SSPFM
-# OUTPUTS:
-## return two grid with the data splitted into "on/off" according to the bias shape
-
 def extract_hist(*input_data, bias):
+    """
+    Split the SSPFM curve into on and off signal.
+    Function was rewritten to work with m_apply, and to take account a bug into Cypher machine, leading to pulse not
+    all being the same size.
+
+    Parameters
+    ----------
+    input_data : array-like
+        data which needs to be splitted
+    bias : array-like
+        data corresponding to the bias channel
+
+    Returns
+    -------
+    output : array-like
+        return two grid with the data splitted into "on/off" according to the bias shape
+
+    """
     idx_zeroes = np.where(bias[0, 0, :] == 0)[0]
     idx_Nonzeroes = np.where(bias[0, 0, :] != 0)[0]
 
@@ -43,6 +51,26 @@ def extract_hist(*input_data, bias):
 
 
 def calc_hyst_params(bias, phase):
+    """
+    Calculate hysteresis parameters from bias and phase channels.
+    Used in PFM_params_map. Would recommend using the function instead.
+
+    Parameters
+    ----------
+    bias : array-like
+        array containing the bias acquired during an SSPFM
+    phase : array-like
+        array containing the phase acquired during an SSPFM
+
+    Returns
+    -------
+        list
+        list where the elements correspond to :
+            the positive coercive bias
+            the negative coercive bias
+            The size of the phase jump (left side)
+            The size of the phase jump (right side)
+    """
     biasdiff = np.diff(bias)
     up = np.sort(np.unique(np.hstack((np.where(biasdiff > 0)[0], np.where(biasdiff > 0)[0] + 1))))
     dn = np.sort(np.unique(np.hstack((np.where(biasdiff < 0)[0], np.where(biasdiff < 0)[0] + 1))))
@@ -86,6 +114,27 @@ def calc_hyst_params(bias, phase):
 
 
 def PFM_params_map(bias, phase):
+    """
+    Calculate physically relevant hysteresis parameters from bias and phase channels.
+
+    Parameters
+    ----------
+    bias : array-like
+        array containing the bias acquired during an SSPFM
+    phase : array-like
+        array containing the phase acquired during an SSPFM
+
+    Returns
+    -------
+        list
+        list where the elements correspond to :
+            the positive coercive bias
+            the negative coercive bias
+            The size of the phase jump (left side)
+            The size of the phase jump (right side)
+            the imprint of the switching loop
+            the phase shift of the switching loop
+    """
     x, y, z = np.shape(phase)
     coerc_pos = np.zeros((x, y), dtype=float)
     coerc_neg = np.zeros((x, y), dtype=float)
@@ -214,18 +263,25 @@ def clean_loop(bias, phase, amp, threshold=None, debug=False):
     return list_bias, list_phase, list_amp, mask
 
 
-# FUNCTION negative_
-## Processes an array determine negatives of all values
-## Trivial sample function to show how to use proc_tools
-# INPUTS:
-## filename: name of hdf5 file containing data
-## data_folder: folder searched for inputs. eg. 'datasets', or 'process/negative'
-## selection: determines the name of folders or files to be used. Can be None (selects all), a string, or a list of strings
-## criteria: determines category of files to search
-# OUTPUTS:
-## null
-
 def negative_(filename, data_folder='datasets', selection=None, criteria=0):
+    """
+    Processes an array determine negatives of all values
+    Trivial sample function to show how to use proc_tools
+
+    Parameters
+    ----------
+    filename : str
+        name of the hdf5 file in which the data you want to apply the function to is contained
+    data_folder : str, optional
+        path in the hdf5 where the data is contained (default: 'datasets')
+    selection : str, optional
+        determines the name of folders or files to be used. Can be None which selects all data (default), a string, or a list of strings
+    criteria : int
+        determines category of files to search
+    Returns
+    -------
+        None
+    """
     # Trivial sample function to show how to use proc_tools
     # Processes an array determine negatives of all values
     in_path_list = core.path_inputs(filename, data_folder, selection, criteria)
