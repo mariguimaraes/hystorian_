@@ -3231,6 +3231,7 @@ def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_in
         out-of-plane lattice index
     out_index : int or float, optional
         in-plane lattice index (default : 0)
+        
     Returns
     -------
         None
@@ -3259,7 +3260,26 @@ def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_in
                 f[path].attrs['in_param'] = in_param
 
 
-def find_contours(data):
+def find_largest_contour(data):
+    '''
+    From a data array, converts to a binarised image and extracts the largest contour, returning
+    both the contour as a cv2 contour, and an image with this contour drawn.
+    
+    Parameters
+    ----------
+    data : array
+        array from which contour is to be found
+        
+    Returns
+    -------
+    c : list
+        the largest contour found
+    img_contours : array
+        image array with the contour drawn
+    '''
+    #Converts, then Find largst contour
+    # c: largest contour
+    # img_contour is image of only that contour
     data = data.astype(np.uint8)
     (cnts, _) = cv2.findContours(data, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     c = max(cnts, key=cv2.contourArea)
@@ -3268,42 +3288,84 @@ def find_contours(data):
     return c, img_contours
 
 
-def morphological_interpolation_filled(c1, c2, f1, f2):
-    MaxVal = np.max([c1, c2]) + 1
+def morphological_interpolation(c1,c2, f1=None, f2=None):
+    '''
+    Interpolates between two contours and returns an image with these interpolation
+    
+    Parameters
+    ----------
+    c1 : array
+        array showing the first contour line. Each value should represent all values of the
+        contour line. All other values should be set to 0.
+    c2 : array
+        array showing the second contour line. As c1.
+    f1 : array, optional
+        array showing where c1 is 'filled'. In this array, the filled regions should be set to
+        True; all other values should be set to False. If f1 is not set, the function will
+        automatically try and generate f1 by filling all points connected to the point (0,0)
+    f2 : array, optional
+        array showing where c2 is 'filled'. As f1.
+        
+    Returns
+    -------
+    interpolation : array
+        array showing the interpolation between c1 and c2
+    '''
+    MaxVal=np.max([c1,c2])+1
 
-    Fmin = np.minimum(c1, c2)
-    Fmax = np.maximum(c1, c2)
-
-    Fw = np.where(c1 + c2 == 0, f1 ^ f2, 0) * MaxVal
-    Fmin = np.where(Fmin == 0, np.maximum(Fmin, Fw), Fmin)
+    Fmin = np.minimum(c1,c2)
+    Fmax = np.maximum(c1,c2)
+    if f1 is None:
+        f1 = flood_fill(c1, (0,0), 1, tolerance=0, connectivity=1)>0
+    if f2 is None:
+        f2 = flood_fill(c2, (0,0), 1, tolerance=0, connectivity=1)>0
+    
+    Fw = np.where(c1+c2 == 0, MaxVal*(f1^f2), 0)
+    Fmin = np.where(Fmin==0, np.maximum(Fmin, Fw), Fmin)
 
     i = 0
     while np.max(Fmin) == MaxVal:
-        i = i + 1
+        i = i+1
         Fw = np.maximum(Fmin, Fmax)
+
         while True:
-            tmp = ndimage.grey_erosion(Fw, footprint=1.0 * ndimage.generate_binary_structure(2, 1))
+            tmp = ndimage.grey_erosion(Fw, footprint=1.0*ndimage.generate_binary_structure(2,1))
             mask = Fw == MaxVal
             Fw = np.where(mask, tmp, Fw)
             if np.max(Fw) < MaxVal:
                 break
 
-        Ft = np.where(Fw != 0,
-                      ndimage.grey_dilation(Fw,footprint=ndimage.generate_binary_structure(2,1)),
+        Ft = np.where(Fw!=0,
+                      ndimage.grey_dilation(Fw, footprint=ndimage.generate_binary_structure(2,1)),
                       0)
-        Fw = np.where(np.logical_and(Fw != 0, Fw != Ft), Fw, 0)
-        Fw = np.where(Fw != 0, (Fw + Ft) / 2, 0)
-        Fmin = np.where(Fw != 0, np.minimum(Fmin, Fw), Fmin)
-        Fmax = np.where(Fw != 0, np.maximum(Fmax, Fw), Fmax)
+        Fw = np.where(np.logical_and(Fw!=0, Fw!=Ft), Fw,0)
+        Fw = np.where(Fw!=0, (Fw+Ft)/2, 0)
+        Fmin = np.where(Fw!=0, np.minimum(Fmin, Fw), Fmin)
+        Fmax = np.where(Fw!=0, np.maximum(Fmax, Fw), Fmax)
         if i > 20:
-            Fmin = np.where(Fmin == MaxVal, 0, Fmin)
-            Fmax = np.where(Fmin == MaxVal, 0, Fmax)
-    return Fmin, Fmax
+            Fmin = np.where(Fmin==MaxVal, 0, Fmin)
+            Fmax = np.where(Fmin==MaxVal, 0, Fmax)
+    interpolation = np.maximum(c1, c2)
+    interpolation = np.where(np.logical_and(interpolation==0, Fmin!=0), Fmin, interpolation)
+    interpolation = np.where(interpolation==0, np.nan, interpolation)
+    return interpolation
 
 
 def dpad8(angle):
     '''
-    given an angle, return the direction to go (x,y)
+    Given an angle, returns a direction the angle corresponds to in terms of coordinates.
+    
+    Parameters
+    ----------
+    angle : int or float
+        angle in radians, measured clockwise from vertical up
+        
+    Returns
+    -------
+    result : tuple
+        direction. First value corresponds to the vertical direction (up-positive), second value
+        corresponds to horizontal direction (right-positive)
+        
     '''
     step = np.pi / 8.0
     if (angle < step) and (angle >= -step):
@@ -3323,14 +3385,25 @@ def dpad8(angle):
     if -np.pi / 4.0 + step > angle >= -np.pi / 4.0 - step:
         return (1, -1)
 
-    print(angle)
     print("ERROR NO ORIENTATION WAS FOUND")
     return (0, 0)
 
 
 def dpad8_val(angle):
     '''
-    given an angle, return the direction to go (x,y)
+    Given an angle, returns a direction the angle corresponds to in terms of a single value.
+    
+    Parameters
+    ----------
+    angle : int or float
+        angle in radians, measured clockwise from vertical up
+        
+    Returns
+    -------
+    result : int
+        direction, counting 4 directions measured clockwise from the vertical direction,
+        from 0 to 7
+        
     '''
     step = np.pi / 8.0
     if (angle < step) and (angle >= -step):
@@ -3355,9 +3428,24 @@ def dpad8_val(angle):
 
 
 def nan_gradient(array):
-    # Calculates gradient of array, using the central difference method of np.gradient
-    # If this generates nans, attempts to replace nans with backwards and forwards difference
-    # calculated using np.diff
+    '''
+    Calculates gradient of array, using the central difference method of np.gradient
+    If this generates nans, attempts to replace nans with backwards and forwards difference
+    calculated using np.diff
+    
+    Parameters
+    ----------
+    array : array
+        array from which gradients are calculated
+        
+    Returns
+    -------
+    final_y_diff : tuple
+        gradient in the y-direction
+    final_x_diff : tuple
+        gradient in the x-direction
+        
+    '''
     array = np.array(array)
     y_grad, x_grad = np.gradient(array)
 
@@ -3385,6 +3473,28 @@ def nan_gradient(array):
 
 
 def find_path_growth(interpolation, contour_init, surf2, loop_exit=100):
+    '''
+    Calculates paths taken from points on an interface
+    
+    Parameters
+    ----------
+    interpolation : array
+        (interpolated) image from which paths are found from
+    contour_init : list
+        contour from which paths are drawn from
+    surf2 : array
+        second surface that the first surface must reach and terminate at
+    loop_exit : float or int
+        amount of interations performed before termination
+        
+    Returns
+    -------
+    paths : list
+        list of paths drawn
+    path_warning : list
+        list of bools, where True corresponds to the path terminating early
+    '''
+    
     # Compute the gradient
     gradx, grady = nan_gradient(interpolation)
     angle_map = np.arctan2(grady, gradx)
@@ -3519,5 +3629,4 @@ def find_grown_element(contour_init, contour_end, path1, path2, img_contour_end)
 
     data = (img_bin).astype(np.uint8)
     (cnts, img) = cv2.findContours(data, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-
     return cnts

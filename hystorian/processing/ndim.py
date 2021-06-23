@@ -3,12 +3,11 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
-
 def extract_hist(*input_data, bias):
     """
     Split the SSPFM curve into on and off signal.
-    Function was rewritten to work with m_apply, and to take account a bug into Cypher machine, leading to pulse not
-    all being the same size.
+    Function was rewritten to work with m_apply, and to take account a bug into Cypher machine,
+    leading to pulse not all being the same size.
 
     Parameters
     ----------
@@ -157,7 +156,8 @@ def PFM_params_map(bias, phase):
 
 def gauss_area(x, y):
     """
-    Determine the area created by the polygon formed by x,y using the Gauss's area formula (also called shoelace formula)
+    Determine the area created by the polygon formed by x,y using the Gauss's area formula (also
+    called shoelace formula)
 
     Parameters
     ----------
@@ -190,8 +190,8 @@ def gauss_area(x, y):
 
 def clean_loop(bias, phase, amp, threshold=None, debug=False):
     '''
-    Used to determine if a SSPFM loop is good or not by calculating the area encompassed by the hysteresis curve and
-    comparing it to a threshold
+    Used to determine if a SSPFM loop is good or not by calculating the area encompassed by the
+    hysteresis curve and comparing it to a threshold
 
     Parameters
     ----------
@@ -205,7 +205,8 @@ def clean_loop(bias, phase, amp, threshold=None, debug=False):
         minimal value of the loop area to be considered a good loop (default: None)
         if set to None will use threshold = np.mean(area_grid_full) - 2 * np.std(area_grid_full)
     debug: bool, optional
-        if set to True will use plt.imshow() to plot the loops in red for bad and blue for good. (default: False)
+        if set to True will use plt.imshow() to plot the loops in red for bad and blue for good.
+        (default: False)
 
     Returns
     -------
@@ -216,7 +217,8 @@ def clean_loop(bias, phase, amp, threshold=None, debug=False):
         list_amp: array-like
             list of the amplitudes corresponding to good loops
         mask: nd-array
-            a 2D mask where a 1 correspond to a good loop and 0 to a bad loop, can be used to mask the input data.
+            a 2D mask where a 1 correspond to a good loop and 0 to a bad loop, can be used to mask
+            the input data.
     '''
     list_bias = []
     list_phase = []
@@ -275,7 +277,8 @@ def negative_(filename, data_folder='datasets', selection=None, criteria=0):
     data_folder : str, optional
         path in the hdf5 where the data is contained (default: 'datasets')
     selection : str, optional
-        determines the name of folders or files to be used. Can be None which selects all data (default), a string, or a list of strings
+        determines the name of folders or files to be used. Can be None which selects all data
+        (default), a string, or a list of strings
     criteria : int
         determines category of files to search
     Returns

@@ -43,7 +43,8 @@ def save_image(data,
     labelsize: int, optional
         setup the px size of the labels. (default: 16)
     full_range: bool, optional
-        use the whole data scale if set to True, or use [mean-std_range*std, mean+std_range*std]. (default: True)
+        use the whole data scale if set to True, or use [mean-std_range*std, mean+std_range*std].
+        (default: True)
     std_range: int or float, optional
         the number of standard deviation to use in case full_range is set to false. (default: 3)
     colorm: str, optional
@@ -61,12 +62,13 @@ def save_image(data,
     save: bool, optional
         If set to true, use plt.imsave() to save the image (default: True)
     image_name: str, optional
-        filename to use while saving the image. If set to None will try to use source_path to generate a filename,
-        if no source_path is given, will use 'image' (default: None)
+        filename to use while saving the image. If set to None will try to use source_path to
+        generate a filename, if no source_path is given, will use 'image' (default: None)
     saving_path: str, optional
         path where to save the file. (default: '')
     source_path: str, optional
-        If set, and image_name not set, this variable will be used to generate the file name (default: None)
+        If set, and image_name not set, this variable will be used to generate the file name
+        (default: None)
     verbose: bool, optional
         if True, print a line when the image is saved. (default: false)
     Returns
@@ -131,7 +133,8 @@ def save_image(data,
                       " size and shape are correctly define for each data channel.")
                 raise
         else:
-            print("Scalebar package is not installed, please install it if you want to add a scalebar to your image")
+            print("Scalebar package is not installed, please install it if you want to add a"+
+                  " scalebar to your image")
     # Generate ouputs:
     if save:
         if image_name is None:
@@ -165,9 +168,11 @@ def plot_hysteresis_parameters_(filename, PATH,
                                 verbose=False):
 
     '''
-    NOTE - This function is not made to be used by m_apply, this is indicated by the trailing underscore.
-    Used on data processed using twodim.calc_hyst_params() to plot and save an image containing maps of the
-    6 hysteresis parameters : coercive voltage (up and down), step (left and right), imprint and phase shift.
+    NOTE - This function is not made to be used by m_apply, this is indicated by the trailing
+    underscore. Used on data processed using twodim.calc_hyst_params() to plot and save an image 
+    containing maps of the 6 hysteresis parameters : coercive voltage (up and down), step (left and
+    right), imprint and phase shift.
+    
     Parameters
     ----------
     filename: str
@@ -189,19 +194,19 @@ def plot_hysteresis_parameters_(filename, PATH,
     save: bool, optional
         If set to true, use plt.imsave() to save the image (default: True)
     image_name: str, optional
-        filename to use while saving the image. If set to None will try to use source_path to generate a filename,
-        if no source_path is given, will use 'image' (default: None)
+        filename to use while saving the image. If set to None will try to use source_path to
+        generate a filename, if no source_path is given, will use 'image' (default: None)
     saving_path: str, optional
         path where to save the file. (default: '')
     source_path: str, optional
-        If set, and image_name not set, this variable will be used to generate the file name (default: None)
+        If set, and image_name not set, this variable will be used to generate the file name
+        (default: None)
     verbose: bool, optional
         if True, print a line when the image is saved. (default: false)
     Returns
     -------
         None
     '''
-
 
     if size is None:
         fig = plt.figure(figsize=(20, 30))
