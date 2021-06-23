@@ -185,7 +185,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
     filename : str
         name of hdf5 file containing data
     all_input_criteria : str
-        criteria to identify paths to source files using pt.path_search. Should be
+        criteria to identify paths to source files using core.path_search. Should be
         height data to extract parameters from
     mode : str, optional
         Determines mode of operation, and thus parameters used. Can be 'SingleECC', 'ManualECC',
@@ -229,9 +229,9 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
         all_input_criteria = [all_input_criteria]
     all_in_path_list = []
     for channel_type in all_input_criteria:
-        in_path_list = pt.path_search(filename, channel_type)
+        in_path_list = core.path_search(filename, channel_type)
         all_in_path_list.append(in_path_list[0])
-    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
+    out_folder_locations = core.find_output_folder_location(filename, 'distortion_params',
                                                             all_in_path_list[0])
     eyes = np.eye(2, 3, dtype=np.float32)
     cumulative_tform21 = np.eye(2, 3, dtype=np.float32)
@@ -301,9 +301,9 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                         if len(recent_offsets) > 3:
                             recent_offsets = recent_offsets[1:]
 
-            data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
+            data = core.write_output_f(f, cumulative_tform21, out_folder_locations[i],
                                        all_in_path_list[0][i], distortion_params_, locals())
-            pt.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
+            core.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
                                  all_in_path_list[0][i], clear=False)
 
 
@@ -566,7 +566,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
     filename : str
         Filename of hdf5 file containing data
     all_input_criteria : list
-        Criteria to identify paths to source files using pt.path_search. First should
+        Criteria to identify paths to source files using core.path_search. First should
         be data to be corrected, second should be the distortion parameters.
     cropping : bool, optional
         If set to True, each dataset is cropped to show only the common area. If
@@ -576,7 +576,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
     -------
     None
     """
-    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
+    all_in_path_list = core.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     dm_path_list = all_in_path_list[1]
 
@@ -591,7 +591,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
             yoffsets.append(np.array(matrix[1, 2]))
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
-    out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
+    out_folder_locations = core.find_output_folder_location(filename, 'distortion_correction',
                                                             in_path_list)
 
     with h5py.File(filename, "a") as f:
@@ -602,11 +602,11 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
                 final_image = array_cropped(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             else:
                 final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
-            data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
+            data = core.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
                                                                                  dm_path_list[i]],
                                        distortion_correction_, locals())
             propagate_scale_attrs(data, f[in_path_list[i]])
-            pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
+            core.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
                                  in_path_list[i])
 
 
@@ -795,10 +795,10 @@ def phase_linearisation(image, min_separation=90, background=None,
         elif background > 0:
             if np.mean(linearised_array[:, :background]) > np.mean(linearised_array):
                 linearised_array = 1 - linearised_array
-    pt.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
+    core.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
 
     linearised = medfilt(cv2.blur(linearised_array, (7, 7)), 7)
-    result = pt.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
+    result = core.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
     return result
 
 
@@ -862,7 +862,7 @@ def m_sum(*args):
             arg = arg.astype(int)
         total = total + arg
     input_count = len(args)
-    result = pt.hdf5_dict(total, input_count=input_count)
+    result = core.hdf5_dict(total, input_count=input_count)
     return result
 
 
@@ -906,7 +906,7 @@ def phase_binarisation(phase, thresh_estimate=None, thresh_search_range=None, bl
 
     if np.mean(binary) > 0.95:
         binary = 1 - binary
-    result = pt.hdf5_dict(binary, threshold=best_thresh)
+    result = core.hdf5_dict(binary, threshold=best_thresh)
     return result
 
 
@@ -1106,7 +1106,7 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
                     cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                     phase_filter_lines.append(line)
         lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
-        pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
+        core.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
         # Find angles of each line
         angles = []
@@ -1140,9 +1140,8 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
             for x1, y1, x2, y2 in line:
                 cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 5)
         lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
-        pt.intermediate_plot(line_image, 'clean', plots, 'Lines Found, after filtering')
-
-    result = pt.hdf5_dict(line_image, binarisation_threshold=bin_thresh)
+        core.intermediate_plot(line_image, 'clean', plots, 'Lines Found, after filtering')
+    result = core.hdf5_dict(line_image, binarisation_threshold=bin_thresh)
     return result
 
 
@@ -1172,13 +1171,13 @@ def create_domain_wall_filter(phase, filter_width=15, plots=[]):
     """
     # Binarised_Phase
     binPhase = np.copy(phase)
-    pt.intermediate_plot(binPhase, 'phase', plots, 'Binarised Phase')
+    core.intermediate_plot(binPhase, 'phase', plots, 'Binarised Phase')
 
     # Create Filter
     ite = filter_width // 2
     domain_wall_filter = ~(binary_dilation(binPhase, iterations=ite) ^
                            binary_erosion(binPhase, iterations=ite, border_value=1))
-    pt.intermediate_plot(domain_wall_filter, 'filter', plots, 'Domain Wall Filter')
+    core.intermediate_plot(domain_wall_filter, 'filter', plots, 'Domain Wall Filter')
     return domain_wall_filter
 
 
@@ -1225,51 +1224,51 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
     """
     # Raw Data
     amp = np.copy(amplitude)
-    pt.intermediate_plot(amp, 'amp', plots, 'Original Data')
+    core.intermediate_plot(amp, 'amp', plots, 'Original Data')
 
     # Row Alignment, if direction set
     if direction == 'Vert':
         amp = align_rows(amp, domain_wall_filter)
     elif direction == 'Horz':
         amp = align_rows(amp, domain_wall_filter, cols=True)
-    pt.intermediate_plot(amp, 'row_align', plots, 'Row Aligned Data')
+    core.intermediate_plot(amp, 'row_align', plots, 'Row Aligned Data')
 
     # Fit to a spline (reduce high frequency noise)
     spline_amp = cspline2d(amp, 2.0)
-    pt.intermediate_plot(spline_amp, 'spline', plots, 'Spline Fitted Data')
+    core.intermediate_plot(spline_amp, 'spline', plots, 'Spline Fitted Data')
 
     # Find derivatives to highlight peaks
     if direction == 'Vert':
         first_deriv = np.gradient(spline_amp)[1]
-        pt.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
+        core.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
         deriv_amp = (np.gradient(first_deriv))[1]
-        pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
+        core.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
     elif direction == 'Horz':
         first_deriv = np.gradient(spline_amp)[0]
-        pt.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
+        core.intermediate_plot(first_deriv, 'first_deriv', plots, 'First Derivatives')
         deriv_amp = (np.gradient(first_deriv))[0]
-        pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
+        core.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
     else:
         if direction is not None:
             print('Direction should be set to either \'Vert\', \'Horz\' or None. Behaviour\
                     defaulting to None')
         first_deriv = np.gradient(spline_amp)
-        pt.intermediate_plot(first_deriv[0] + first_deriv[1], 'first_deriv', plots,
+        core.intermediate_plot(first_deriv[0] + first_deriv[1], 'first_deriv', plots,
                                'First Derivatives')
         second_deriv_y = np.gradient(first_deriv[0])[0]
         second_deriv_x = np.gradient(first_deriv[1])[1]
         deriv_amp = second_deriv_y + second_deriv_x
-        pt.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
+        core.intermediate_plot(deriv_amp, 'second_deriv', plots, 'Second Derivatives')
 
     # Binarise second derivative
     thresh = threshold_after_peak(deriv_amp, thresh_factor)
     binary = (deriv_amp > thresh)
-    pt.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
+    core.intermediate_plot(binary, 'binary', plots, 'Binarised Derivatives')
 
     # Remove Small Points
     filtered_deriv_amp = binary_erosion(binary_dilation(binary, iterations=dilation),
                                         iterations=erosion)
-    pt.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
+    core.intermediate_plot(filtered_deriv_amp, 'erode', plots, 'Eroded Binary')
     return filtered_deriv_amp.astype(np.uint8), thresh
 
 
@@ -1418,7 +1417,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
     filename : string
         name of hdf5 file containing data
     all_input_criteria : list
-        criteria to identify paths to source files using pt.path_search. First pass
+        criteria to identify paths to source files using core.path_search. First pass
         amplitude data, then pass phase binarisation data.
     filter_width : int or float, optional
         total width of the filter, in pixels, around the domain-wall
@@ -1451,14 +1450,14 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
     ------
         None
     """
-    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
+    all_in_path_list = core.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     if len(all_in_path_list) != 1:
         pb_path_list = all_in_path_list[1]
     else:
         pb_path_list = None
 
-    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_params',
+    out_folder_locations = core.find_output_folder_location(filename, 'rotation_params',
                                                           in_path_list)
 
     rotation_list = []
@@ -1507,7 +1506,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
                             if (x1 != x2) and (y1 != y2):
                                 valid_lines.append(line)
                 lines_edges = cv2.addWeighted(a_estimate, 0.8, line_image, 1, 0)
-                pt.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
+                core.intermediate_plot(line_image, 'lines', plots, 'Lines Found')
 
                 # Find first angle guess
                 angles = []
@@ -1534,7 +1533,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
                 rotation_deg = -key_angles[np.argmin(np.abs(key_angles))]
                 rotation_list.append(rotation_deg)
                 average_angle = np.mean(rotation_list)
-            pt.progress_report(index + 1, len(in_path_list), start_time, 'a_angle',
+            core.progress_report(index + 1, len(in_path_list), start_time, 'a_angle',
                                  in_path_list[index])
 
         rotation_array = np.array(rotation_list)
@@ -1542,7 +1541,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
         average_angle = rotation_array[int(len(rotation_array) / 2)]
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
         warp_matrix = cv2.getRotationMatrix2D((orig_x / 2, orig_y / 2), average_angle, 1)
-        data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
+        data = core.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
                             find_a_domain_angle_, locals(), output_name = filename.split('.')[0])
         data.attrs['angle offset (degs)'] = average_angle
         data.attrs['binarisation_threshold'] = bin_thresh
@@ -1567,7 +1566,7 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
     filename : string
         name of hdf5 file containing data
     all_input_criteria : list
-        criteria to identify paths to source files using pt.path_search. First should
+        criteria to identify paths to source files using core.path_search. First should
         be data to be corrected. Second should be rotation parameters.
     cropping : bool, optional
         determines if the image should be cropped to the maximum common area.
@@ -1580,7 +1579,7 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
     Allow :
         for true non-cropping, which would extend the border to the maximum possible limit.
     """
-    all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
+    all_in_path_list = core.path_search(filename, all_input_criteria, repeat='block')
     in_path_list = all_in_path_list[0]
     rm_path_list = all_in_path_list[1]
 
@@ -1589,7 +1588,7 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
         for path in rm_path_list[:]:
             rotation_matrices.append(np.copy(f[path]))
 
-    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_alignment',
+    out_folder_locations = core.find_output_folder_location(filename, 'rotation_alignment',
                                                             in_path_list)
     with h5py.File(filename, "a") as f:
         start_time = time.time()
@@ -1632,11 +1631,11 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
             if array_is_bool:
                 new_img = new_img.astype(bool)
 
-            data = pt.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
+            data = core.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
                                                                              rm_path_list[i]],
                                        rotation_alignment_, locals())
             propagate_scale_attrs(data, f[in_path_list[i]])
-            pt.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
+            core.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
                                  in_path_list[i])
 
 
@@ -1660,7 +1659,7 @@ def threshold_ratio(image, thresh_ratio=0.5):
     min_level = np.nanmin(image)
     real_threshold = min_level + (thresh_ratio * (max_level - min_level))
     thresh_data = image > real_threshold
-    result = pt.hdf5_dict(thresh_data, threshold=real_threshold)
+    result = core.hdf5_dict(thresh_data, threshold=real_threshold)
     return result
 
 
@@ -1944,16 +1943,16 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
                 else:
                     print('Error: Invalid method submitted')
                 switchmap[i, j] = switch_scan
-        pt.progress_report(i + 1, phase_list[0].shape[0], start_time, 'switchmap',
-                             'Scanning Row ' + str(i + 1))
+        core.progress_report(i + 1, phase_list[0].shape[0], start_time, 'switchmap',
+                           'Scanning Row ' + str(i + 1))
 
     if source_path is None:
         result = switchmap
     else:
         if voltage_increment is None:
-            result = pt.hdf5_dict(switchmap, voltage_mV=voltage)
+            result = core.hdf5_dict(switchmap, voltage_mV=voltage)
         else:
-            result = pt.hdf5_dict(switchmap, voltage_list_mV=voltage)
+            result = core.hdf5_dict(switchmap, voltage_list_mV=voltage)
     return result
 
 
@@ -2004,15 +2003,15 @@ def switch_type_(filename, all_input_criteria):
     filename : string
         name of hdf5 file containing data
     all_input_criteria : list
-        criteria to identify paths to source files using pt.path_search. Should lead
+        criteria to identify paths to source files using core.path_search. Should lead
         to switchmap only.
 
     Returns
     ------
         None
     """
-    in_path_list = pt.path_search(filename, all_input_criteria)[0]
-    out_folder_locations = pt.find_output_folder_location(filename, 'switch_type', '')
+    in_path_list = core.path_search(filename, all_input_criteria)[0]
+    out_folder_locations = core.find_output_folder_location(filename, 'switch_type', '')
     with h5py.File(filename, "a") as f:
         switchmap = np.copy(f[in_path_list[0]])
 
@@ -2140,31 +2139,31 @@ def switch_type_(filename, all_input_criteria):
             else:
                 name = 'Scan_' + str(i).zfill(3)
             current_folder_location = out_folder_locations[0] + name
-            data = pt.write_output_f(f, totalmap, current_folder_location, in_path_list,
+            data = core.write_output_f(f, totalmap, current_folder_location, in_path_list,
                                        switch_type_, locals(), output_name='Switchmap')
             propagate_scale_attrs(data, f[in_path_list[0]])
-            pt.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
+            core.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
 
         gen_loc = core.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
         data = core.write_output_f(f, nucl_centres, gen_loc, in_path_list, switch_type_, locals(),
                                    output_name='NucleationCentres')
-        data = core.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='ClosureCentres')
+        data = core.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_,
+                                   locals(), output_name='ClosureCentres')
 
-        gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
+        gen_loc = core.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
                                                    True)[0]
-        data = core.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='TotalJumps')
-        data = core.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='Nucleation')
-        data = core.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='Motion')
-        data = core.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='Merging')
-        data = core.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='Errors')
-        data = core.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, switch_type_, locals(),
-                                   output_name='Closure')
+        data = core.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list,
+                                   switch_type_, locals(), output_name='TotalJumps')
+        data = core.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list,
+                                   switch_type_, locals(), output_name='Nucleation')
+        data = core.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, 
+                                   switch_type_, locals(), output_name='Motion')
+        data = core.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list,
+                                   switch_type_, locals(), output_name='Merging')
+        data = core.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, 
+                                   switch_type_, locals(), output_name='Errors')
+        data = core.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, 
+                                   switch_type_, locals(), output_name='Closure')
 
 
 def fill_blanks(list_of_lists):
@@ -2299,13 +2298,13 @@ def differentiate(image, return_directions=True):
     deriv = np.gradient(image)
     abs_deriv = np.abs(deriv)
     mag_deriv = np.sqrt(abs_deriv[0] ** 2 + abs_deriv[1] ** 2)
-    mag_deriv = pt.hdf5_dict(mag_deriv, dimension='Abs')
+    mag_deriv = core.hdf5_dict(mag_deriv, dimension='Abs')
     if not return_directions:
         result = mag_deriv
     else:
         result = [mag_deriv]
         for i in range(len(deriv)):
-            result.append(pt.hdf5_dict(deriv[i], dimension=[i]))
+            result.append(core.hdf5_dict(deriv[i], dimension=[i]))
         result = tuple(result)
     return result
 
@@ -3226,7 +3225,7 @@ def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_in
     filename : string
         Name of hdf5 file containing data
     all_input_criteria : list of strings
-        criteria to identify paths to source files using pt.path_search. Should refer to
+        criteria to identify paths to source files using core.path_search. Should refer to
         q-vector data to write attributes to
     out_index : int or float
         out-of-plane lattice index
@@ -3236,7 +3235,7 @@ def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_in
     -------
         None
     """
-    in_path_list = pt.path_search(filename, all_input_criteria)[0]
+    in_path_list = core.path_search(filename, all_input_criteria)[0]
     with h5py.File(filename, "a") as f:
         for i in range(len(in_path_list)):
             path = in_path_list[i]
