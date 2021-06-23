@@ -17,8 +17,7 @@ import inspect
 def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
             use_attrs=None, prop_attrs=None, increment_proc=True, process_folder='process',
             **kwargs):
-
-    '''
+    """
     Take any function and handles the inputs of the function by looking into the hdf5 file
     Also write the output of the function into the hdf5.
 
@@ -52,7 +51,7 @@ def m_apply(filename, function, in_paths, output_names=None, folder_names=None,
     Returns
     -------
         output of the passed function
-    '''
+    """
     # Convert in_paths to a list if not already
     if type(in_paths) != list:
         in_paths = [in_paths]

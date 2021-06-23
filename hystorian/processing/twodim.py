@@ -1,7 +1,7 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from . import core as pt
+from . import core
 import cv2
 import time
 
@@ -16,7 +16,7 @@ from skimage import img_as_ubyte
 import itertools
 
 
-def line_fit(line, order=1,box=[0]):
+def line_fit(line, order=1, box=[0]):
     """
     Do a nth order polynomial line flattening
 
@@ -32,8 +32,8 @@ def line_fit(line, order=1,box=[0]):
     """
     if order < 0:
         raise ValueError('expected deg >= 0')
-    newline=line
-    if len(box)==2:
+    newline = line
+    if len(box) == 2:
         newline = line[box[0]:box[1]]
     x = np.arange(len(newline))
     k = np.isfinite((newline))
@@ -75,7 +75,7 @@ def line_flatten_image(data, order=1, axis=0, box=[0]):
     return ndata
 
 
-def plane_flatten_image(data, order=1,box=[]):
+def plane_flatten_image(data, order=1, box=[]):
     """
     Do a plane flattening
 
@@ -90,8 +90,8 @@ def plane_flatten_image(data, order=1,box=[]):
         same shape as data
     """
     fitdata = data
-    if len(box)==4:
-        fitdata = data[box[0]:box[1],box[2]:box[3]]
+    if len(box) == 4:
+        fitdata = data[box[0]:box[1], box[2]:box[3]]
     xx, yy = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
     xxfit, yyfit = np.meshgrid(np.arange(fitdata.shape[1]), np.arange(fitdata.shape[0]))
     m = polyfit2d(xxfit.ravel(), yyfit.ravel(), fitdata.ravel(), order=order)
@@ -146,7 +146,7 @@ def normalise(array, new_min=0, new_max=1):
 def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offset=False,
                        cumulative=False, filterfunc=normalise, warp_mode=cv2.MOTION_TRANSLATION,
                        termination_eps=1e-5, number_of_iterations=10000, max_divisions=8,
-                       warp_check_range = 8, divisor_init = 0.25, lim=50, speed=2):
+                       warp_check_range=8, divisor_init=0.25, lim=50, speed=2):
     """
     Determine cumulative translation matrices for distortion correction and directly write it into
     an hdf5 file
@@ -193,7 +193,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
     -------
         None
     """
-    
+
     if type(all_input_criteria) != list:
         all_input_criteria = [all_input_criteria]
     if type(all_input_criteria[0]) != list:
@@ -203,7 +203,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
         in_path_list = pt.path_search(filename, channel_type)
         all_in_path_list.append(in_path_list[0])
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_params',
-                                                          all_in_path_list[0])
+                                                            all_in_path_list[0])
     eyes = np.eye(2, 3, dtype=np.float32)
     cumulative_tform21 = np.eye(2, 3, dtype=np.float32)
     with h5py.File(filename, "a") as f:
@@ -219,7 +219,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                 for channel_i in range(len(all_in_path_list)):
                     i1 = f[all_in_path_list[channel_i][0]]
                     if (i > 1) and (not cumulative):
-                        i1 = f[all_in_path_list[channel_i][i-1]]
+                        i1 = f[all_in_path_list[channel_i][i - 1]]
                     i2 = f[all_in_path_list[channel_i][i]]
                     if filterfunc is not None:
                         i1 = filterfunc(i1)
@@ -239,21 +239,25 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                     recent_offsets = []
                 if mode == 'SingleECC':
                     tform21 = generate_transform_xy_single(img1[0], img2[0], offset_px, warp_mode,
-                                                           termination_eps, number_of_iterations)
+                                                           termination_eps,
+                                                           number_of_iterations)
                 elif mode == 'ManualECC':
                     tform21 = generate_transform_xy_manual(img1, img2, offset_px, max_divisions,
-                                                           warp_check_range, divisor_init, lim)
+                                                           warp_check_range,
+                                                           divisor_init, lim)
                 elif mode == 'MultiECC':
                     tform21 = generate_transform_xy_multi(img1[0], img2[0], offset_px, warp_mode,
-                                                          termination_eps, number_of_iterations,
+                                                          termination_eps,
+                                                          number_of_iterations,
                                                           lim, speed, recent_offsets, cumulative,
                                                           cumulative_tform21)
                 else:
                     print('Invalid mode requested. Defaulting to SingleECC')
-                    mode='SingleECC'
+                    mode = 'SingleECC'
                     tform21 = generate_transform_xy_single(img1[0], img2[0], offset_px, warp_mode,
-                                                           termination_eps, number_of_iterations)
-                        
+                                                           termination_eps,
+                                                           number_of_iterations)
+
                 if cumulative:
                     tform21[0, 2] = tform21[0, 2] - cumulative_tform21[0, 2]
                     tform21[1, 2] = tform21[1, 2] - cumulative_tform21[1, 2]
@@ -261,7 +265,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                 cumulative_tform21[1, 2] = cumulative_tform21[1, 2] + tform21[1, 2]
                 print('Scan ' + str(i) + ' Complete. Cumulative Transform Matrix:')
                 print(cumulative_tform21)
-                
+
                 if mode == 'multiECC':
                     if (offset_px[0] == 0) and (offset_px[1] == 0):
                         recent_offsets.append([tform21[0, 2], tform21[1, 2]] - offset_px)
@@ -269,9 +273,9 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
                             recent_offsets = recent_offsets[1:]
 
             data = pt.write_output_f(f, cumulative_tform21, out_folder_locations[i],
-                                     all_in_path_list[0][i],  distortion_params_, locals())
+                                       all_in_path_list[0][i], distortion_params_, locals())
             pt.progress_report(i + 1, len(all_in_path_list[0]), start_time, 'distortion_params',
-                               all_in_path_list[0][i], clear=False)
+                                 all_in_path_list[0][i], clear=False)
 
 
 def m2px(m, points, scan_size):
@@ -296,8 +300,9 @@ def m2px(m, points, scan_size):
     return px
 
 
-def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
-                          number_of_iterations=10000):
+def generate_transform_xy_single(img, img_orig, offset_guess=[0, 0], warp_mode=cv2.MOTION_TRANSLATION,
+                                 termination_eps=1e-5,
+                                 number_of_iterations=10000):
     """
     Determines transformation matrices in x and y coordinates for SingleECC mode
 
@@ -330,11 +335,12 @@ def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = 
     warp_matrix[0, 2] = offset_guess[0]
     warp_matrix[1, 2] = offset_guess[1]
     (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                         criteria,None,1)
+                                         criteria, None, 1)
     return tform21
 
 
-def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions = 8, warp_check_range = 8, divisor_init = 0.25, lim=50):
+def generate_transform_xy_manual(img1, img2, offset_guess=[0, 0], max_divisions=8, warp_check_range=8,
+                                 divisor_init=0.25, lim=50):
     """
     Determines transformation matrices in x and y coordinates for ManualECC mode
 
@@ -368,30 +374,30 @@ def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions =
         last_k = np.Inf
         last_j = np.Inf
         offset_guess = np.array(offset_guess)
-        low_offset_check = offset_guess - (warp_check_range/2)/divisor
-        high_offset_check = offset_guess + (warp_check_range/2)/divisor
-        i_check = np.linspace(low_offset_check[0], high_offset_check[0], warp_check_range+1)
-        j_check = np.linspace(low_offset_check[1], high_offset_check[1], warp_check_range+1)
+        low_offset_check = offset_guess - (warp_check_range / 2) / divisor
+        high_offset_check = offset_guess + (warp_check_range / 2) / divisor
+        i_check = np.linspace(low_offset_check[0], high_offset_check[0], warp_check_range + 1)
+        j_check = np.linspace(low_offset_check[1], high_offset_check[1], warp_check_range + 1)
         for k in i_check:
             for j in j_check:
                 warp_matrix[0, 2] = k
                 warp_matrix[1, 2] = j
-                if k-offset_guess[0] < last_k*1.5:
-                    if j-offset_guess[1] < last_j*1.5:
-                        currDiff=0
+                if k - offset_guess[0] < last_k * 1.5:
+                    if j - offset_guess[1] < last_j * 1.5:
+                        currDiff = 0
                         for channel_i in range(len(img1)):
                             img_test = cv2.warpAffine(img1[channel_i], warp_matrix,
-                                                      (np.shape(img2)[2], np.shape(img2)[1]),
-                                                      flags=cv2.INTER_LINEAR+cv2.WARP_INVERSE_MAP)
-                            currDiff = currDiff+np.sum(np.square(img_test[lim:-lim, lim:-lim]
-                                                        - img2[channel_i][lim:-lim, lim:-lim]))
+                                                      (np.shape(img2)[2], np.shape(img2)[1]), flags=cv2.INTER_LINEAR +
+                                                                                                    cv2.WARP_INVERSE_MAP)
+                            currDiff = currDiff + np.sum(np.square(img_test[lim:-lim, lim:-lim]
+                                                                   - img2[channel_i][lim:-lim, lim:-lim]))
                         if currDiff < diff:
                             diff = currDiff
                             offset1 = k
                             offset2 = j
         warp_matrix[0, 2] = offset1
         warp_matrix[1, 2] = offset2
-        divisor = divisor*4
+        divisor = divisor * 4
         tform21 = warp_matrix
         offset_guess = [offset1, offset2]
     return tform21
@@ -441,7 +447,7 @@ def generate_transform_xy_multi(img, img_orig, offset_px=[0,0], warp_mode=cv2.MO
     # Here we generate a MOTION_EUCLIDEAN matrix by doing a 
     # findTransformECC (OpenCV 3.0+ only).
     # Returns the transform matrix of the img with respect to img_orig
-    
+
     # Redo using the same logic as the previous one; but only use the actual logic to optimise
     # parameters just once
 
@@ -485,7 +491,7 @@ def generate_transform_xy_multi(img, img_orig, offset_px=[0,0], warp_mode=cv2.MO
         print('Offset found from file attributes: ' + str(offset_px))
         warp_check_range = warp_check_range + 8
         recent_offsets = []
-    
+
     warp_matrix = np.eye(2, 3, dtype=np.float32)
     term_flags = cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
 
@@ -508,7 +514,7 @@ def generate_transform_xy_multi(img, img_orig, offset_px=[0,0], warp_mode=cv2.MO
                 img_test = cv2.warpAffine(img, tform21, (np.shape(img)[1], np.shape(img)[0]),
                                           flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
                 currDiff = np.sum(np.square(img_test[lim:-lim, lim:-lim]
-                                                - img_orig[lim:-lim, lim:-lim]))
+                                            - img_orig[lim:-lim, lim:-lim]))
                 if currDiff < diff:
                     diff = currDiff
                     offset1 = tform21[0, 2]
@@ -557,7 +563,7 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
     offset_caps = [np.max(xoffsets), np.min(xoffsets), np.max(yoffsets), np.min(yoffsets)]
 
     out_folder_locations = pt.find_output_folder_location(filename, 'distortion_correction',
-                                                          in_path_list)
+                                                            in_path_list)
 
     with h5py.File(filename, "a") as f:
         start_time = time.time()
@@ -568,11 +574,11 @@ def distortion_correction_(filename, all_input_criteria, cropping=True):
             else:
                 final_image = array_expanded(orig_image, xoffsets[i], yoffsets[i], offset_caps)
             data = pt.write_output_f(f, final_image, out_folder_locations[i], [in_path_list[i],
-                                                                               dm_path_list[i]],
-                                    distortion_correction_, locals())
+                                                                                 dm_path_list[i]],
+                                       distortion_correction_, locals())
             propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i + 1, len(in_path_list), start_time, 'distortion_correction',
-                               in_path_list[i])
+                                 in_path_list[i])
 
 
 def propagate_scale_attrs(new_data, old_data):
@@ -599,6 +605,7 @@ def propagate_scale_attrs(new_data, old_data):
             scan_size = old_data.attrs['size']
             shape = old_data.attrs['shape']
             new_data.attrs['scale_m_per_px'] = scan_size[0] / shape[0]
+
 
 def array_cropped(array, xoffset, yoffset, offset_caps):
     """
@@ -704,11 +711,11 @@ def phase_linearisation(image, min_separation=90, background=None,
     """
     phase_flat = np.array(image).ravel()
     min_phase = int(np.floor(np.min(phase_flat)))
-    if phase_range == None:
+    if phase_range is None:
         max_phase = int(np.floor(np.max(phase_flat)))
-        phase_range = max_phase-min_phase
+        phase_range = max_phase - min_phase
     else:
-        max_phase = min_phase+phase_range
+        max_phase = min_phase + phase_range
 
     # Convert original data into histograms and find largest peak
     ydata, bin_edges = np.histogram(phase_flat, bins=360, range=[min_phase, max_phase])
@@ -760,7 +767,7 @@ def phase_linearisation(image, min_separation=90, background=None,
             if np.mean(linearised_array[:, :background]) > np.mean(linearised_array):
                 linearised_array = 1 - linearised_array
     pt.intermediate_plot(linearised_array, force_plot=show, text='Linearised Array')
-          
+
     linearised = medfilt(cv2.blur(linearised_array, (7, 7)), 7)
     result = pt.hdf5_dict(linearised, peak_values=[peak1_value, peak2_value])
     return result
@@ -936,7 +943,7 @@ def wrap(x, low=0, high=360):
         wrapped number
     """
     angle_range = high - low
-    x = ((x-low) % angle_range)+low
+    x = ((x - low) % angle_range) + low
     return x
 
 
@@ -989,7 +996,7 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
         amplitude data containing the a-domains to be found
     binarised_phase : array-like, optional
         binarised phase data used to differentiate a-domain walls from c-domain walls
-        (default: None). By default, the binarised phase will be generated from amplitude using 
+        (default: None). By default, the binarised phase will be generated from amplitude using
         estimate_a_domains
     direction : str, optional
         Direction of the a domains to be found.
@@ -999,7 +1006,7 @@ def find_a_domains(amplitude, binarised_phase=None, direction=None, filter_width
             'Horz': Finds horizontal domain walls
     filter_width : int, optional
         total width of the filter, in pixels, around the domain-wall
-        boundaries. This is the total distance - so half this value is applied to each side. 
+        boundaries. This is the total distance - so half this value is applied to each side.
         (default: 15)
     thresh_factor : int or float, optional
         factor used by binarisation. A higher number gives fewer valid points. (default: 2)
@@ -1152,7 +1159,7 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
     Refines an amplitude image to points of higher second derivative, which are likely to
     correspond to domain walls. If phase is given, this is used to further the filter the lines to
     find only the a-domains. Function allows for optional viewing of intermediate steps.
-      
+
     Parameters
     ----------
     amplitude : 2d array
@@ -1180,7 +1187,7 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
         amount of dilation steps to clean image
     erosion : int or float
         amount of erosion steps to clean image
-    
+
     Returns
     ------
     filtered_deriv_amp : 2d array
@@ -1220,7 +1227,7 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
                     defaulting to None')
         first_deriv = np.gradient(spline_amp)
         pt.intermediate_plot(first_deriv[0] + first_deriv[1], 'first_deriv', plots,
-                             'First Derivatives')
+                               'First Derivatives')
         second_deriv_y = np.gradient(first_deriv[0])[0]
         second_deriv_x = np.gradient(first_deriv[1])[1]
         deriv_amp = second_deriv_y + second_deriv_x
@@ -1241,7 +1248,7 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
 def align_rows(array, mask=None, cols=False):
     """
     Aligns rows (or cols) of an array, with a mask provided
-      
+
     Parameters
     ----------
     array : 2d array
@@ -1250,7 +1257,7 @@ def align_rows(array, mask=None, cols=False):
         mask of data to be ignored when aligning rows
     cols : bool
         If set to true, the columns are instead aligned
-    
+
     Returns
     ------
     new_array : 2d array
@@ -1280,7 +1287,7 @@ def threshold_after_peak(deriv_amp, factor=4):
     all valid values, and finding the maximum value of this histogram. The threshold is the point
     where the height of the maximum is less than the the maximum divided by the factor passed to
     this function.
-      
+
     Parameters
     ----------
     deriv_amp : 2d array
@@ -1288,7 +1295,7 @@ def threshold_after_peak(deriv_amp, factor=4):
     thresh_factor : int or float
         The factor the maximum is divided by to find the threshold. A higher
         number gives fewer valid points.
-    
+
     Returns
     ------
     thresh : int or float
@@ -1311,17 +1318,17 @@ def threshold_after_peak(deriv_amp, factor=4):
 def find_desired_angles(raw_data):
     """
     Finds best angles to find a-domains, by sorting all angles into a histogram and finding the
-    most common angle. A list of this angle, its antiparallel, and its two perpendiculars are then 
+    most common angle. A list of this angle, its antiparallel, and its two perpendiculars are then
     returned.
-      
+
     Parameters
     ----------
     raw_data : 2d array
         a list of angles to be given
-    
+
     Returns
     ------
-    angles : 
+    angles :
         A list of the four angles that the a-domains should fit to
     """
     angles = np.zeros(4)
@@ -1336,7 +1343,7 @@ def check_within_angle_range(angle, key_angle, angle_range, low=-180, high=180):
     """
     Checks if an angle is within a valid range around another angle given. This function uses the
     wrap functionality to search a full revolution.
-      
+
     Parameters
     ----------
     angle : int or float
@@ -1349,10 +1356,10 @@ def check_within_angle_range(angle, key_angle, angle_range, low=-180, high=180):
         the minimum value of the angle span
     high : int or float
         the maximum value of the angle span
-    
+
     Returns
     ------
-    status : 
+    status :
         a bool stating whether the angles are in range (True) or not (False)
     """
     low_angle = wrap(key_angle - angle_range, low, high)
@@ -1377,7 +1384,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
     a-domains (or some other vertical feature) is oriented vertically and horizontally. Works by
     finding the a-domains (by looking for points of high second derivative), finding the most
     common angles in for these a-domains, and taking the median of these angles along all images
-      
+
     Parameters
     ----------
     filename : string
@@ -1411,7 +1418,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
             'binary': Binarisation of second derivative
             'erode': Binarisation data after an erosion filter is applied
             'lines': Lines found, and should correspond to a-domains on original amplitude image
-    
+
     Returns
     ------
         None
@@ -1499,7 +1506,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
                 rotation_list.append(rotation_deg)
                 average_angle = np.mean(rotation_list)
             pt.progress_report(index + 1, len(in_path_list), start_time, 'a_angle',
-                               in_path_list[index])
+                                 in_path_list[index])
 
         rotation_array = np.array(rotation_list)
         rotation_array = sorted(rotation_array[~np.isnan(rotation_array)])
@@ -1507,7 +1514,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
         warp_matrix = cv2.getRotationMatrix2D((orig_x / 2, orig_y / 2), average_angle, 1)
         data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
-                                 find_a_domain_angle_, locals(), output_name = filename.split('.')[0])
+                                   find_a_domain_angle_, locals(), output_name=filename.split('.')[0])
         data.attrs['angle offset (degs)'] = average_angle
         data.attrs['binarisation_threshold'] = bin_thresh
         data.attrs['filter_width'] = filter_width
@@ -1520,12 +1527,12 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
 def rotation_alignment_(filename, all_input_criteria, cropping=True):
     """
     Applies a rotation matrix to an image. An option also allows for cropping to the largest
-    common area, which is found via trial and error. If one rotation matrix is given, it is 
+    common area, which is found via trial and error. If one rotation matrix is given, it is
     applied to all images given. If multiple rotation matrices are given, it applies each rotation
-    matrix n times consecutively, where n is the amount of images divided by the number of 
+    matrix n times consecutively, where n is the amount of images divided by the number of
     rotation matrices. If this would not be a whole number, the program returns an error and ends
     without running.
-      
+
     Parameters
     ----------
     filename : string
@@ -1537,11 +1544,11 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
         determines if the image should be cropped to the maximum common area.
         If this value is set to False, the image will not be intentionally cropped and the image
         will maintain consistent dimensions. This will often result in some cropping regardless.
-    
+
     Returns
     ------
         None  TO DO:
-    Allow : 
+    Allow :
         for true non-cropping, which would extend the border to the maximum possible limit.
     """
     all_in_path_list = pt.path_search(filename, all_input_criteria, repeat='block')
@@ -1554,7 +1561,7 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
             rotation_matrices.append(np.copy(f[path]))
 
     out_folder_locations = pt.find_output_folder_location(filename, 'rotation_alignment',
-                                                          in_path_list)
+                                                            in_path_list)
     with h5py.File(filename, "a") as f:
         start_time = time.time()
         for i in range(len(in_path_list)):
@@ -1597,27 +1604,27 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
                 new_img = new_img.astype(bool)
 
             data = pt.write_output_f(f, new_img, out_folder_locations[i], [in_path_list[i],
-                                                                           rm_path_list[i]],
-                                    rotation_alignment_, locals())
+                                                                             rm_path_list[i]],
+                                       rotation_alignment_, locals())
             propagate_scale_attrs(data, f[in_path_list[i]])
             pt.progress_report(i + 1, len(in_path_list), start_time, 'a_alignment',
-                               in_path_list[i])
+                                 in_path_list[i])
 
 
 def threshold_ratio(image, thresh_ratio=0.5):
     """
     Thresholds an image by passing in a ratio between the minimum and maximum values of this image
-      
+
     Parameters
     ----------
     image : 2d array
         image to be thresholded
     thresh_ratio : int or float
         ratio between the minimum and maximum of the image to threshold
-    
+
     Returns
     ------
-    result : 
+    result :
         hdf5_dict thresholded image, and the threshold value in attrs
     """
     max_level = np.nanmax(image)
@@ -1635,7 +1642,7 @@ def directional_skeletonize(domain_guess, direction='Vert', false_positives=None
     either vertically or horizontally to the edge of each shape. If the edge of this shape is
     within 10 pixels of the edge of the image, the line is further extended to the end of the
     image. Extra lines can also be removed via the false_positives variable.
-      
+
     Parameters
     ----------
     domain_guess : 2d array
@@ -1649,12 +1656,12 @@ def directional_skeletonize(domain_guess, direction='Vert', false_positives=None
         is described by an int, starting from number 0, which is the left- or up-most line.
     max_edge : int or float
         the distance a line will stretch to read the edge or another line
-    
+
     Returns
     ------
-    all_domains : 
+    all_domains :
         image showing all domains found
-    good_domains : 
+    good_domains :
         image showing only good domains that have not been filtered
     """
     if (direction != 'Vert') and (direction != 'Horz'):
@@ -1729,15 +1736,15 @@ def directional_skeletonize(domain_guess, direction='Vert', false_positives=None
 def final_a_domains(orig_vert, orig_horz, closing_distance=50):
     """
     Creates a folder with all a-domain data from the directionally skeletonized binary images
-    (both horz and vert). This includes the final cleaning steps, where both vertical and 
-    horizontal lines are overlayed and compared; if one line overlaps (or approaches) a 
+    (both horz and vert). This includes the final cleaning steps, where both vertical and
+    horizontal lines are overlayed and compared; if one line overlaps (or approaches) a
     perpendicular and ends at a distance less than that described by closing_distance, the extra
-    line is cut (or the approaching line extended) such that the line terminates where it would 
-    coincide with the perpendicular. The final dataset folder contains images of both the 
-    horizontal and vertical a-domains, a composite image made from both the horizontal and 
+    line is cut (or the approaching line extended) such that the line terminates where it would
+    coincide with the perpendicular. The final dataset folder contains images of both the
+    horizontal and vertical a-domains, a composite image made from both the horizontal and
     vertical domains, and separate lists of both the horizontal and vertical domains that contain
     coordinates for a start and end of each domain
-      
+
     Parameters
     ----------
     orig_vert : 2d array
@@ -1747,14 +1754,14 @@ def final_a_domains(orig_vert, orig_horz, closing_distance=50):
     closing : int or float
         extra distance a line is extended to (or cut by) if it approaches
         a perpendicular
-    
+
     Returns
     ------
-    new_all : 
+    new_all :
         all a-domains
-    new_vert : 
+    new_vert :
         vert a-domains
-    new_horz : 
+    new_horz :
         horz a-domains
     np.array(vert_list) : list
         coordinates of end points of vert a-domains
@@ -1845,7 +1852,7 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
     Generates a switchmap from binarised phase data. A switchmap is a 2D array, where the number
     at each coordinate corresponds to the 'time' it takes that coordinate to switch phase. If a
     coordinate did not switch, it is set to a NaN.
-      
+
     Parameters
     ----------
     *phase_list : list
@@ -1862,10 +1869,10 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
     voltage_increment : int or float
         increment of voltage (in mV) on each step, used to find
         subsequent voltages
-    
+
     Returns
     ------
-    result : 
+    result :
         hdf5_dict showing the switchmap, as well as the relevant voltages in attributes
     """
     if source_path is not None:
@@ -1910,7 +1917,7 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
                     print('Error: Invalid method submitted')
                 switchmap[i, j] = switch_scan
         pt.progress_report(i + 1, phase_list[0].shape[0], start_time, 'switchmap',
-                           'Scanning Row ' + str(i + 1))
+                             'Scanning Row ' + str(i + 1))
 
     if source_path is None:
         result = switchmap
@@ -1925,15 +1932,15 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
 def wherechanged(arr):
     """
     Returns the indices where a list changes values
-      
+
     Parameters
     ----------
     arr : array or list
         the array or list that may contain changes
-    
+
     Returns
     ------
-    where : 
+    where :
         a list of indices that changes occur
     """
     where = []
@@ -1950,20 +1957,20 @@ def switch_type_(filename, all_input_criteria):
     switch_type, a folder is made for each scan. This folder contains an array, where the number
     defines the type of switch that had occurred at that coordinate by that point (no distinction
     is made in the recency of switches). NaN = no switch; 1 = nucleation; 2 = motion; 3 = merging;
-    4 = errors. These are defined by the amount of neighbours for a switch (nucleation has 0, 
-    motion has 1, merging has 2, errors have another value). The second folder, 
-    switch_type_general, holds information common to the entire switchmap. In the 'Centres' 
+    4 = errors. These are defined by the amount of neighbours for a switch (nucleation has 0,
+    motion has 1, merging has 2, errors have another value). The second folder,
+    switch_type_general, holds information common to the entire switchmap. In the 'Centres'
     subfolder, two 2D arrays are given. NucleationCentres has 1 at the centre of a nucleation, and
-    0 elsewhere, while ClosureCentres has 1 at the centre of a closure (the opposite of 
-    nucleation; where no more motion or merging can continue off of it), and 0 elsewhere (note 
-    that as closure can be either motion or merging, switch_type does not contain any information 
-    on closure). In the "JumpTypes" subfolder, 6 arrays are stored, which contain information on 
-    the type of switch. These are the four types of switching used in switch_type (Nucleation; 
-    Motion; Merging; and Errors), as well as one for all switching (TotalJumps) and one for 
+    0 elsewhere, while ClosureCentres has 1 at the centre of a closure (the opposite of
+    nucleation; where no more motion or merging can continue off of it), and 0 elsewhere (note
+    that as closure can be either motion or merging, switch_type does not contain any information
+    on closure). In the "JumpTypes" subfolder, 6 arrays are stored, which contain information on
+    the type of switch. These are the four types of switching used in switch_type (Nucleation;
+    Motion; Merging; and Errors), as well as one for all switching (TotalJumps) and one for
     closure (Closure), which has redundancy with Motion and Merging. In these arrays, each row
     signifies scan. Each entry shows the size of a switch at that scan. As the length of each row
     is thus arbitirary, NaNs are made to fill each row to ensure constant length.
-      
+
     Parameters
     ----------
     filename : string
@@ -1971,7 +1978,7 @@ def switch_type_(filename, all_input_criteria):
     all_input_criteria : list
         criteria to identify paths to source files using pt.path_search. Should lead
         to switchmap only.
-    
+
     Returns
     ------
         None
@@ -2106,30 +2113,30 @@ def switch_type_(filename, all_input_criteria):
                 name = 'Scan_' + str(i).zfill(3)
             current_folder_location = out_folder_locations[0] + name
             data = pt.write_output_f(f, totalmap, current_folder_location, in_path_list,
-                                     switch_type_, locals(), output_name='Switchmap')
+                                       switch_type_, locals(), output_name='Switchmap')
             propagate_scale_attrs(data, f[in_path_list[0]])
             pt.progress_report(i + 1, total_scans, start_time, 'switch_type_', '[' + name + ']')
 
-        gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
-        data = pt.write_output_f(f, nucl_centres, gen_loc, in_path_list, switch_type_, locals(),
-                                 output_name='NucleationCentres')
-        data = pt.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_,
-                                 locals(), output_name='ClosureCentres')
+        gen_loc = core.find_output_folder_location(filename, 'switch_type_general', 'Centres')[0]
+        data = core.write_output_f(f, nucl_centres, gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='NucleationCentres')
+        data = core.write_output_f(f, closure_centres, gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='ClosureCentres')
 
         gen_loc = pt.find_output_folder_location(filename, 'switch_type_general', 'JumpTypes',
-                                                 True)[0]
-        data = pt.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, 
-                                 switch_type_, locals(), output_name='TotalJumps')
-        data = pt.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list,
-                                 switch_type_, locals(), output_name='Nucleation')
-        data = pt.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, 
-                                 switch_type_, locals(), output_name='Motion')
-        data = pt.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, 
-                                 switch_type_, locals(), output_name='Merging')
-        data = pt.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list,
-                                 switch_type_, locals(), output_name='Errors')
-        data = pt.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list,
-                                 switch_type_, locals(), output_name='Closure')
+                                                   True)[0]
+        data = core.write_output_f(f, fill_blanks(alljumps_tot), gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='TotalJumps')
+        data = core.write_output_f(f, fill_blanks(alljumps_nucl), gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='Nucleation')
+        data = core.write_output_f(f, fill_blanks(alljumps_mot), gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='Motion')
+        data = core.write_output_f(f, fill_blanks(alljumps_merg), gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='Merging')
+        data = core.write_output_f(f, fill_blanks(alljumps_error), gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='Errors')
+        data = core.write_output_f(f, fill_blanks(alljumps_closure), gen_loc, in_path_list, switch_type_, locals(),
+                                   output_name='Closure')
 
 
 def fill_blanks(list_of_lists):
@@ -2137,12 +2144,12 @@ def fill_blanks(list_of_lists):
     Takes a list of lists, and extends each individual list such that each list is the same size.
     This is done by introducing NaNs. An list that is, for example, [[1,2,3],[],[1]], would then
     become [[1,2,3],[np.nan, np.nan, np.nan],[1, np.nan, np.nan]]
-      
+
     Parameters
     ----------
     list_of_lists : list
         list of lists to be altered so each component list is the same length
-    
+
     Returns
     ------
     list_of_lists : list
@@ -2160,15 +2167,15 @@ def fill_blanks(list_of_lists):
 def interpolated_features(switchmap):
     """
     Creates isolines from a switchmap, then interpolates it
-      
+
     Parameters
     ----------
     switchmap : 2d array
         the switchmap used as the base for key features
-    
+
     Returns
     ------
-    interpolation : 
+    interpolation :
         interpolated features
     """
     isolines = find_isolines(switchmap)
@@ -2191,19 +2198,19 @@ def interpolated_features(switchmap):
 def find_isolines(switchmap, set_midpoints=True):
     """
     Finds key features on a switchmap (or similar structures), by finding edges and subtracting 1.
-    If the point is at the bottom of an edge with height greater than two, and not otherwise 
+    If the point is at the bottom of an edge with height greater than two, and not otherwise
     defined, the point is set to the switchmap value. Borders are also set to nan.
-      
+
     Parameters
     ----------
     switchmap : 2d array
         the switchmap used as the base for key features
     set_midpoints : bool, optional
         sets the middle of each contour as 0.5 less than switchmap value
-    
+
     Returns
     ------
-    isolines : 
+    isolines :
         the key features on the switchmap
     """
     isolines = np.zeros_like(switchmap)
@@ -2211,33 +2218,33 @@ def find_isolines(switchmap, set_midpoints=True):
         for j in range(np.shape(switchmap)[1]):
             if np.isnan(switchmap[i, j]):
                 isolines[i, j] = np.nan
-            if (i==0) or (i==np.shape(switchmap)[0]-1) or (j==0) or (j==np.shape(switchmap)[1]-1):
-                isolines [i, j] = np.nan
+            if (i == 0) or (i == np.shape(switchmap)[0] - 1) or (j == 0) or (j == np.shape(switchmap)[1] - 1):
+                isolines[i, j] = np.nan
             else:
                 for i_del in [-1, +1]:
-                    if switchmap[i,j] < switchmap[i+i_del, j]-1:
-                        isolines[i,j] = switchmap[i,j]
+                    if switchmap[i, j] < switchmap[i + i_del, j] - 1:
+                        isolines[i, j] = switchmap[i, j]
                 for j_del in [-1, +1]:
-                    if switchmap[i,j] < switchmap[i, j+j_del]-1:
-                        isolines[i,j] = switchmap[i,j]
+                    if switchmap[i, j] < switchmap[i, j + j_del] - 1:
+                        isolines[i, j] = switchmap[i, j]
                 for i_del in [-1, +1]:
-                    if switchmap[i,j] > switchmap[i+i_del, j]:
-                        isolines[i,j] = switchmap[i,j] - 1
+                    if switchmap[i, j] > switchmap[i + i_del, j]:
+                        isolines[i, j] = switchmap[i, j] - 1
                 for j_del in [-1, +1]:
-                    if switchmap[i,j] > switchmap[i, j+j_del]:
-                        isolines[i,j] = switchmap[i,j] - 1
-    
+                    if switchmap[i, j] > switchmap[i, j + j_del]:
+                        isolines[i, j] = switchmap[i, j] - 1
+
     if set_midpoints:
         midpoints = np.zeros_like(switchmap)
-        for i in range(int(np.nanmax(switchmap))+1):
-            midpoints = (skeletonize(binary_erosion(switchmap==i, iterations=3),
-                                     method='lee'))+midpoints
+        for i in range(int(np.nanmax(switchmap)) + 1):
+            midpoints = (skeletonize(binary_erosion(switchmap == i, iterations=3),
+                                     method='lee')) + midpoints
         midpoints = midpoints.astype(bool)
 
         for i in range(np.shape(switchmap)[0]):
             for j in range(np.shape(switchmap)[1]):
-                if midpoints[i,j]:
-                    isolines[i,j] = switchmap[i,j]-0.5
+                if midpoints[i, j]:
+                    isolines[i, j] = switchmap[i, j] - 0.5
     return isolines
 
 
@@ -2245,19 +2252,19 @@ def differentiate(image, return_directions=True):
     """
     Differentiates an image. Creates files corresponding to the magnitude, of the derivative and
     optionally, derivatives along both axis separately.
-      
+
     Parameters
     ----------
     image : 2d array
         data to be differentiated
     return_directions : bool, optional
         If set to false, only the derivative magnitude is stored.
-    
+
     Returns
     ------
-    mag_deriv : 
+    mag_deriv :
         array showing magnitude of the derivative at all points
-    result : 
+    result :
         A tuple. The first entry is mag_deriv as above. Subsequent
        entries are different derivatives of from different directions
     """
@@ -2277,38 +2284,38 @@ def differentiate(image, return_directions=True):
 
 def crop(array, background=0):
     """
-    Crops first and last rows and columns to remove regions without any meaningful data. The 
+    Crops first and last rows and columns to remove regions without any meaningful data. The
     columns that are removed are defined by that in background
-      
+
     Parameters
     ----------
     array : 2d array
         array to be cropped
     background : int or float, optional
         value of background data that can be cropped out (default : 0)
-    
+
     Returns
     ------
-    cropped_array : 
+    cropped_array :
         the array after being cropped
     """
     empty_rows = []
     for i in range(np.shape(array)[0]):
         if len(set(array[i])) == 1:
             if np.isnan(background):
-                if np.isnan(array[i,0]):
+                if np.isnan(array[i, 0]):
                     empty_rows.append(i)
             else:
-                if array[i,0] == background:
+                if array[i, 0] == background:
                     empty_rows.append(i)
     empty_cols = []
     for j in range(np.shape(array)[1]):
-        if len(set(array[:,j])) == 1:
+        if len(set(array[:, j])) == 1:
             if np.isnan(background):
-                if np.isnan(array[0,j]):
+                if np.isnan(array[0, j]):
                     empty_cols.append(j)
             else:
-                if array[0,j] == background:
+                if array[0, j] == background:
                     empty_cols.append(j)
 
     starting_row = 0
@@ -2316,95 +2323,95 @@ def crop(array, background=0):
     starting_col = 0
     ending_col = np.shape(array)[1]
     if empty_rows:
-        if empty_rows[0]==0:
-            starting_row = starting_row+1
+        if empty_rows[0] == 0:
+            starting_row = starting_row + 1
             for i in empty_rows:
-                if i==starting_row:
-                    starting_row = starting_row+1
-        if empty_rows[-1]==np.shape(array)[0]-1:
-            ending_row = ending_row-1
+                if i == starting_row:
+                    starting_row = starting_row + 1
+        if empty_rows[-1] == np.shape(array)[0] - 1:
+            ending_row = ending_row - 1
             for i in reversed(empty_rows):
-                if i==ending_row:
-                    ending_row = ending_row-1
+                if i == ending_row:
+                    ending_row = ending_row - 1
     if empty_cols:
-        if empty_cols[0]==0:
-            starting_col = starting_col+1
+        if empty_cols[0] == 0:
+            starting_col = starting_col + 1
             for j in empty_cols:
-                if j==starting_col:
-                    starting_col = starting_col+1
-        if empty_cols[-1]==np.shape(array)[1]-1:
-            ending_col = ending_col-1
+                if j == starting_col:
+                    starting_col = starting_col + 1
+        if empty_cols[-1] == np.shape(array)[1] - 1:
+            ending_col = ending_col - 1
             for j in reversed(empty_cols):
-                if j==ending_col:
-                    ending_col = ending_col-1
+                if j == ending_col:
+                    ending_col = ending_col - 1
     cropped_array = array[starting_row:ending_row, starting_col:ending_col]
     return cropped_array
 
 
-def uncrop_to_multiple(array, multiple=[50,50], background=0):
+def uncrop_to_multiple(array, multiple=[50, 50], background=0):
     """
     Adds additional columns and rows around an array. The values added are defined by background,
-    while the amount of rows and columns are defined by an array. The cols and rows are added 
+    while the amount of rows and columns are defined by an array. The cols and rows are added
     equally in all directions, preferentially to the right/bottom if an odd amount are added
-      
+
     Parameters
     ----------
     array : 2d array
         array to be uncropped
     multiple : list
         list of dimensions that the data will be uncropped by. Data will be
-        uncropped to the the next multiple of the values provided here. ie, given the default 
-        value, rows and cols will be extended such that there are 60, 120, 180, ... or etc. rows 
+        uncropped to the the next multiple of the values provided here. ie, given the default
+        value, rows and cols will be extended such that there are 60, 120, 180, ... or etc. rows
         or cols
     background : int or float
         the values granted to the uncropped regions
-    
+
     Returns
     ------
-    extended_array : 
+    extended_array :
         array after it is uncropped
     """
-    extended_rows = int(np.ceil(np.shape(array)[0]/multiple[0])*multiple[0])
-    extra_rows = extended_rows-np.shape(array)[0]
-    offset_rows = int(np.floor(extra_rows/2))
-    extended_cols = int(np.ceil(np.shape(array)[1]/multiple[1])*multiple[1])
-    extra_cols = extended_cols-np.shape(array)[1]
-    offset_cols = int(np.floor(extra_cols/2))
-    extended_array = np.zeros([extended_rows,extended_cols])+background
-    extended_array[offset_rows:np.shape(array)[0]+offset_rows,
-                   offset_cols:np.shape(array)[1]+offset_cols] = array
+    extended_rows = int(np.ceil(np.shape(array)[0] / multiple[0]) * multiple[0])
+    extra_rows = extended_rows - np.shape(array)[0]
+    offset_rows = int(np.floor(extra_rows / 2))
+    extended_cols = int(np.ceil(np.shape(array)[1] / multiple[1]) * multiple[1])
+    extra_cols = extended_cols - np.shape(array)[1]
+    offset_cols = int(np.floor(extra_cols / 2))
+    extended_array = np.zeros([extended_rows, extended_cols]) + background
+    extended_array[offset_rows:np.shape(array)[0] + offset_rows,
+    offset_cols:np.shape(array)[1] + offset_cols] = array
     return extended_array
 
 
-def compress_to_shape(array, shape=[50,50]):
+def compress_to_shape(array, shape=[50, 50]):
     """
     Compresses an array to a smaller size. This takes rectangular sections of the original array,
     takes the average of it, and averages it into a single pixel. The size of the compressed shape
     is defined by the shape argument. If the initial array is not a direct multiple of the desired
     shape, the function will call uncrop_to_multiple to extend it and ensure clean rectangles.
-      
+
     Parameters
     ----------
     array : 2d array
         array to be compressed
     shape : list, optional
         dimensions of the output array.
-    
+
     Returns
     ------
-    compressed_array : 
+    compressed_array :
         array after it is compressed
     """
     compressed_array = np.zeros(shape)
     extended_array = uncrop_to_multiple(array, shape)
-    row_compression = int(np.shape(extended_array)[0]/shape[0])
-    col_compression = int(np.shape(extended_array)[1]/shape[1])
+    row_compression = int(np.shape(extended_array)[0] / shape[0])
+    col_compression = int(np.shape(extended_array)[1] / shape[1])
     for i in range(np.shape(compressed_array)[0]):
         for j in range(np.shape(compressed_array)[1]):
-            compressed_array[i,j] = np.average(extended_array[i*row_compression:
-                                                              (i+1)*row_compression,
-                                                              j*col_compression:
-                                                              (j+1)*col_compression])
+            compressed_array[i, j] = np.average(extended_array[i * row_compression:
+                                                               (i + 1) * row_compression,
+                                                j * col_compression:
+                                                (j + 1) * col_compression])
     return compressed_array
 
 
@@ -2412,36 +2419,36 @@ def decompress_to_shape(array, shape):
     """
     Decompresses a smaller array into a larger array. Each pixel of the initial, smaller array is
     expanded into a larger rectangle of pixels, with the same value, on the larger array.
-      
+
     Parameters
     ----------
     array : 2d array
         array to be decompressed
     shape : list
         shape of the final, larger array
-    
+
     Returns
     ------
-    decompressed_array : 
+    decompressed_array :
         array after it is decompressed
     """
     decompressed_array = np.zeros(shape)
-    row_compression = np.ceil(shape[0]/np.shape(array)[0])
-    col_compression = np.ceil(shape[1]/np.shape(array)[1])
+    row_compression = np.ceil(shape[0] / np.shape(array)[0])
+    col_compression = np.ceil(shape[1] / np.shape(array)[1])
     for i in range(np.shape(decompressed_array)[0]):
         for j in range(np.shape(decompressed_array)[1]):
-            decompressed_array[i,j] = array[int(np.floor(i/row_compression)),
-                                            int(np.floor(j/col_compression))]
+            decompressed_array[i, j] = array[int(np.floor(i / row_compression)),
+                                             int(np.floor(j / col_compression))]
     return decompressed_array
-    
+
 
 def sample_fraction(array, shape_fraction=0.1, start_shape=None):
     """
     Randomly samples a contiguous block and small fraction of a larger array. Works by taking a
     small point (or smaller shape) and randomly expanding in all directions. To ensure uniformity,
-    a 'supershape' is constructed, which takes the initial array and adds 5 pixels on each 
+    a 'supershape' is constructed, which takes the initial array and adds 5 pixels on each
     direction to reduce edge effects during sampling.
-      
+
     Parameters
     ----------
     array : 2d array
@@ -2452,36 +2459,36 @@ def sample_fraction(array, shape_fraction=0.1, start_shape=None):
     start_shape : 2d array, optional
         A shape used to start the sample. Allows sample_fraction to feed into
         itself and generate larger samples from smaller ones.
-    
+
     Returns
     ------
-    curr_shape : 
+    curr_shape :
         the sample generated from the main array
     """
     basic_array = np.zeros_like(array)
-    total_shapes = 300000 
-    target_shape_size = shape_fraction*np.sum(array)
+    total_shapes = 300000
+    target_shape_size = shape_fraction * np.sum(array)
 
-    #Create Coordinate List:
+    # Create Coordinate List:
     coord_list = []
     coord_list_index_array = np.zeros_like(basic_array)
-    index=0
+    index = 0
     for i in range(np.shape(basic_array)[0]):
         for j in range(np.shape(basic_array)[1]):
-            coord_list.append([i,j])
-            coord_list_index_array[i,j] = index
-            index = index+1
+            coord_list.append([i, j])
+            coord_list_index_array[i, j] = index
+            index = index + 1
     neighbour_array = np.zeros_like(basic_array)
-    neighbour_scaling = np.zeros_like(basic_array)+4
-    
+    neighbour_scaling = np.zeros_like(basic_array) + 4
+
     if start_shape is None:
-        #Pick First Point
+        # Pick First Point
         np.random.seed()
         init_i, init_j = coord_list[int(np.random.choice(coord_list_index_array.flatten()))]
         new_i = init_i
         new_j = init_j
         curr_shape = np.zeros_like(basic_array)
-        curr_shape[init_i, init_j]=1
+        curr_shape[init_i, init_j] = 1
     else:
         start_shape = np.copy(start_shape)
         new_i = None
@@ -2490,79 +2497,79 @@ def sample_fraction(array, shape_fraction=0.1, start_shape=None):
         expanded_point = np.zeros_like(basic_array)
         for i in range(np.shape(basic_array)[0]):
             for j in range(np.shape(basic_array)[1]):
-                if curr_shape[i,j]!= 0:
+                if curr_shape[i, j] != 0:
                     if i != 0:
                         if i == 1:
-                            expanded_point[i-1,j] = expanded_point[i-1,j]+2
+                            expanded_point[i - 1, j] = expanded_point[i - 1, j] + 2
                         else:
-                            expanded_point[i-1,j] = expanded_point[i-1,j]+2
+                            expanded_point[i - 1, j] = expanded_point[i - 1, j] + 2
                     if j != 0:
                         if j == 1:
-                            expanded_point[i,j-1] = expanded_point[i,j-1]+2
+                            expanded_point[i, j - 1] = expanded_point[i, j - 1] + 2
                         else:
-                            expanded_point[i,j-1] = expanded_point[i,j-1]+2
-                    if i != np.shape(curr_shape)[0]-1:
-                        if i == np.shape(curr_shape)[0]-2:
-                            expanded_point[i+1,j] = expanded_point[i+1,j]+2
+                            expanded_point[i, j - 1] = expanded_point[i, j - 1] + 2
+                    if i != np.shape(curr_shape)[0] - 1:
+                        if i == np.shape(curr_shape)[0] - 2:
+                            expanded_point[i + 1, j] = expanded_point[i + 1, j] + 2
                         else:
-                            expanded_point[i+1,j] = expanded_point[i+1,j]+2
-                    if j != np.shape(curr_shape)[1]-1:
-                        if j == np.shape(curr_shape)[1]-2:
-                            expanded_point[i,j+1] = expanded_point[i,j+1]+2
+                            expanded_point[i + 1, j] = expanded_point[i + 1, j] + 2
+                    if j != np.shape(curr_shape)[1] - 1:
+                        if j == np.shape(curr_shape)[1] - 2:
+                            expanded_point[i, j + 1] = expanded_point[i, j + 1] + 2
                         else:
-                            expanded_point[i,j+1] = expanded_point[i,j+1]+2
-                            
-    curr_shape_size = np.sum(curr_shape*array)
+                            expanded_point[i, j + 1] = expanded_point[i, j + 1] + 2
+
+    curr_shape_size = np.sum(curr_shape * array)
     while curr_shape_size < target_shape_size:
-        #Find possible growths from that point
+        # Find possible growths from that point
         last_point = np.zeros_like(basic_array)
-        last_point[new_i, new_j]=1
-        #Use mirror boundary conditions
-        if new_i != None:
+        last_point[new_i, new_j] = 1
+        # Use mirror boundary conditions
+        if new_i is not None:
             expanded_point = np.copy(last_point)
             if new_i > 1:
-                expanded_point[new_i-1, new_j]=1
+                expanded_point[new_i - 1, new_j] = 1
             elif new_i == 1:
-                expanded_point[new_i-1, new_j]=2
+                expanded_point[new_i - 1, new_j] = 2
             if new_j > 1:
-                expanded_point[new_i, new_j-1]=1
+                expanded_point[new_i, new_j - 1] = 1
             elif new_j == 1:
-                expanded_point[new_i, new_j-1]=2
-            if new_i < np.shape(basic_array)[0]-2:
-                expanded_point[new_i+1, new_j]=1
-            elif new_i == np.shape(basic_array)[0]-2:
-                expanded_point[new_i+1, new_j]=2
-            if new_j < np.shape(basic_array)[1]-2:
-                expanded_point[new_i, new_j+1]=1
-            elif new_j == np.shape(basic_array)[1]-2:
-                expanded_point[new_i, new_j+1]=2
-        neighbour_array = neighbour_array+(expanded_point/neighbour_scaling)
-        neighbour_array = neighbour_array*(1-curr_shape)
+                expanded_point[new_i, new_j - 1] = 2
+            if new_i < np.shape(basic_array)[0] - 2:
+                expanded_point[new_i + 1, new_j] = 1
+            elif new_i == np.shape(basic_array)[0] - 2:
+                expanded_point[new_i + 1, new_j] = 2
+            if new_j < np.shape(basic_array)[1] - 2:
+                expanded_point[new_i, new_j + 1] = 1
+            elif new_j == np.shape(basic_array)[1] - 2:
+                expanded_point[new_i, new_j + 1] = 2
+        neighbour_array = neighbour_array + (expanded_point / neighbour_scaling)
+        neighbour_array = neighbour_array * (1 - curr_shape)
 
-        #Grow from one of the growth coords
-        thresh=0.75
-        if np.any(neighbour_array>=thresh):
-            #Grow if too surrounded
-            total_to_change = np.sum(neighbour_array>=thresh)
-            #print(total_to_change)
-            if total_to_change>1:
-                growth_locations = np.where(neighbour_array>=thresh)
-                rand_num=np.random.randint(0, len(growth_locations[0]))
+        # Grow from one of the growth coords
+        thresh = 0.75
+        if np.any(neighbour_array >= thresh):
+            # Grow if too surrounded
+            total_to_change = np.sum(neighbour_array >= thresh)
+            # print(total_to_change)
+            if total_to_change > 1:
+                growth_locations = np.where(neighbour_array >= thresh)
+                rand_num = np.random.randint(0, len(growth_locations[0]))
                 new_i = growth_locations[0][rand_num]
                 new_j = growth_locations[1][rand_num]
             else:
-                new_coords = np.where(neighbour_array>=thresh)
+                new_coords = np.where(neighbour_array >= thresh)
                 new_i = new_coords[0]
                 new_j = new_coords[1]
         else:
-            #Randomly grow:
+            # Randomly grow:
             probability_array = np.copy(neighbour_array)
             normalise_factor = np.sum(probability_array)
-            new_i,new_j=coord_list[int(np.random.choice(coord_list_index_array.flatten(),
-                                            p=(probability_array/normalise_factor).flatten()))]
-        curr_shape[new_i, new_j]=1
-        curr_shape_size = np.sum(curr_shape*array)
-        #Should make it only consider largest area?
+            new_i, new_j = coord_list[int(np.random.choice(coord_list_index_array.flatten(),
+                                                           p=(probability_array / normalise_factor).flatten()))]
+        curr_shape[new_i, new_j] = 1
+        curr_shape_size = np.sum(curr_shape * array)
+        # Should make it only consider largest area?
     return curr_shape
 
 
@@ -2570,14 +2577,14 @@ def MLE(x_list, show=False):
     """
     Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
     estimation
-      
+
     Parameters
     ----------
     x_list : list
         list of events/avalanches
     show : bool, optional
         If True, shows the MLE plot
-    
+
     Returns
     ------
     x0_list : list
@@ -2586,12 +2593,12 @@ def MLE(x_list, show=False):
         list of all a (scaling parameters)
     """
     x_arr = np.array(x_list)
-    max_x0_check = round(max(x_list)/2)
-    x0_arr=np.linspace(1, max_x0_check, max_x0_check)
+    max_x0_check = round(max(x_list) / 2)
+    x0_arr = np.linspace(1, max_x0_check, max_x0_check)
     x0_list = list(x0_arr)
     a_list = []
     for x0 in x0_arr:
-        a_est = 1+(len(x_arr[x_arr>x0])/(np.sum(np.log(x_arr[x_arr>x0]/(x0)))))
+        a_est = 1 + (len(x_arr[x_arr > x0]) / (np.sum(np.log(x_arr[x_arr > x0] / (x0)))))
         a_list.append(a_est)
     if show:
         plt.semilogx(x0_list, a_list)
@@ -2607,14 +2614,14 @@ def KS_statistic(x_list, x0_list, a_list, show=False):
     """
     Generates a list of cutoffs and scaling parameters of a power law, using maximum likelihood
     estimation
-      
+
     Parameters
     ----------
     x_list : list
         list of events/avalanches
     show : bool, optional
         If True, shows the MLE plot
-    
+
     Returns
     ------
     x0_list : list
@@ -2632,8 +2639,8 @@ def KS_statistic(x_list, x0_list, a_list, show=False):
         P_ks = []
         for x in x_ks:
             P_ks.append(power_law_CDF(x, a_est, x0_est))
-        #P_ks = np.array(P_ks)
-        D = np.max(abs(P_ks-S_ks))
+        # P_ks = np.array(P_ks)
+        D = np.max(abs(P_ks - S_ks))
         D_list.append(D)
     if show:
         plt.semilogx(x0_list, D_list)
@@ -2649,7 +2656,7 @@ def power_law_CDF(x, a, x0):
     """
     Returns the CDF of a power law fit, given an event size, scaling parameter, and power law
     cutoff
-      
+
     Parameters
     ----------
     x : int or float
@@ -2658,20 +2665,20 @@ def power_law_CDF(x, a, x0):
         scaling parameter
     x0 : int or float
         power law cutoff
-    
+
     Returns
     ------
-    P : 
+    P :
         cumulative probability
     """
-    P = 1-((x/x0)**(1-a))
+    P = 1 - ((x / x0) ** (1 - a))
     return P
 
 
-def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
+def power_law_params(x_list, x0_list, a_list, D_list, max_x0=20):
     """
     Generates important parameters of a power law fit, given MLE and KS results
-      
+
     Parameters
     ----------
     x_list : list
@@ -2684,10 +2691,10 @@ def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
         list of KS statistics
     max_x0 : int or float
         maximum value of x0 that will be considered
-    
+
     Returns
     ------
-    P : 
+    P :
         parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic
         for optimal cutoff and scaling parameter; number of events above cutoff; total number of
         events; average event size considered; largest event size considered
@@ -2697,11 +2704,11 @@ def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
     optimal_x0 = x0_list[min_D_arg]
     optimal_a = a_list[min_D_arg]
     min_D = np.min(D_list)
-    valid_n = sum(np.array(x_list)>optimal_x0)
+    valid_n = sum(np.array(x_list) > optimal_x0)
     total_n = len(x_list)
-    mean_x_size = np.mean(x_array[x_array>optimal_x0])
+    mean_x_size = np.mean(x_array[x_array > optimal_x0])
     max_x_size = np.max(x_array)
-    total_x_size_thresh = np.sum(x_array[x_array>optimal_x0])
+    total_x_size_thresh = np.sum(x_array[x_array > optimal_x0])
     total_x_size = np.sum(x_array)
     P = [optimal_x0, optimal_a, min_D, valid_n, total_n, mean_x_size, max_x_size,
          total_x_size_thresh, total_x_size]
@@ -2710,9 +2717,9 @@ def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
 
 def power_law_params_force_fit(x_list, optimal_x0, optimal_a):
     """
-    Generates important parameters of a power law fit, given the scaling parameters and minimum 
+    Generates important parameters of a power law fit, given the scaling parameters and minimum
     cutoff
-      
+
     Parameters
     ----------
     x_list : list
@@ -2721,12 +2728,12 @@ def power_law_params_force_fit(x_list, optimal_x0, optimal_a):
         minimum cutoff used
     optimal_a : int or float
         scaling parameter used
-    
+
     Returns
     ------
-    P : 
+    P :
         parameters as a list, including, in order: minimum cutoff; scaling parameter; KS statistic
-        for optimal cutoff and scalign parameter; number of events above cutoff; total number of 
+        for optimal cutoff and scalign parameter; number of events above cutoff; total number of
         events; average event size considered; largest event size considered
     """
     x_array = np.array(x_list)
@@ -2737,12 +2744,12 @@ def power_law_params_force_fit(x_list, optimal_x0, optimal_a):
     for x in x_ks:
         P_ks.append(power_law_CDF(x, optimal_a, optimal_x0))
     P_ks = np.array(P_ks)
-    D = np.max(abs(P_ks-S_ks))
-    valid_n = sum(np.array(x_list)>optimal_x0)
+    D = np.max(abs(P_ks - S_ks))
+    valid_n = sum(np.array(x_list) > optimal_x0)
     total_n = len(x_list)
-    mean_x_size = np.mean(x_array[x_array>optimal_x0])
+    mean_x_size = np.mean(x_array[x_array > optimal_x0])
     max_x_size = np.max(x_array)
-    total_x_size_thresh = np.sum(x_array[x_array>optimal_x0])
+    total_x_size_thresh = np.sum(x_array[x_array > optimal_x0])
     total_x_size = np.sum(x_array)
     P = [optimal_x0, optimal_a, D, valid_n, total_n, mean_x_size, max_x_size,
          total_x_size_thresh, total_x_size]
@@ -2755,7 +2762,7 @@ def all_sample_fractions(array, iterations=100, fractions=[0.1,0.15,0.2,0.25],
     Generates a 4D array of several samples; the first axis allows choice of the fraction of each
     sampling; the second axis allows for each iteration of this fraction. The remaining two axes
     are the 2D array of each individual sample.
-      
+
     Parameters
     ----------
     array : 2d array
@@ -2768,56 +2775,56 @@ def all_sample_fractions(array, iterations=100, fractions=[0.1,0.15,0.2,0.25],
         the size to which the array is compressed to during sampling
     background : int or float, optional
         values of background areas that may be removed during compression
-    
+
     Returns
     ------
-    sample_fractions_all_fractions : 
+    sample_fractions_all_fractions :
         4D array describing all samples extracted
     """
-    #Compress array and generate "supershape" template from which subshapes are drawn
+    # Compress array and generate "supershape" template from which subshapes are drawn
     if np.isnan(background):
         bool_array = ~np.isnan(array)
     else:
-        bool_array = ~(array==background)
+        bool_array = ~(array == background)
     cropped_array = crop(bool_array)
     expanded_array = uncrop_to_multiple(cropped_array, compression)
     compressed_array = compress_to_shape(expanded_array, compression)
     array_supershape = uncrop_to_multiple(compressed_array, [compression[0]+10,
                                                              compression[1]+10])
-    
-    #Generate first generation of all shapes
-    if type(fractions)!= list:
+
+    # Generate first generation of all shapes
+    if type(fractions) != list:
         fractions = [fractions]
     sample_fractions_all_fractions = []
     sample_fractions_one_fraction = []
     for sample_count in range(iterations):
         shape = sample_fraction(array_supershape, fractions[0]).astype(bool)
         sample_fractions_one_fraction.append(shape)
-       
-    #If multiple fractions are provides, generate successive generations
-    if len(fractions)>1:
-        for i in range(1,len(fractions)):
+
+    # If multiple fractions are provides, generate successive generations
+    if len(fractions) > 1:
+        for i in range(1, len(fractions)):
             sample_fractions_all_fractions.append(sample_fractions_one_fraction)
             sample_fractions_one_fraction = []
             for sample_count in range(iterations):
-                shape = sample_fraction(array_supershape, fractions[i], 
-                                        sample_fractions_all_fractions[i-1]
+                shape = sample_fraction(array_supershape, fractions[i],
+                                        sample_fractions_all_fractions[i - 1]
                                         [sample_count]).astype(bool)
                 sample_fractions_one_fraction.append(shape)
         sample_fractions_all_fractions.append(sample_fractions_one_fraction)
     else:
         sample_fractions_all_fractions = sample_fractions_one_fraction
-        
+
     sample_fractions_all_fractions = np.array(sample_fractions_all_fractions)
-    #axes = [(fraction_num)][sample_num][y][x]
+    # axes = [(fraction_num)][sample_num][y][x]
     return sample_fractions_all_fractions
 
 
-def multi_power_law(switchmap, sample_fractions, compression=[50,50], background=np.nan):
+def multi_power_law(switchmap, sample_fractions, compression=[50, 50], background=np.nan):
     """
-    Applies a power law fit to a switchmap (or similar), multiple times according to samples 
+    Applies a power law fit to a switchmap (or similar), multiple times according to samples
     extracted from sample_fractions, and extracts parameters
-      
+
     Parameters
     ----------
     switchmap : 2d array
@@ -2828,83 +2835,82 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
         the size to which the array is compressed to during sampling
     background : int or float
         values of background areas that may be removed during compression
-    
+
     Returns
     ------
-    all_params : 
+    all_params :
         parameters in an 3D array. First axis represents each fraction value provided by
         sample_fractions. Second axis represents data for each particular sample. What remains is
         a 1D array, which contains the following parameters in order: optimal cutoff; scaling
         parameter; KS statistic for the optimal cutoff and scaling parameter; number of events
-        above cutoff; total number of events; average event size considered; largest event size 
+        above cutoff; total number of events; average event size considered; largest event size
         considered
     """
-    all_params = np.zeros([np.shape(sample_fractions)[0], np.shape(sample_fractions)[1],9])
+    all_params = np.zeros([np.shape(sample_fractions)[0], np.shape(sample_fractions)[1], 9])
 
-    #Recenter initial array in same manner as supershape
+    # Recenter initial array in same manner as supershape
     if np.isnan(background):
         bool_array = ~np.isnan(switchmap)
     else:
-        bool_array = ~(array==background)
+        bool_array = ~(array == background)
     cropped_array = crop(bool_array)
     expanded_array = uncrop_to_multiple(cropped_array, compression)
     compressed_array = compress_to_shape(expanded_array, compression)
-    array_supershape = uncrop_to_multiple(compressed_array, [compression[0]+10, 
+    array_supershape = uncrop_to_multiple(compressed_array, [compression[0]+10,
                                                              compression[1]+10])
     copied_array = np.copy(switchmap)
-    copied_array[~bool_array]=0
-    scaled_array = uncrop_to_multiple(crop(copied_array*bool_array),compression)
-            
+    copied_array[~bool_array] = 0
+    scaled_array = uncrop_to_multiple(crop(copied_array * bool_array), compression)
+
     for fraction_num in reversed(range(np.shape(sample_fractions)[0])):
-    #for fraction_num in (range(np.shape(sample_fractions)[0])):
+        # for fraction_num in (range(np.shape(sample_fractions)[0])):
         for shape_num in range(np.shape(sample_fractions)[1]):
             print(shape_num)
             shape = sample_fractions[fraction_num][shape_num]
-            
-            #Prepare the samples of the switchmap
-            avalanche_size_list = []
-            sample=decompress_to_shape(np.ceil(shape*array_supershape)[5:np.shape(shape)[0]-5,
-                                                                       5:np.shape(shape)[1]-5],
-                                       np.shape(expanded_array))
-            sample=sample*scaled_array
 
-            #Find Avalanche Sizes
-            for i in range(1,int(np.max(sample)+1)):
-                avalanche_size = np.sum(sample==i)
-                if avalanche_size>0:
+            # Prepare the samples of the switchmap
+            avalanche_size_list = []
+            sample = decompress_to_shape(np.ceil(shape * array_supershape)[5:np.shape(shape)[0] - 5,
+                                         5:np.shape(shape)[1] - 5],
+                                         np.shape(expanded_array))
+            sample = sample * scaled_array
+
+            # Find Avalanche Sizes
+            for i in range(1, int(np.max(sample) + 1)):
+                avalanche_size = np.sum(sample == i)
+                if avalanche_size > 0:
                     avalanche_size_list.append(avalanche_size)
-            if fraction_num == (np.shape(sample_fractions)[0]-1):
-            #if fraction_num == 0:
-            
-                #Using MLE, generate list of x0s and as
+            if fraction_num == (np.shape(sample_fractions)[0] - 1):
+                # if fraction_num == 0:
+
+                # Using MLE, generate list of x0s and as
                 x0_list, a_list = MLE(avalanche_size_list)
 
-                #Find KS_Statistic
+                # Find KS_Statistic
                 D_list = KS_statistic(avalanche_size_list, x0_list, a_list)
 
-                #Report Parameters
+                # Report Parameters
                 params = power_law_params(avalanche_size_list, x0_list, a_list, D_list, max_x0=20)
-                
+
             else:
-                #optimal_x0 = all_params[0, shape_num, 0]
-                #optimal_a = all_params[0, shape_num, 1]
-                optimal_x0 = all_params[np.shape(sample_fractions)[0]-1, shape_num, 0]
-                optimal_a = all_params[np.shape(sample_fractions)[0]-1, shape_num, 1]
+                # optimal_x0 = all_params[0, shape_num, 0]
+                # optimal_a = all_params[0, shape_num, 1]
+                optimal_x0 = all_params[np.shape(sample_fractions)[0] - 1, shape_num, 0]
+                optimal_a = all_params[np.shape(sample_fractions)[0] - 1, shape_num, 1]
                 params = power_law_params_force_fit(avalanche_size_list, optimal_x0, optimal_a)
-                
-                
-            #optimal_x0, optimal_a, min_D, valid_n, total_n, mean_x_size, max_x_size,
+
+            # optimal_x0, optimal_a, min_D, valid_n, total_n, mean_x_size, max_x_size,
             #   total_x_size_thresh, total_x_size
             all_params[fraction_num, shape_num] = params
     return all_params
 
 
-def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], angle_correction_deg = False,
-                plot_fit=False, plot_name = 'fit', plot_axes = ['','']):
+def centre_peak(x, y, z, theo_x, theo_y, xc_range=[], yc_range=[], angle_correction_deg=False,
+                plot_fit=False, plot_name='fit', plot_axes=['', '']):
     """
     Given a dataset containing a gaussian peak, transforms the data by a linear shift such that the
     peak is at a given coordinate
-      
+
     Parameters
     ----------
     x : int or float
@@ -2930,32 +2936,32 @@ def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], angle_cor
         name of output plot if generated
     plot_axes : list
         axes labels (x and y) for the output plot
-    
+
     Returns
     ------
-    xc_fitted : 
+    xc_fitted :
         x-coordinate of centre of fitted peak
-    yc_fitted : 
+    yc_fitted :
         y-coordinate of centre of fitted peak
     """
     measured_x, measured_y = find_peak_position(x, y, z, xc_range, yc_range, plot_fit,
                                                 plot_name, plot_axes)
     if angle_correction_deg:
-        angle_factor_x = np.cos(np.pi*theo_x/180)/np.cos(np.pi*x/180)
-        angle_factor_y = np.cos(np.pi*theo_y/180)/np.cos(np.pi*y/180)
+        angle_factor_x = np.cos(np.pi * theo_x / 180) / np.cos(np.pi * x / 180)
+        angle_factor_y = np.cos(np.pi * theo_y / 180) / np.cos(np.pi * y / 180)
     else:
         angle_factor_x = 1
         angle_factor_y = 1
-    adj_x = x + (theo_x - measured_x)*angle_factor_x
-    adj_y = y + (theo_y - measured_y)*angle_factor_y
+    adj_x = x + (theo_x - measured_x) * angle_factor_x
+    adj_y = y + (theo_y - measured_y) * angle_factor_y
     return adj_x, adj_y
 
 
-def find_peak_position(x,y,z, xc_range = [], yc_range = [], plot_fit=False, plot_name = 'fit',
-                       plot_axes = ['','']):
+def find_peak_position(x, y, z, xc_range=[], yc_range=[], plot_fit=False, plot_name='fit',
+                       plot_axes=['', '']):
     """
     Fits, and optionally plots, 2-dimensional rotated gaussian to 3 sets of 2D arrays
-      
+
     Parameters
     ----------
     x : int or float
@@ -2974,12 +2980,12 @@ def find_peak_position(x,y,z, xc_range = [], yc_range = [], plot_fit=False, plot
         name of output plot if generated
     plot_axes : list
         axes labels (x and y) for the output plot
-    
+
     Returns
     ------
-    xc_fitted : 
+    xc_fitted :
         x-coordinate of centre of fitted peak
-    yc_fitted : 
+    yc_fitted :
         y-coordinate of centre of fitted peak
     """
     if xc_range and yc_range:
@@ -2990,110 +2996,110 @@ def find_peak_position(x,y,z, xc_range = [], yc_range = [], plot_fit=False, plot
         yc_est = np.mean([yc_range])
         yc_max = yc_range[1]
         ilow = 0
-        ihigh = np.shape(y)[0]-1
+        ihigh = np.shape(y)[0] - 1
         for i in range(np.shape(y)[0]):
-            if all(y[i,:]<yc_min):
+            if all(y[i, :] < yc_min):
                 ilow = i
-            if all(y[i,:]>yc_max):
+            if all(y[i, :] > yc_max):
                 ihigh = i
         jlow = 0
-        jhigh = np.shape(x)[1]-1
+        jhigh = np.shape(x)[1] - 1
         for j in range(np.shape(x)[1]):
-            if all(x[:,j]<xc_min):
+            if all(x[:, j] < xc_min):
                 jlow = j
-            if all(x[:,j]>xc_max):
+            if all(x[:, j] > xc_max):
                 jhigh = j
     else:
         min_z = np.min(z)
         max_z = np.max(z)
-        ratio = max_z/min_z
-        threshold = ratio**0.75
-        
-        ijmax = np.argmax(z)
-        imax = int(np.floor(ijmax/np.shape(z)[1]))
-        jmax = ijmax%np.shape(z)[1]
+        ratio = max_z / min_z
+        threshold = ratio ** 0.75
 
-        xc_est = x[imax,jmax]
+        ijmax = np.argmax(z)
+        imax = int(np.floor(ijmax / np.shape(z)[1]))
+        jmax = ijmax % np.shape(z)[1]
+
+        xc_est = x[imax, jmax]
         ilow = imax
-        while (z[ilow, jmax] >= z[imax,jmax]/threshold) and ilow > 0:
+        while (z[ilow, jmax] >= z[imax, jmax] / threshold) and ilow > 0:
             ilow -= 1
         ihigh = imax
-        while (z[ihigh, jmax] >= z[imax,jmax]/threshold) and ihigh < np.shape(z)[0]-1:
+        while (z[ihigh, jmax] >= z[imax, jmax] / threshold) and ihigh < np.shape(z)[0] - 1:
             ihigh += 1
-        xc_min = np.min([x[ilow, jmax],x[ihigh,jmax]])
-        xc_max = np.max([x[ilow, jmax],x[ihigh,jmax]])
+        xc_min = np.min([x[ilow, jmax], x[ihigh, jmax]])
+        xc_max = np.max([x[ilow, jmax], x[ihigh, jmax]])
 
-        yc_est = y[imax,jmax]
+        yc_est = y[imax, jmax]
         jlow = jmax
-        while (z[imax, jlow] >= z[imax,jmax]/threshold) and jlow > 0:
+        while (z[imax, jlow] >= z[imax, jmax] / threshold) and jlow > 0:
             jlow -= 1
         jhigh = jmax
-        while (z[imax, jhigh] >= z[imax,jmax]/threshold) and jhigh < np.shape(z)[1]-1:
+        while (z[imax, jhigh] >= z[imax, jmax] / threshold) and jhigh < np.shape(z)[1] - 1:
             jhigh += 1
-        yc_min = np.min([y[imax, jlow],y[imax,jhigh]])
-        yc_max = np.max([y[imax, jlow],y[imax,jhigh]])
-    
+        yc_min = np.min([y[imax, jlow], y[imax, jhigh]])
+        yc_max = np.max([y[imax, jlow], y[imax, jhigh]])
+
     if ilow > ihigh:
         ilow, ihigh = ihigh, ilow
     if jlow > jhigh:
         jlow, jhigh = jhigh, jlow
-    
+
     z0_est = np.min(z[ilow:ihigh, jlow:jhigh])
-    z0_min = z0_est/2
-    z0_max = z0_est*2
-    
-    amp_est = np.max(z[ilow:ihigh, jlow:jhigh])-z0_est
-    amp_min = amp_est/2
-    amp_max = amp_est*2
-    
+    z0_min = z0_est / 2
+    z0_max = z0_est * 2
+
+    amp_est = np.max(z[ilow:ihigh, jlow:jhigh]) - z0_est
+    amp_min = amp_est / 2
+    amp_max = amp_est * 2
+
     theta_est = 0
     theta_min = -np.pi
     theta_max = np.pi
-    
+
     w1_est = 0.1
     w1_min = 0
     w1_max = 10
-    
+
     w2_est = 0.1
     w2_min = 0
     w2_max = 10
-    
+
     p_est = [amp_est, xc_est, w1_est, yc_est, w2_est, theta_est, z0_est]
     p_min = [amp_min, xc_min, w1_min, yc_min, w2_min, theta_min, z0_min]
     p_max = [amp_max, xc_max, w1_max, yc_max, w2_max, theta_max, z0_max]
-    
-    xyz = np.vstack((x.ravel(),y.ravel(),z.ravel()))
+
+    xyz = np.vstack((x.ravel(), y.ravel(), z.ravel()))
     if xc_range and yc_range:
         for_deletion = []
         for i in range(np.shape(xyz)[1]):
-            if ((xyz[0,i] < xc_range[0]) or (xyz[0,i] > xc_range[1]) or
-                    (xyz[1,i] < yc_range[0]) or (xyz[1,i] > yc_range[1])):
+            if ((xyz[0, i] < xc_range[0]) or (xyz[0, i] > xc_range[1]) or
+                    (xyz[1, i] < yc_range[0]) or (xyz[1, i] > yc_range[1])):
                 for_deletion.append(i)
         xyz = np.delete(xyz, for_deletion, axis=1)
 
     xy_crop = xyz[0:2]
     z_crop = xyz[2]
-    
-    popt, pcov = curve_fit(gauss_curve_rotation, xy_crop, z_crop, p0 = p_est,
-                           bounds = [p_min, p_max])
+
+    popt, pcov = curve_fit(gauss_curve_rotation, xy_crop, z_crop, p0=p_est,
+                           bounds=[p_min, p_max])
     xc_fitted = popt[1]
     yc_fitted = popt[3]
     theta_fitted = popt[5]
-    
+
     if plot_fit:
         m1 = np.tan(theta_fitted)
-        m2 = np.tan(theta_fitted+np.pi/2)
-        b1 = yc_fitted-m1*xc_fitted
-        b2 = yc_fitted-m2*xc_fitted
+        m2 = np.tan(theta_fitted + np.pi / 2)
+        b1 = yc_fitted - m1 * xc_fitted
+        b2 = yc_fitted - m2 * xc_fitted
         x_plot = np.array([xc_min, xc_max])
-        y1 = m1*x_plot+b1
-        y2 = m2*x_plot+b2
-        plt.figure(figsize=(10,10))
-        spacing=500
+        y1 = m1 * x_plot + b1
+        y2 = m2 * x_plot + b2
+        plt.figure(figsize=(10, 10))
+        spacing = 500
         x_spaced = np.linspace(xc_min, xc_max, spacing)
         y_spaced = np.linspace(yc_min, yc_max, spacing)
-        x_arr = np.array([list(x_spaced),]*spacing)
-        y_arr = np.array([list(y_spaced),]*spacing).T
+        x_arr = np.array([list(x_spaced), ] * spacing)
+        y_arr = np.array([list(y_spaced), ] * spacing).T
         theo_intensity = np.log10(gauss_curve_rotation([x_arr, y_arr], *popt))
         plt.contour(x_spaced, y_spaced, np.log10(theo_intensity), levels=5, colors='k')
         plt.tricontourf(xy_crop[0], xy_crop[1], np.log10(z_crop), levels=100, cmap='jet')
@@ -3108,7 +3114,7 @@ def find_peak_position(x,y,z, xc_range = [], yc_range = [], plot_fit=False, plot
         plt.xlabel(plot_axes[0], fontsize=18)
         plt.ylabel(plot_axes[1], fontsize=18)
         plt.title('Peak Fit', fontsize=22)
-        plt.savefig(plot_name+'.png')
+        plt.savefig(plot_name + '.png')
         plt.show()
         plt.close()
     return [xc_fitted, yc_fitted]
@@ -3118,7 +3124,7 @@ def gauss_curve_rotation(data, amp, xc, w1, yc, w2, theta, z0):
     """
     Calculates the value at the surface of a rotated gaussian, given the spacial coordinates and
     fit parameters
-      
+
     Parameters
     ----------
     data : array
@@ -3126,36 +3132,36 @@ def gauss_curve_rotation(data, amp, xc, w1, yc, w2, theta, z0):
     amp : int or float
         amplitude of gassuain curve
     xc : int or float
-        x-coordinate of centre of gaussian 
+        x-coordinate of centre of gaussian
     w1 : int or float
         width of gaussian (1)
     yc : int or float
-        y-coordinate of centre of gaussian 
+        y-coordinate of centre of gaussian
     w2 : int or float
         width of gaussian (2)
     theta : int or float
         angle of rotation of gaussian
     z0 : int or float
         baseline of curve fit
-    
+
     Returns
     ------
     z : 2d array
         value of the surface
     """
     x, y = data
-    z=z0+amp*np.exp(-0.5*((x*np.cos(theta)+y*np.sin(theta)
-                           -xc*np.cos(theta)-yc*np.sin(theta))/w1)**2
-                    -0.5*((-x*np.sin(theta)+y*np.cos(theta)
-                           +xc*np.sin(theta)-yc*np.cos(theta))/w2)**2)
+    z = z0 + amp * np.exp(-0.5 * ((x * np.cos(theta) + y * np.sin(theta)
+                                   - xc * np.cos(theta) - yc * np.sin(theta)) / w1) ** 2
+                          - 0.5 * ((-x * np.sin(theta) + y * np.cos(theta)
+                                    + xc * np.sin(theta) - yc * np.cos(theta)) / w2) ** 2)
     return z
 
 
-def qvector(twtheta, omega, wavelength = 1.5405980, source_unit='deg'):
+def qvector(twtheta, omega, wavelength=1.5405980, source_unit='deg'):
     """
-    Converts 2-theta and omega 2-axes measurement into reciprocal space data, in units of 
+    Converts 2-theta and omega 2-axes measurement into reciprocal space data, in units of
     1/angstrom
-      
+
     Parameters
     ----------
     twtheta : 2d array
@@ -3166,7 +3172,7 @@ def qvector(twtheta, omega, wavelength = 1.5405980, source_unit='deg'):
         wavelength of incident beam
     source_unit : string
         unit of angles
-    
+
     Returns
     ------
     qx : array
@@ -3175,11 +3181,11 @@ def qvector(twtheta, omega, wavelength = 1.5405980, source_unit='deg'):
         out-of-plane reciprocal space vector
     """
     if source_unit == 'deg' or source_unit == 'degree':
-        twtheta = twtheta*np.pi/180
-        omega = omega*np.pi/180
-    qx = 2*np.pi/wavelength*(np.cos(omega)-np.cos(twtheta-omega))
-    qz = 2*np.pi/wavelength*(np.sin(omega)+np.sin(twtheta-omega))
-    return qx,qz
+        twtheta = twtheta * np.pi / 180
+        omega = omega * np.pi / 180
+    qx = 2 * np.pi / wavelength * (np.cos(omega) - np.cos(twtheta - omega))
+    qz = 2 * np.pi / wavelength * (np.sin(omega) + np.sin(twtheta - omega))
+    return qx, qz
 
 
 def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_index=0):
@@ -3209,21 +3215,21 @@ def add_lattice_param_attributes_(filename, all_input_criteria, out_index, in_in
             q_in = np.array(f[path])[0]
             f[path].attrs['out_index'] = out_index
             f[path].attrs['in_index'] = in_index
-            q_magnitude = np.sqrt(np.sum(np.array(f[path])**2))
+            q_magnitude = np.sqrt(np.sum(np.array(f[path]) ** 2))
             f[path].attrs['q_magnitude'] = q_magnitude
-            d_spacing = 2*np.pi/q_magnitude
+            d_spacing = 2 * np.pi / q_magnitude
             f[path].attrs['d_spacing'] = d_spacing
-            if in_index==0:
-                out_param = out_index*2*np.pi/q_magnitude
+            if in_index == 0:
+                out_param = out_index * 2 * np.pi / q_magnitude
                 f[path].attrs['out_param'] = out_param
-                angle = 180*np.arctan(q_in/q_out)/np.pi
+                angle = 180 * np.arctan(q_in / q_out) / np.pi
                 f[path].attrs['angle_deg'] = angle
             else:
-                out_param = out_index*2*np.pi/q_out
+                out_param = out_index * 2 * np.pi / q_out
                 f[path].attrs['out_param'] = out_param
-                in_param = in_index*2*np.pi/q_in
+                in_param = in_index * 2 * np.pi / q_in
                 f[path].attrs['in_param'] = in_param
-                
+
 
 def find_contours(data):
     data = data.astype(np.uint8)
@@ -3235,20 +3241,20 @@ def find_contours(data):
 
 
 def morphological_interpolation_filled(c1, c2, f1, f2):
-    MaxVal=np.max([c1, c2])+1
+    MaxVal = np.max([c1, c2]) + 1
 
     Fmin = np.minimum(c1, c2)
     Fmax = np.maximum(c1, c2)
 
-    Fw = np.where(c1+c2 == 0, f1 ^ f2, 0)*MaxVal
+    Fw = np.where(c1 + c2 == 0, f1 ^ f2, 0) * MaxVal
     Fmin = np.where(Fmin == 0, np.maximum(Fmin, Fw), Fmin)
 
     i = 0
     while np.max(Fmin) == MaxVal:
-        i = i+1
+        i = i + 1
         Fw = np.maximum(Fmin, Fmax)
         while True:
-            tmp = ndimage.grey_erosion(Fw, footprint=1.0*ndimage.generate_binary_structure(2, 1))
+            tmp = ndimage.grey_erosion(Fw, footprint=1.0 * ndimage.generate_binary_structure(2, 1))
             mask = Fw == MaxVal
             Fw = np.where(mask, tmp, Fw)
             if np.max(Fw) < MaxVal:
@@ -3258,7 +3264,7 @@ def morphological_interpolation_filled(c1, c2, f1, f2):
                       ndimage.grey_dilation(Fw,footprint=ndimage.generate_binary_structure(2,1)),
                       0)
         Fw = np.where(np.logical_and(Fw != 0, Fw != Ft), Fw, 0)
-        Fw = np.where(Fw != 0, (Fw+Ft)/2, 0)
+        Fw = np.where(Fw != 0, (Fw + Ft) / 2, 0)
         Fmin = np.where(Fw != 0, np.minimum(Fmin, Fw), Fmin)
         Fmax = np.where(Fw != 0, np.maximum(Fmax, Fw), Fmax)
         if i > 20:
@@ -3392,7 +3398,7 @@ def find_path_growth(interpolation, contour_init, surf2, loop_exit=100):
                 if loop_exit is not None:
                     if path_cnt[idx] > loop_exit:
                         print(
-                            'more than ' + str(loop_exit) + 
+                            'more than ' + str(loop_exit) +
                             ' steps where taken, breaking out of the loop. IDX: ' + str(idx))
                         print(direction_map_x[current_x][current_y])
                         print(direction_map_y[current_x][current_y])
