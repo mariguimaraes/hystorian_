@@ -40,7 +40,6 @@ def line_fit(line, order=1,box=[0]):
     if not np.isfinite(newline).any():
         return line
     coefficients = np.polyfit(x[k], newline[k], order)
-
     return line - np.polyval(coefficients, np.arange(len(line)))
 
 
@@ -99,6 +98,21 @@ def plane_flatten_image(data, order=1,box=[]):
 
 
 def polyfit2d(x, y, z, order=1):
+    """
+    Fit a 2D polynomial model to a dataset
+
+    Parameters
+    ----------
+    x : list or array
+    y : list or array
+    z : list or array
+    order : int
+
+    Returns
+    -------
+    m : array-like
+        list of indexes
+    """
     ncols = (order + 1) ** 2
     g = np.zeros((x.size, ncols))
     ij = itertools.product(range(order + 1), range(order + 1))
@@ -110,6 +124,21 @@ def polyfit2d(x, y, z, order=1):
 
 
 def polyval2d(x, y, m):
+    """
+    Applies polynomial indices obtained from polyfit2d on an x and y
+
+    Parameters
+    ----------
+    x : list or array
+    y : list or array
+    m : list
+        polynomials used
+
+    Returns
+    -------
+    z : array-like
+        array of heights
+    """
     order = int(np.sqrt(len(m))) - 1
     ij = itertools.product(range(order + 1), range(order + 1))
     z = np.zeros_like(x, dtype=float)
@@ -158,7 +187,7 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
     all_input_criteria : str
         criteria to identify paths to source files using pt.path_search. Should be
         height data to extract parameters from
-    mode : str
+    mode : str, optional
         Determines mode of operation, and thus parameters used. Can be 'SingleECC', 'ManualECC',
         or 'MultiECC', in decreasing order of speed
     read_offset : bool, optional
@@ -169,20 +198,20 @@ def distortion_params_(filename, all_input_criteria, mode='SingleECC', read_offs
         False), or to the original image (True). Output format is identical.
     fitlerfunc : func, optional
         Function applied to image before identifying distortion params
-    warp_mode : int
+    warp_mode : int, optional
         Mode of warp identified. Relevant for SingleECC and MultiECC modes.
         Only cv2.MOTION_TRANSLATION is currently tested.
-    termination_eps : float
+    termination_eps : float, optional
         Termination precision for SingleECC and MultiECC modes
-    number_of_iterations : int
+    number_of_iterations : int, optional
         Termination number for SingleECC and MultiECC modes
-    max_divisions : int
+    max_divisions : int, optional
         Number of recursive checks for ManualECC mode
-    warp_check_range : int
+    warp_check_range : int, optional
         Length and height of grid checked for ManualECC mode
-    divisor_init : float
+    divisor_init : float, optional
         Spacing between grid points in Manual ECCmode.
-    lim : int
+    lim : int, optional
         External limits examined in ManualECC and MultiECC mode
     speed : int, optional
         Value between 1 and 4, which determines speed and accuracy of MultiECC mode. A higher
@@ -296,8 +325,9 @@ def m2px(m, points, scan_size):
     return px
 
 
-def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
-                          number_of_iterations=10000):
+def generate_transform_xy_single(img, img_orig, offset_guess=[0,0],
+                                 warp_mode = cv2.MOTION_TRANSLATION, termination_eps = 1e-5,
+                                 number_of_iterations=10000):
     """
     Determines transformation matrices in x and y coordinates for SingleECC mode
 
@@ -307,13 +337,13 @@ def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = 
         Currently used image (in cv2 format) to find transformation array of
     img_orig : cv2
         Image (in cv2 format) transformation array is based off of
-    offset_guess : list of ints
+    offset_guess : list of ints, optional
         Estimated shift and offset between images
-    warp_mode : see cv2 documentation
+    warp_mode : see cv2 documentation, optional
         warp_mode used in cv2's findTransformationECC function
-    termination_eps : float
+    termination_eps : float, optional
         eps used to terminate fit
-    number_of_iterations : int
+    number_of_iterations : int, optional
         number of iterations in fit before termination
     
     Returns
@@ -334,7 +364,8 @@ def generate_transform_xy_single(img, img_orig, offset_guess=[0,0], warp_mode = 
     return tform21
 
 
-def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions = 8, warp_check_range = 8, divisor_init = 0.25, lim=50):
+def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions = 8,
+                                 warp_check_range = 8, divisor_init = 0.25, lim=50):
     """
     Determines transformation matrices in x and y coordinates for ManualECC mode
 
@@ -344,15 +375,15 @@ def generate_transform_xy_manual(img1, img2, offset_guess=[0,0], max_divisions =
         Currently used image (in cv2 format) to find transformation array of
     img2 : cv2
         Image (in cv2 format) transformation array is based off of
-    offset_guess : list of ints
+    offset_guess : list of ints, optional
         Estimated shift and offset between images
-    max_divisions : int
+    max_divisions : int, optional
         Number of recursive checks for ManualECC mode
-    warp_check_range : int
+    warp_check_range : int, optional
         Length and height of grid checked for ManualECC mode
-    divisor_init : float
+    divisor_init : float, optional
         Spacing between grid points in Manual ECCmode.
-    lim : int
+    lim : int, optional
         External limits examined in ManualECC and MultiECC mode
     
     Returns
@@ -410,21 +441,21 @@ def generate_transform_xy_multi(img, img_orig, offset_px=[0,0], warp_mode=cv2.MO
         Currently used image (in cv2 format) to find transformation array of
     img_orig : cv2
         Image (in cv2 format) transformation array is based off of
-    offset_px : list of ints
+    offset_px : list of ints, optional
         Actual shift estimated and taken from machine
-    warp_mode : see cv2 documentation
+    warp_mode : see cv2 documentation, optional
         warp_mode used in cv2's findTransformationECC function
-    termination_eps : float
+    termination_eps : float, optional
         eps used to terminate fit
-    number_of_iterations : int
+    number_of_iterations : int, optional
         number of iterations in fit before termination
-    lim : int
+    lim : int, optional
         External limits examined in ManualECC and MultiECC mode
     speed : int, optional
         Value between 1 and 4, which determines speed and accuracy of MultiECC mode. A higher
         number is faster, but assumes lower distortion and thus may be incorrect. Default value
         is 2.
-    recent_offsets : list
+    recent_offsets : list, optional
         List of recent offsets used to increase speed
     cumulative : bool, optional
         Determines if each image is compared to the previous image (default, False), or to the
@@ -1157,15 +1188,14 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
     ----------
     amplitude : 2d array
         Amplitude image from which domain walls are to be emphasised
-    domain_wall_filter : 2d array
-        Filter used during row alignment to ignore effects of 180
-        degree walls
-    direction : string
+    domain_wall_filter : 2d array, optional
+        Filter used during row alignment to ignore effects of 180 degree walls
+    direction : string, optional
         Direction of the derivative taken:
             None: Takes both derivatives, adding together the values of the second derivative.
             'Vert': Finds vertical domain walls (differentiates horizontally)
             'Horz': Finds horizontal domain walls (differentiates vertically)
-    plots : list
+    plots : list, optional
         option to plot intermediary steps. Plots if the following are in array:
             'amp': Raw amplitude data that contains a-domains
             'row_align': Data after row-alignment (if any)
@@ -1174,12 +1204,12 @@ def estimate_a_domains(amplitude, domain_wall_filter=None, direction=None, plots
             'second_deriv': Second derivitave of amplitude
             'binary': Binarisation of second derivative
             'erode': Binarisation data after an erosion filter is applied
-    thresh_factor : int or float
-        factor used by binarisation. A higher number gives fewer valid points.
-    dilation : int or float
-        amount of dilation steps to clean image
-    erosion : int or float
-        amount of erosion steps to clean image
+    thresh_factor : int or float, optional
+        factor used by binarisation. A higher number gives fewer valid points. (default : 2)
+    dilation : int or float, optional
+        amount of dilation steps to clean image (default : 2)
+    erosion : int or float, optional
+        amount of erosion steps to clean image (default : 4)
     
     Returns
     ------
@@ -1246,9 +1276,9 @@ def align_rows(array, mask=None, cols=False):
     ----------
     array : 2d array
         the array to be aligned
-    mask : 2d array
+    mask : 2d array, optional
         mask of data to be ignored when aligning rows
-    cols : bool
+    cols : bool, optional
         If set to true, the columns are instead aligned
     
     Returns
@@ -1285,9 +1315,9 @@ def threshold_after_peak(deriv_amp, factor=4):
     ----------
     deriv_amp : 2d array
         data passed in to obtain the threshold.
-    thresh_factor : int or float
-        The factor the maximum is divided by to find the threshold. A higher
-        number gives fewer valid points.
+    thresh_factor : int or float, optional
+        The factor the maximum is divided by to find the threshold. A higher number gives fewer
+        valid points. (default : 4)
     
     Returns
     ------
@@ -1345,10 +1375,10 @@ def check_within_angle_range(angle, key_angle, angle_range, low=-180, high=180):
         another angle to be compared to
     angle_range : list
         the range that angle and key_angle must be within one another
-    low : int or float
-        the minimum value of the angle span
-    high : int or float
-        the maximum value of the angle span
+    low : int or float, optional
+        the minimum value of the angle span (default : -180)
+    high : int or float, optional
+        the maximum value of the angle span (default : 180)
     
     Returns
     ------
@@ -1385,22 +1415,22 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
     all_input_criteria : list
         criteria to identify paths to source files using pt.path_search. First pass
         amplitude data, then pass phase binarisation data.
-    filter_width : int or float
+    filter_width : int or float, optional
         total width of the filter, in pixels, around the domain-wall
         boundaries. This is the total distance - so half this value is applied to each side.
-    thresh_factor : int or float
+    thresh_factor : int or float, optional
         factor used by binarisation. A higher number gives fewer valid points.
-    dilation : int or float
+    dilation : int or float, optional
         amount of dilation steps to clean image
-    erosion : int or float
+    erosion : int or float, optional
         amount of erosion steps to clean image
-    line_threshold : int or float
+    line_threshold : int or float, optional
         minimum number of votes (intersections in Hough grid cell)
-    min_line_length : int or float
+    min_line_length : int or float, optional
         minimum number of pixels making up a line
-    max_line_gap : int or float
+    max_line_gap : int or float, optional
         maximum gap in pixels between connectable line segments
-    plots : list
+    plots : list, optional
         option to plot intermediary steps. Plots if the following are in array:
             'amp': Raw amplitude data that contains a-domains
             'phase': Binarised phase data
@@ -1423,7 +1453,8 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
     else:
         pb_path_list = None
 
-    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_params', in_path_list)
+    out_folder_locations = pt.find_output_folder_location(filename, 'rotation_params',
+                                                          in_path_list)
 
     rotation_list = []
     with h5py.File(filename, "a") as f:
@@ -1507,7 +1538,7 @@ def find_a_domain_angle_(filename, all_input_criteria, filter_width=15, thresh_f
         orig_y, orig_x = (f[in_path_list[index]].attrs['shape'])
         warp_matrix = cv2.getRotationMatrix2D((orig_x / 2, orig_y / 2), average_angle, 1)
         data = pt.write_output_f(f, warp_matrix, out_folder_locations[0], in_path_list,
-                                 find_a_domain_angle_, locals(), output_name = filename.split('.')[0])
+                            find_a_domain_angle_, locals(), output_name = filename.split('.')[0])
         data.attrs['angle offset (degs)'] = average_angle
         data.attrs['binarisation_threshold'] = bin_thresh
         data.attrs['filter_width'] = filter_width
@@ -1533,7 +1564,7 @@ def rotation_alignment_(filename, all_input_criteria, cropping=True):
     all_input_criteria : list
         criteria to identify paths to source files using pt.path_search. First should
         be data to be corrected. Second should be rotation parameters.
-    cropping : bool
+    cropping : bool, optional
         determines if the image should be cropped to the maximum common area.
         If this value is set to False, the image will not be intentionally cropped and the image
         will maintain consistent dimensions. This will often result in some cropping regardless.
@@ -1744,7 +1775,7 @@ def final_a_domains(orig_vert, orig_horz, closing_distance=50):
         image showing the vertical a-domains
     orig_horz : 2d array
         image showing the horizontal a-domains
-    closing : int or float
+    closing : int or float, optional
         extra distance a line is extended to (or cut by) if it approaches
         a perpendicular
     
@@ -1850,18 +1881,17 @@ def switchmap(*phase_list, method='total', source_path=None, voltage_increment=N
     ----------
     *phase_list : list
         list of all binarised phases used to identify the switchmap
-    method : string
+    method : string, optional
         determines the method used to generate the switchmap:
             'maximum': switching occurs at the final time the coordinate switches
             'minimum': switching occurs at the first time the coordinate switches
             'median': switching occurs at the median of all times the coordinate switches
             'total': switching occurs at the number of total scans that the coordinate is not
                 switched
-    source_path : string
+    source_path : string, optional
         path name of first source, used to find initial voltage (in mV)
-    voltage_increment : int or float
-        increment of voltage (in mV) on each step, used to find
-        subsequent voltages
+    voltage_increment : int or float, optional
+        increment of voltage (in mV) on each step, used to find subsequent voltages
     
     Returns
     ------
@@ -2351,13 +2381,13 @@ def uncrop_to_multiple(array, multiple=[50,50], background=0):
     ----------
     array : 2d array
         array to be uncropped
-    multiple : list
+    multiple : list, optional
         list of dimensions that the data will be uncropped by. Data will be
         uncropped to the the next multiple of the values provided here. ie, given the default 
         value, rows and cols will be extended such that there are 60, 120, 180, ... or etc. rows 
         or cols
-    background : int or float
-        the values granted to the uncropped regions
+    background : int or float, optional
+        the values granted to the uncropped regions (default : 0)
     
     Returns
     ------
@@ -2682,7 +2712,7 @@ def power_law_params(x_list, x0_list, a_list, D_list, max_x0 = 20):
         list of scaling parameters
     D_list : list
         list of KS statistics
-    max_x0 : int or float
+    max_x0 : int or float, optional
         maximum value of x0 that will be considered
     
     Returns
@@ -2824,9 +2854,9 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
         the array to be sampled
     sample_fractions : array
         4D array showing all samples, extracted from function all_sample_fractions
-    compression : list
+    compression : list, optional
         the size to which the array is compressed to during sampling
-    background : int or float
+    background : int or float, optional
         values of background areas that may be removed during compression
     
     Returns
@@ -2899,11 +2929,12 @@ def multi_power_law(switchmap, sample_fractions, compression=[50,50], background
     return all_params
 
 
-def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], angle_correction_deg = False,
-                plot_fit=False, plot_name = 'fit', plot_axes = ['','']):
+def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [],
+                angle_correction_deg = False, plot_fit=False, plot_name = 'fit',
+                plot_axes = ['','']):
     """
-    Given a dataset containing a gaussian peak, transforms the data by a linear shift such that the
-    peak is at a given coordinate
+    Given a dataset containing a gaussian peak, transforms the data by a linear shift such that
+    the peak is at a given coordinate
       
     Parameters
     ----------
@@ -2917,18 +2948,18 @@ def centre_peak(x, y, z, theo_x, theo_y, xc_range = [], yc_range = [], angle_cor
         the x-position of where the peak should be
     theo_y : int or float
         the y-position of where the peak should be
-    xc_range : list
+    xc_range : list, optional
         x-range of data searched for peak. By default, searches entire span
-    yc_range : list
+    yc_range : list, optional
         y-range of data searched for peak. By default, searches entire span
-    angle_correction : bool
+    angle_correction : bool, optional
         if set to True, will attempt to fit x and y as angles to a
         a change in displacement
-    plot_fit : bool
+    plot_fit : bool, optional
         if set to True, plots the fit
-    plot_name : string
+    plot_name : string, optional
         name of output plot if generated
-    plot_axes : list
+    plot_axes : list, optional
         axes labels (x and y) for the output plot
     
     Returns
@@ -2964,15 +2995,15 @@ def find_peak_position(x,y,z, xc_range = [], yc_range = [], plot_fit=False, plot
         2D dataset containing position data in one of the spacial dimensions
     z : 2d array
         2D dataset containing value at the spacial dimensions defined by x and y
-    xc_range : list
+    xc_range : list, optional
         x-range of data searched for peak. By default, searches entire span
-    yc_range : list
+    yc_range : list, optional
         y-range of data searched for peak. By default, searches entire span
-    plot_fit : bool
+    plot_fit : bool, optional
         if set to True, plots the fit
-    plot_name : string
+    plot_name : string, optional
         name of output plot if generated
-    plot_axes : list
+    plot_axes : list, optional
         axes labels (x and y) for the output plot
     
     Returns
@@ -3162,9 +3193,9 @@ def qvector(twtheta, omega, wavelength = 1.5405980, source_unit='deg'):
         array of 2-theta angle data
     omega : 2d array
         array of omega angle data
-    wavelength : int or float
+    wavelength : int or float, optional
         wavelength of incident beam
-    source_unit : string
+    source_unit : string, optional
         unit of angles
     
     Returns
