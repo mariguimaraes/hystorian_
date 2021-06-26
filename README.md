@@ -11,6 +11,8 @@ Find the link to the paper here: http://dx.doi.org/10.1016/j.ultramic.2021.11334
 
 We would be gratefull if you cited it if it was usefull for your research
 
+You can install the package using Pip.
+
 ## Structure of an hdf5 file
 An hdf5 file has a tree-like structure consisting of groups (folders) and datasets. Each groups and datasets can have attributes attached to them. An attribute is a small metadata containing informations about the corresponding dataset or group. Here we use them to store general information about the data or parameters of the post-processing.
 
