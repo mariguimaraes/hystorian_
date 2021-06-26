@@ -22,7 +22,6 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://gitlab.unige.ch/paruch-group/hystorian',
     packages=['hystorian', 'hystorian.io', 'hystorian.processing'],
-    license='CC-By 4.0',
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
