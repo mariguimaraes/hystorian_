@@ -1,34 +1,32 @@
-# Multiscale
+# What is Hystorian?
 
-Please go see the wiki if you want to have more informations https://gitlab.unige.ch/paruch-group/multiscale/-/wikis/home
+Keeping track of the post-treatement done on our data can sometimes be cumbersome.
 
-## Intoduction
-Multiscale is a large scale project. Which has the motivation to gatherer all the snippets of code currently in the group under an organised library.
+Hystorian is a project born from our AFM group to solve this issue. It is a python package with two main functionalities:
 
-The project is based on the fact that, at the core our datas are only 1D, 2D, ND array, such that all the functions developped independently, could in theory be used for a lot of our datas.
+1. It handles multiple file format and converted all of them into uniformized hdf5 files. 
+2. It keeps track of the processing done on the data. 
 
-The first part of the project is to create a file convert, which will convert most of the file type we use, into a well defined hdf5 format. Such that any data processing would be done using this format, for inter-compatibility.
+Find the link to the paper here: http://dx.doi.org/10.1016/j.ultramic.2021.113345
 
-## How to participate?
-The easiest way to help develop this project would be to setup a github repository on your computer. On windows https://gitforwindows.org/ seems to work nicely.
-Once installed, you need to create a ssh key pair to share your code with gitlab. https://gitlab.unige.ch/help/ssh/README#generating-a-new-ssh-key-pair
+We would be gratefull if you cited it if it was usefull for your research
 
-Once it is done, open Git Bash and clone the project by typing:
+## Structure of an hdf5 file
+An hdf5 file has a tree-like structure consisting of groups (folders) and datasets. Each groups and datasets can have attributes attached to them. An attribute is a small metadata containing informations about the corresponding dataset or group. Here we use them to store general information about the data or parameters of the post-processing.
 
-`git clone git@gitlab.unige.ch:paruch-group/multiscale.git /PATH/TO/THE/FOLDER/YOU/WANT/THE/CODE`
+The tree-structure we use in Hystorian is the following :
+1. A dataset group, containing all the raw data you want to regroup inside a single hdf5.
+2. A metadata group, containing the metadatas of the initial files.
+3. A process group, containing the data processed from the original data, or from other processed data.
 
-From there you can modify the code locally, and when necessary commit it to the server either by using Git GUI, or the usual git command lines.
+## m_apply
 
-## Uniformized structure of the files
-The file contain:
+Our goal was to streamline the process and make the usage of Hystorian as seamless as possible for people already using Python. The key to this is the [`m_apply`](/Functions/Core/m_apply) function. It allows the application of any usual python function working on array on a datasets inside an hdf5 and to write the results into the same hdf5, while keeping all the key arguments of the function stored with the datasets inside the hdf5 file. Tutorials below show you how to use it in real case examples.
 
-* a **metadata** dataset, usually containing the unmodified metadata from the file
+## Tutorials
 
-* a **type** dataset, containing a string with the extension name of the unconverted file
+A few tutorial were written by R.Bulanadi and can be found in the examples folder of the project, or in the links below:
 
-* a **data** folder containing **M dataset of dimension N**. Each of the dataset has a list of attributes. For the moment the attributes are the following:
-	* name -- Name of the channel
-	* shape -- Shape of the datas
-	* size -- Physical size of the datas
-	* offset -- Offset of the datas
-	* unit -- Physical units of the datas
+* [Basic](https://gitlab.unige.ch/paruch-group/hystorian/-/wikis/tutorial/basic)
+* [Intermediate](https://gitlab.unige.ch/paruch-group/hystorian/-/wikis/tutorial/intermediate)
+* [Programming](https://gitlab.unige.ch/paruch-group/hystorian/-/wikis/tutorial/programming)
