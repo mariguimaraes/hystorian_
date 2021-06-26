@@ -13,7 +13,7 @@ deploy_staging:
     TWINE_USERNAME: $STAGING_USERNAME
     TWINE_PASSWORD: $STAGING_PASSWORD
   script:
-    - twine upload --repository testpypi dist/*
+    - twine upload --repository testpypi dist/* --verbose
   except:
     - tags
 
