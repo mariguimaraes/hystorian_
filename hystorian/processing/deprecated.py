@@ -315,3 +315,232 @@ def generate_transform_xy_classic(img, img_orig, tfinit=None, offset_guess = [0,
             warp_matrix[0, 2] = offset1
             warp_matrix[1, 2] = offset2
     return warp_matrix
+
+
+
+
+def sample_fraction(array, shape_fraction=0.1, start_shape=None):
+    """
+    Randomly samples a contiguous block and small fraction of a larger array. Works by taking a
+    small point (or smaller shape) and randomly expanding in all directions. To ensure uniformity,
+    a 'supershape' is constructed, which takes the initial array and adds 5 pixels on each
+    direction to reduce edge effects during sampling.
+
+    Parameters
+    ----------
+    array : 2d array
+        array to be sampled
+    shape_fraction : int or float, optional
+        the fraction of the array that is actually sampled. eg., by
+        default, an area of 0.1 will return a block of area 10% of the overall array
+    start_shape : 2d array, optional
+        A shape used to start the sample. Allows sample_fraction to feed into
+        itself and generate larger samples from smaller ones.
+
+    Returns
+    ------
+    curr_shape :
+        the sample generated from the main array
+    """
+    basic_array = np.zeros_like(array)
+    total_shapes = 300000
+    target_shape_size = shape_fraction * np.sum(array)
+
+    # Create Coordinate List:
+    coord_list = []
+    coord_list_index_array = np.zeros_like(basic_array)
+    index = 0
+    for i in range(np.shape(basic_array)[0]):
+        for j in range(np.shape(basic_array)[1]):
+            coord_list.append([i, j])
+            coord_list_index_array[i, j] = index
+            index = index + 1
+    neighbour_array = np.zeros_like(basic_array)
+    neighbour_scaling = np.zeros_like(basic_array) + 4
+
+    if start_shape is None:
+        # Pick First Point
+        np.random.seed()
+        init_i, init_j = coord_list[int(np.random.choice(coord_list_index_array.flatten()))]
+        new_i = init_i
+        new_j = init_j
+        curr_shape = np.zeros_like(basic_array)
+        curr_shape[init_i, init_j] = 1
+    else:
+        start_shape = np.copy(start_shape)
+        new_i = None
+        new_j = None
+        curr_shape = start_shape
+        expanded_point = np.zeros_like(basic_array)
+        for i in range(np.shape(basic_array)[0]):
+            for j in range(np.shape(basic_array)[1]):
+                if curr_shape[i, j] != 0:
+                    if i != 0:
+                        if i == 1:
+                            expanded_point[i - 1, j] = expanded_point[i - 1, j] + 2
+                        else:
+                            expanded_point[i - 1, j] = expanded_point[i - 1, j] + 2
+                    if j != 0:
+                        if j == 1:
+                            expanded_point[i, j - 1] = expanded_point[i, j - 1] + 2
+                        else:
+                            expanded_point[i, j - 1] = expanded_point[i, j - 1] + 2
+                    if i != np.shape(curr_shape)[0] - 1:
+                        if i == np.shape(curr_shape)[0] - 2:
+                            expanded_point[i + 1, j] = expanded_point[i + 1, j] + 2
+                        else:
+                            expanded_point[i + 1, j] = expanded_point[i + 1, j] + 2
+                    if j != np.shape(curr_shape)[1] - 1:
+                        if j == np.shape(curr_shape)[1] - 2:
+                            expanded_point[i, j + 1] = expanded_point[i, j + 1] + 2
+                        else:
+                            expanded_point[i, j + 1] = expanded_point[i, j + 1] + 2
+
+    curr_shape_size = np.sum(curr_shape * array)
+    while curr_shape_size < target_shape_size:
+        # Find possible growths from that point
+        last_point = np.zeros_like(basic_array)
+        last_point[new_i, new_j] = 1
+        # Use mirror boundary conditions
+        if new_i is not None:
+            expanded_point = np.copy(last_point)
+            if new_i > 1:
+                expanded_point[new_i - 1, new_j] = 1
+            elif new_i == 1:
+                expanded_point[new_i - 1, new_j] = 2
+            if new_j > 1:
+                expanded_point[new_i, new_j - 1] = 1
+            elif new_j == 1:
+                expanded_point[new_i, new_j - 1] = 2
+            if new_i < np.shape(basic_array)[0] - 2:
+                expanded_point[new_i + 1, new_j] = 1
+            elif new_i == np.shape(basic_array)[0] - 2:
+                expanded_point[new_i + 1, new_j] = 2
+            if new_j < np.shape(basic_array)[1] - 2:
+                expanded_point[new_i, new_j + 1] = 1
+            elif new_j == np.shape(basic_array)[1] - 2:
+                expanded_point[new_i, new_j + 1] = 2
+        neighbour_array = neighbour_array + (expanded_point / neighbour_scaling)
+        neighbour_array = neighbour_array * (1 - curr_shape)
+
+        # Grow from one of the growth coords
+        thresh = 0.75
+        if np.any(neighbour_array >= thresh):
+            # Grow if too surrounded
+            total_to_change = np.sum(neighbour_array >= thresh)
+            # print(total_to_change)
+            if total_to_change > 1:
+                growth_locations = np.where(neighbour_array >= thresh)
+                rand_num = np.random.randint(0, len(growth_locations[0]))
+                new_i = growth_locations[0][rand_num]
+                new_j = growth_locations[1][rand_num]
+            else:
+                new_coords = np.where(neighbour_array >= thresh)
+                new_i = new_coords[0]
+                new_j = new_coords[1]
+        else:
+            # Randomly grow:
+            probability_array = np.copy(neighbour_array)
+            normalise_factor = np.sum(probability_array)
+            new_i, new_j = coord_list[int(np.random.choice(coord_list_index_array.flatten(),
+                                                           p=(probability_array / normalise_factor).flatten()))]
+        curr_shape[new_i, new_j] = 1
+        curr_shape_size = np.sum(curr_shape * array)
+        # Should make it only consider largest area?
+    return curr_shape
+
+
+
+def all_sample_fractions(array, iterations=100, fractions=[0.1,0.15,0.2,0.25],
+                         compression=[50,50], background=np.nan):
+    """
+    Generates a 4D array of several samples; the first axis allows choice of the fraction of each
+    sampling; the second axis allows for each iteration of this fraction. The remaining two axes
+    are the 2D array of each individual sample.
+
+    Parameters
+    ----------
+    array : 2d array
+        the array to be sampled
+    iterations : int or float, optional
+        number of samples to be taken of for each fraction
+    fractions : list, optional
+        fractions to be sampled of the array
+    compression : list, optional
+        the size to which the array is compressed to during sampling
+    background : int or float, optional
+        values of background areas that may be removed during compression
+
+    Returns
+    ------
+    sample_fractions_all_fractions :
+        4D array describing all samples extracted
+    """
+    # Compress array and generate "supershape" template from which subshapes are drawn
+    if np.isnan(background):
+        bool_array = ~np.isnan(array)
+    else:
+        bool_array = ~(array == background)
+    cropped_array = crop(bool_array)
+    expanded_array = uncrop_to_multiple(cropped_array, compression)
+    compressed_array = compress_to_shape(expanded_array, compression)
+    array_supershape = uncrop_to_multiple(compressed_array, [compression[0]+10,
+                                                             compression[1]+10])
+
+    # Generate first generation of all shapes
+    if type(fractions) != list:
+        fractions = [fractions]
+    sample_fractions_all_fractions = []
+    sample_fractions_one_fraction = []
+    for sample_count in range(iterations):
+        shape = sample_fraction(array_supershape, fractions[0]).astype(bool)
+        sample_fractions_one_fraction.append(shape)
+
+    # If multiple fractions are provides, generate successive generations
+    if len(fractions) > 1:
+        for i in range(1, len(fractions)):
+            sample_fractions_all_fractions.append(sample_fractions_one_fraction)
+            sample_fractions_one_fraction = []
+            for sample_count in range(iterations):
+                shape = sample_fraction(array_supershape, fractions[i],
+                                        sample_fractions_all_fractions[i - 1]
+                                        [sample_count]).astype(bool)
+                sample_fractions_one_fraction.append(shape)
+        sample_fractions_all_fractions.append(sample_fractions_one_fraction)
+    else:
+        sample_fractions_all_fractions = sample_fractions_one_fraction
+
+    sample_fractions_all_fractions = np.array(sample_fractions_all_fractions)
+    # axes = [(fraction_num)][sample_num][y][x]
+    return sample_fractions_all_fractions
+
+
+def interpolated_features(switchmap):
+    """
+    Creates isolines from a switchmap, then interpolates it
+
+    Parameters
+    ----------
+    switchmap : 2d array
+        the switchmap used as the base for key features
+
+    Returns
+    ------
+    interpolation :
+        interpolated features
+    """
+    isolines = find_isolines(switchmap)
+
+    isoline_y = []
+    isoline_x = []
+    isoline_z = []
+    for i in range(np.shape(isolines)[0]):
+        for j in range(np.shape(isolines)[1]):
+            if isolines[i, j] != 0:
+                isoline_x.append(j)
+                isoline_y.append(i)
+                isoline_z.append(isolines[i, j])
+    grid_x, grid_y = np.mgrid[0:np.shape(isolines)[0]:1, 0:np.shape(isolines)[1]:1]
+    interpolation = interpolate.griddata(np.array([isoline_y, isoline_x]).T, np.array(isoline_z),
+                                         (grid_x, grid_y), method='linear', fill_value=np.nan)
+    return interpolation

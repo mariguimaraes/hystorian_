@@ -423,7 +423,6 @@ def write_generic_attributes(dataset, out_folder_location, in_paths, output_name
         dataset.attrs['operation name'] = 'None.' + function.__name__
     else:
         dataset.attrs['operation name'] = function.__module__ + '.' + function.__name__
-    print(function.__module__)
     if function.__module__ == '__main__':
         dataset.attrs['function code'] = inspect.getsource(function)
     dataset.attrs['operation number'] = operation_name.split('-')[0]
@@ -780,9 +779,6 @@ def write_output_f(f, data, out_folder_location, in_paths, function, all_variabl
     write_generic_attributes(dataset, out_folder_location, in_paths, output_name, function)
     write_kwargs_as_attributes(dataset, function, all_variables, first_kwarg)
     return dataset
-
-
-
 
 
 #   FUNCTION read_dataset

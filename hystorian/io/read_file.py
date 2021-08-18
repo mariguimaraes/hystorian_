@@ -45,7 +45,8 @@ def tohdf5(filename,filepath=None, params=None):
             if xrdml_bool:
                 xrdml_files.xrdml2hdf5(filename, filepath)
             else:
-                print('xrdml_files was not imported, probably due to the missing xrd_tools package. Please install it.')
+                print('xrdml_files was not imported, probably due to the missing xrd_tools package.'+
+                      ' Please install it.')
                 
             filetype = 'xrdml'
         elif filename.split('.')[-1] == 'ardf' or filename.split('.')[-1] == 'ARDF':
@@ -60,8 +61,8 @@ def tohdf5(filename,filepath=None, params=None):
         elif filename.split('.')[-1] == 'csv':
             csv_files.csv2hdf5(filename, filepath)
             filetype = 'csv'
-        elif filename.split('.')[-1] == 'jpg' or filename.split('.')[-1] == 'png' or filename.split('.')[-1] == 'jpeg' \
-                or filename.split('.')[-1] == 'bmp':
+        elif ((filename.split('.')[-1] == 'jpg') or (filename.split('.')[-1] == 'png')
+              or (filename.split('.')[-1] == 'jpeg') or (filename.split('.')[-1] == 'bmp')):
             img_files.image2hdf5(filename, filepath)
             filetype = 'jpg'
         elif re.match('\d{3}', filename.split('.')[-1]) is not None:
@@ -75,20 +76,23 @@ def tohdf5(filename,filepath=None, params=None):
             try:
                 shg_files.dat2hdf5(filename, filepath, params)
             except:
-                print('This dat file has a shape which is not supported, for the moment dat file are used for SHG datas')
+                print('This dat file has a shape which is not supported, for the moment dat file'+
+                      ' are used for SHG datas')
             filetype= 'dat'
         else:
             print('file type not yet supported')
     return filetype
 
-def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False, verbose=True, overwrite=False):
+def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', merge_process=False, verbose=True,
+               overwrite=False):
     '''
     Take a list of file to convert into a single hdf5 file
 
     Parameters
     ----------
     filelist: list of strings
-        list of the file to be converted. MUST contain the extensions. There can be multiple type of file in the list
+        list of the file to be converted. MUST contain the extensions. There can be multiple types
+        of file in the list
     combined_name: str
         Name of the hdf5 file
     erase_file : str, optional
@@ -120,7 +124,8 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
     for i, filename in enumerate(filelist):
 
         if filename.split('.')[0] == combined_name:
-            print('Warning: \'' + filename + '\' already exists. File has been ignored and will be overwritten.')
+            print('Warning: \'' + filename + '\' already exists. File has been ignored and will be'+
+                  ' overwritten.')
             continue
         else:
             if filename.split('.')[-1] != 'hdf5':
@@ -140,7 +145,8 @@ def merge_hdf5(filelist, combined_name,shortend = True, erase_file='partial', me
                         continue
                 else:
                     print(
-                        'Warning: \'' + filename + '\' is a non-hdf5 file, but the list containt a hdf5 file with the same name. File has been ignored.')
+                        'Warning: \'' + filename + '\' is a non-hdf5 file, but the list containt a hdf5 file'+
+                        ' with the same name. File has been ignored.')
                     continue
         with h5py.File(combined_name + '.hdf5', 'a') as f:
             metadatagrp = f['metadata']
