@@ -17,7 +17,7 @@ def save_image(data,
                labelsize=16,
                full_range=False,
                std_range=3,
-               colorm='inferno',
+               cmap='inferno',
                colorbar=True,
                scalebar=False,
                physical_size=(0, 'unit'),
@@ -27,7 +27,8 @@ def save_image(data,
                image_name=None,
                saving_path='',
                source_path=None,
-               verbose=False):
+               verbose=False,
+               colorm=None):
 
     '''
     Wrapper around plt.imshow() and plt.savefig() to uniformize image saving
@@ -47,7 +48,7 @@ def save_image(data,
         (default: True)
     std_range: int or float, optional
         the number of standard deviation to use in case full_range is set to false. (default: 3)
-    colorm: str, optional
+    cmap: str, optional
         choose the colormap, see matplotlib for the list of available colormap (default: 'inferno')
     colorbar: bool, optional
         allows to remove the colorbar if set to false. (default: True)
@@ -75,6 +76,11 @@ def save_image(data,
     -------
     None
     '''
+
+    #Remove later
+    if colorm:
+        print('Use of \'colorm\' is depracated; use \'cmap\' instead')
+        cmap = colorm
 
     # Generate size of image frame
     if size is None:
@@ -107,7 +113,7 @@ def save_image(data,
         v_max = mean_val + std_range * std_val
 
     # Plot image
-    pos = plt.imshow(data, vmin=v_min, vmax=v_max, cmap=colorm)
+    pos = plt.imshow(data, vmin=v_min, vmax=v_max, cmap=cmap)
 
     # Generate colourbar
     if colorbar:

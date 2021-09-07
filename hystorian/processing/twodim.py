@@ -380,8 +380,7 @@ def generate_transform_xy_single(img, img_orig, offset_guess=[0,0],
     criteria = (term_flags, number_of_iterations, termination_eps)
     warp_matrix[0, 2] = offset_guess[0]
     warp_matrix[1, 2] = offset_guess[1]
-    (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode,
-                                         criteria, None, 1)
+    (cc, tform21) = cv2.findTransformECC(img_orig, img, warp_matrix, warp_mode, criteria)
     return tform21
 
 

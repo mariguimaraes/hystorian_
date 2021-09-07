@@ -229,6 +229,126 @@ def l_apply(filename, function, all_input_criteria, repeat=None, **kwargs):
         increment_proc = False
 
 
+def print_tree(filename, root=''):
+    '''
+    Prints the file structure of a .hdf5 file.
+
+    Parameters
+    ----------
+    filename : name of file to be examined
+    root : optional, allows showing only a subset of the tree (default : '')
+
+    Returns
+    -------
+    null
+    '''
+
+    def print_branches(name):
+        space = '    '
+        branch = '│   '
+        tee = '├── '
+        last = '└── '
+
+        shift = ''
+        curr_name_segments = (name.split('/'))
+        last_name_segments = []
+        for i in range((len(curr_name_segments))):
+            if i == 0:
+                if not root:
+                    last_name_segments.append(list(f.keys())[-1])
+                else:
+                    last_name_segments.append(list(f[root].keys())[-1])
+            else:
+                if not root:
+                    last_name_segments.append(list(f[name.rsplit('/', len(curr_name_segments) - i)[0]])[-1])
+                else:
+                    last_name_segments.append(list(f[root][name.rsplit('/', len(curr_name_segments) - i)[0]])[-1])
+        for i in range((len(curr_name_segments))):
+            curr_name = curr_name_segments[i]
+            last_name = last_name_segments[i]
+            if i != len(curr_name_segments) - 1:
+                if curr_name != last_name:
+                    shift += branch
+                else:
+                    shift += space
+            else:
+                if curr_name != last_name:
+                    shift += tee
+                else:
+                    shift += last
+        item_name = name.split("/")[-1]
+        print(shift + item_name)
+
+    with h5py.File(filename, "r") as f:
+        if root:
+            print(filename + '[' + root + ']')
+            f[root].visit(print_branches)
+        else:
+            print(filename)
+            f.visit(print_branches)
+
+
+def list_processes(filename, process=''):
+    '''
+    Returns a list of all processes in a named .hdf5 file.
+
+    Parameters
+    ----------
+    filename : name of file to be searched
+    process : optional, shortens the list of processes using regex (default : '')
+
+    Returns
+    -------
+    proclst : a list of all processes
+    '''
+
+    procs = np.array(pt.path_search(filename, 'process*' + process + '*')).ravel()
+    if len(procs) == 0:
+        return None
+    proclst = [p.split('/')[1].split('/')[0] for p in procs]
+    proclst = sorted(list(set(proclst)))
+    return proclst
+
+
+def last_process(filename, process=''):
+    '''
+    Returns a the filename of the last process as a string
+
+    Parameters
+    ----------
+    filename : name of file to be searched
+    process : optional, further qualifies the last process by a regex condition (default : '')
+
+    Returns
+    -------
+    final process filling the regex condition (if any)
+    '''
+    list_of_processes = list(list_processes(filename, process=''))
+    return (list_of_processes[-1])
+
+
+def remove_process(filename, process):
+    '''
+    Clears a named process from a named .hdf5 file. Note that the data is not de-allocated
+    in computer memory; use core.deallocate_hdf5_memory to regain memory.
+
+    Parameters
+    ----------
+    filename : name of file to be altered
+    process : string containing name of process to be removed
+
+    Returns
+    -------
+    null
+    '''
+    process_path = 'process/' + process
+    with h5py.File(filename, "a") as f:
+        if process_path in f.keys():
+            del f[process_path]
+            print(process_path + ' has been removed')
+        else:
+            print(process_path + ' not found')
+
 #   FUNCTION path_search
 # Uses regex expressions to search for all paths. Useful when writing complicated custom functions
 # that cannot use m_apply or l_apply
