@@ -1,7 +1,7 @@
 from igor import binarywave
 import h5py
 from numpy import flipud
-
+import numpy as np
 
 # ==========================================
 # IBW conversion
