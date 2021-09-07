@@ -52,23 +52,28 @@ def ibw2hdf5(filename, filepath=None):
             datagrp.attrs.__setattr__('type', filename.split('.')[-1])
 
         for i, k in enumerate(label_list):
+            if len(np.shape(tmpdata['wData'])) == 2:
+                datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:, i].T))
+                datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:, i].T.shape
+                datagrp[label_list[i]].attrs['scale_m_per_px'] = fastsize/tmpdata['wData'][:, i].T.shape[0]
+            else:
                 datagrp.create_dataset(k, data=flipud(tmpdata['wData'][:, :, i].T))
-
-                datagrp[label_list[i]].attrs['name'] = k.decode('utf8')
                 datagrp[label_list[i]].attrs['shape'] = tmpdata['wData'][:, :, i].T.shape
-                datagrp[label_list[i]].attrs['size'] = (fastsize, slowsize)
-                datagrp[label_list[i]].attrs['offset'] = (xoffset, yoffset)
-                datagrp[label_list[i]].attrs['path'] = ("datasets/" + filename.split('.')[0]+"/"+str(k).split('\'')[1])
                 datagrp[label_list[i]].attrs['scale_m_per_px'] = fastsize/tmpdata['wData'][:, :, i].T.shape[0]
+            datagrp[label_list[i]].attrs['name'] = k.decode('utf8')
+            datagrp[label_list[i]].attrs['size'] = (fastsize, slowsize)
+            datagrp[label_list[i]].attrs['offset'] = (xoffset, yoffset)
+            datagrp[label_list[i]].attrs['path'] = ("datasets/" + filename.split('.')[0]+"/"+str(k).split('\'')[1])
 
-                if "Phase" in str(k):
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
-                elif "Amplitude" in str(k):
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'V')
-                elif "Height" in str(k):
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'm')
-                else:
-                    datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'unknown')
-            # f.create_dataset("channelsdata/pxs", data=sizes)
+
+            if "Phase" in str(k):
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'deg')
+            elif "Amplitude" in str(k):
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'V')
+            elif "Height" in str(k):
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'm')
+            else:
+                datagrp[label_list[i]].attrs['unit'] = ('m', 'm', 'unknown')
+        # f.create_dataset("channelsdata/pxs", data=sizes)
 
     print('file successfully converted')
