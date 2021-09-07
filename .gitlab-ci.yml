@@ -1,19 +1,17 @@
-deploy_staging:
-  stage: deploy
-  variables:
-    TWINE_USERNAME: $STAGING_USERNAME
-    TWINE_PASSWORD: $STAGING_PASSWORD
-  script:
-    - twine upload --repository testpypi dist/* --verbose
-  except:
-    - tags
+image: python:3.9.2-buster
+
+stages:
+  - deploy_stage
+  - deploy_prod
+
+before_script:
+   - pip install twine
+   - python setup.py sdist
 
 deploy_production:
-  stage: deploy
+  stage: deploy_prod
   variables:
     TWINE_USERNAME: __token__
     TWINE_PASSWORD: $PRODUCTION_PASSWORD
   script:
     - twine upload --repository-url https://upload.pypi.org/legacy/ dist/* --verbose
-  only:
-    - tags
