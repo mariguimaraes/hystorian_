@@ -21,9 +21,9 @@ deploy_staging:
 deploy_production:
   stage: deploy_prod
   variables:
-    TWINE_USERNAME: $PRODUCTION_USERNAME
+    TWINE_USERNAME: __token__
     TWINE_PASSWORD: $PRODUCTION_PASSWORD
   script:
-    - twine upload dist/* --verbose
+    - twine upload --repository-url https://upload.pypi.org/legacy/ dist/* --verbose
   only:
     - tags
