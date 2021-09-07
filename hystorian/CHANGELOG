@@ -1,4 +1,4 @@
-## [1.0.2] - 2021-09-07
+## [1.0.3] - 2021-09-07
 ### Added
 - Function core.print_tree added. Used to print the structure of a hdf5 file.
 - Function core.list_process added. Return a list of all the processed in a hdf5 file.
