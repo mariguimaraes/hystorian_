@@ -1,14 +1,15 @@
 image: python:3.9.2-buster
 
 stages:
-  - deploy
+  - deploy_stage
+  - deploy_prod
 
 before_script:
    - pip install twine
    - python setup.py sdist
 
 deploy_staging:
-  stage: deploy
+  stage: deploy_stage
   variables:
     TWINE_USERNAME: $STAGING_USERNAME
     TWINE_PASSWORD: $STAGING_PASSWORD
@@ -18,7 +19,7 @@ deploy_staging:
     - tags
 
 deploy_production:
-  stage: deploy
+  stage: deploy_prod
   variables:
     TWINE_USERNAME: $PRODUCTION_USERNAME
     TWINE_PASSWORD: $PRODUCTION_PASSWORD
