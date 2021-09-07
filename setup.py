@@ -26,5 +26,14 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
+    install_requires=[
+        'h5py>2,<3',
+        'numpy>=1.18',
+        'igor',
+        'pillow>7',
+        'scipy',
+        'skimage',
+        'opencv'
+    ],
     python_requires='>=3.6',
 )

@@ -1,0 +1,13 @@
+## [1.0.2] - 2021-09-07
+### Added
+- Function core.print_tree added. Used to print the structure of a hdf5 file.
+- Function core.list_process added. Return a list of all the processed in a hdf5 file.
+- Function core.last_process added. Return the last process of a hdf5 file.
+- Function core.remove_process added. Remove the passed process from a hdf5 file.
+
+### Changed
+- Updated dependencies in setup.py
+- Replaced interpolated_features by generate_interpolation
+- Moved sample_fraction, all_sample_fractions, interpolated_features to deprecated
+
+### Removed
