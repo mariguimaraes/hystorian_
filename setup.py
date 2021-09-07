@@ -32,8 +32,7 @@ setuptools.setup(
         'igor',
         'pillow>7',
         'scipy',
-        'scikit-image',
-        'opencv'
+        'scikit-image'
     ],
     python_requires='>=3.6',
 )
