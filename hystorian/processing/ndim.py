@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
+
 def extract_hist(*input_data, bias):
     """
     Split the SSPFM curve into on and off signal.
@@ -22,11 +23,17 @@ def extract_hist(*input_data, bias):
         return two grid with the data splitted into "on/off" according to the bias shape
 
     """
-    idx_zeroes = np.where(bias[0, 0, :] == 0)[0]
-    idx_Nonzeroes = np.where(bias[0, 0, :] != 0)[0]
+    bias = bias[~np.isnan(bias)]
+    if len(np.shape(bias)) == 1:
+        idx_zeroes = np.where(bias[:] == 0)[0]
+        idx_Nonzeroes = np.where(bias[:] != 0)[0]
+    else:
+        idx_zeroes = np.where(bias[0, 0, :] == 0)[0]
+        idx_Nonzeroes = np.where(bias[0, 0, :] != 0)[0]
 
     v1 = idx_zeroes[:-1]
     v2 = np.roll(idx_zeroes, 1)[:-1]
+
     list_change_zeroes = list(np.where((v1 - v2) != 1)[0])
 
     idx_start = idx_zeroes[list_change_zeroes]
@@ -36,15 +43,33 @@ def extract_hist(*input_data, bias):
     list_change_nonzeroes = list(np.where((v1 - v2) != 1)[0])
     idx_end = idx_Nonzeroes[list_change_nonzeroes]
 
-    data_k_on = np.ndarray((np.shape(bias)[0], np.shape(bias)[1], len(idx_end) - 1))
-    data_k_off = np.ndarray((np.shape(bias)[0], np.shape(bias)[1], len(idx_end) - 1))
+    if idx_end[0] < idx_start[0]:
+        reverse = True
+        tmp = idx_end
+        idx_end = idx_start
+        idx_start = tmp
+    if len(np.shape(bias)) == 1:
+        data_k_on = []
+        data_k_off = []
+    else:
+        data_k_on = np.ndarray((np.shape(bias)[0], np.shape(bias)[1], np.min([len(idx_start), len(idx_end)]) - 1))
+        data_k_off = np.ndarray((np.shape(bias)[0], np.shape(bias)[1], np.min([len(idx_start), len(idx_end)]) - 1))
 
     input_data = input_data[0]
-    for i in range(len(idx_end) - 1):
-        data_k_on[:, :, i] = np.median(input_data[:, :, idx_end[i]:idx_start[i + 1]], axis=2)
-        data_k_off[:, :, i] = np.median(input_data[:, :, idx_start[i + 1]:idx_end[i + 1]], axis=2)
+    input_data = input_data[~np.isnan(input_data)]
+    for i in range(np.min([len(idx_start), len(idx_end)]) - 1):
+        if len(np.shape(bias)) == 1:
+            data_k_on.append(np.nanmedian(input_data[idx_end[i]:idx_start[i + 1]]))
 
-    output = [data_k_on, data_k_off]
+            data_k_off.append(np.nanmedian(input_data[idx_start[i + 1]:idx_end[i + 1]]))
+        else:
+            data_k_on[:, :, i] = np.median(input_data[:, :, idx_end[i]:idx_start[i + 1]], axis=2)
+            data_k_off[:, :, i] = np.median(input_data[:, :, idx_start[i + 1]:idx_end[i + 1]], axis=2)
+    if reverse:
+        output = [data_k_off, data_k_on]
+    else:
+        output = [data_k_on, data_k_off]
+
     output = tuple(output)
     return output
 

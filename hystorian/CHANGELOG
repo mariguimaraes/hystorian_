@@ -9,6 +9,7 @@
 - Updated dependencies in setup.py
 - Replaced interpolated_features by generate_interpolation
 - Moved sample_fraction, all_sample_fractions, interpolated_features to deprecated
-- Function ibw2hf5 changed to work with linescan (v 1.0.3.1)
+- Function ibw2hf5 changed to work with linescan (v 1.0.3dev4)
+- Updating extract_hist to work with single line SSPFM and to handle different bias shape better (v 1.0.3dev7)
 
 ### Removed
