@@ -1,3 +1,6 @@
+## [1.0.4] - 2022-08-08
+### Changed
+- Complete rework of ardf_files to fully work with Forces Maps from Asylum AFM. Based on the following matlab code: https://ch.mathworks.com/matlabcentral/fileexchange/80212-ardf-to-matlab/?s_tid=LandingPageTabfx 
 ## [1.0.3] - 2021-09-07
 ### Added
 - Function core.print_tree added. Used to print the structure of a hdf5 file.
